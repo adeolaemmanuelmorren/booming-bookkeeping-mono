@@ -268,6 +268,9 @@ async function waitForIdentityManifest(
         config,
         fetcher,
       );
+      if (isIdentityManifestOutputIncomplete(manifest)) {
+        throw new IdentityManifestNotVisibleError(input.batchId);
+      }
       assertManifestMatchesEngine(manifest, engine);
       return manifest;
     } catch (error) {
@@ -275,6 +278,7 @@ async function waitForIdentityManifest(
     }
   }
 
+  if (finalError instanceof IdentityManifestNotVisibleError) throw finalError;
   if (isIdentityManifestMissingError(finalError)) {
     throw new IdentityManifestNotVisibleError(input.batchId);
   }
@@ -285,6 +289,13 @@ async function waitForIdentityManifest(
 export function isIdentityManifestMissingError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.message === "Tinybird identity compaction manifest query returned no rows.";
+}
+
+export function isIdentityManifestOutputIncomplete(
+  manifest: IdentityCompactionManifest,
+): boolean {
+  return !manifest.isValid
+    && manifest.actualOutputRowCount < manifest.expectedOutputRowCount;
 }
 
 function batchCheckpoint(

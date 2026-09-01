@@ -14,7 +14,10 @@ import {
   type PublicationCoordinator,
 } from "../src/publication-coordinator";
 import { IDENTITY_ENQUEUE_BATCHES } from "../src/copy-plan";
-import { IdentityManifestNotVisibleError } from "../src/identity-worker";
+import {
+  IdentityManifestNotVisibleError,
+  isIdentityManifestOutputIncomplete,
+} from "../src/identity-worker";
 import { IdentityActivationNotVisibleError } from "../src/tinybird-api";
 
 const tinybirdOrigin = "https://api.us-east.tinybird.co";
@@ -34,6 +37,29 @@ describe("publication coordinator", () => {
     const error = new IdentityManifestNotVisibleError("identity-batch-1");
 
     expect(isTransientUpstreamError(error)).toBe(true);
+  });
+
+  it("distinguishes delayed output chunks from a corrupt manifest", () => {
+    const manifest = {
+      tenantId: "boom",
+      batchVersion: 1,
+      batchId: "identity-batch-1",
+      inputEventCount: 1000,
+      inputHash: "b".repeat(64),
+      checkpointIngestedAt: "2026-08-26 12:34:59.123456",
+      checkpointEventId: "c".repeat(64),
+      expectedOutputRowCount: 4698,
+      expectedOutputHash: "d".repeat(64),
+      actualOutputRowCount: 3000,
+      actualOutputHash: "e".repeat(64),
+      isValid: false,
+    };
+
+    expect(isIdentityManifestOutputIncomplete(manifest)).toBe(true);
+    expect(isIdentityManifestOutputIncomplete({
+      ...manifest,
+      actualOutputRowCount: manifest.expectedOutputRowCount,
+    })).toBe(false);
   });
 
   it("treats delayed activation visibility as backpressure", () => {
@@ -991,6 +1017,81 @@ describe("publication coordinator", () => {
 
       const status = await instance.status();
       expect(status.identityPhase).toBe("validate");
+      expect(status.lastError).toBeNull();
+    });
+  });
+
+  it("recovers a now-valid partial-output batch without replacing its id", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("recover-partial-output-batch-test");
+    const generationId = "generation_partial_output";
+    const scheduledAt = "2026-08-26T12:34:00.000Z";
+    const batchVersion = new Date(scheduledAt).valueOf();
+    const batchId = `${generationId}_identity_${batchVersion}_engine1_limit1000`;
+
+    mockManifest({ batchId, batchVersion, inputEventCount: 1000 });
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedPreparedIdentityPhase(
+        state,
+        generationId,
+        "activate",
+        scheduledAt,
+        batchVersion,
+        batchId,
+      );
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET phase = 'failed', identity_phase = 'compute', last_error = ?
+          WHERE id = 1
+        `,
+        "Identity Worker manifest is invalid.",
+      );
+
+      const status = await instance.recoverFailed("retry_known_job_or_raw");
+
+      expect(status.phase).toBe("copying");
+      expect(status.identityBatch?.id).toBe(batchId);
+      expect(status.lastError).toContain("not visible yet for batch");
+    });
+  });
+
+  it("replaces a truly invalid identity batch id during recovery", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("recover-corrupt-output-batch-test");
+    const generationId = "generation_corrupt_output";
+    const scheduledAt = "2026-08-26T12:34:00.000Z";
+    const batchVersion = new Date(scheduledAt).valueOf();
+    const batchId = `${generationId}_identity_${batchVersion}_engine1_limit1000`;
+
+    mockManifest({
+      batchId,
+      batchVersion,
+      inputEventCount: 1000,
+      isValid: false,
+    });
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedPreparedIdentityPhase(
+        state,
+        generationId,
+        "activate",
+        scheduledAt,
+        batchVersion,
+        batchId,
+      );
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET phase = 'failed', identity_phase = 'compute', last_error = ?
+          WHERE id = 1
+        `,
+        "Identity Worker manifest is invalid.",
+      );
+
+      const status = await instance.recoverFailed("retry_known_job_or_raw");
+
+      expect(status.phase).toBe("copying");
+      expect(status.identityBatch?.id).toContain(`${batchId}_retry`);
       expect(status.lastError).toBeNull();
     });
   });

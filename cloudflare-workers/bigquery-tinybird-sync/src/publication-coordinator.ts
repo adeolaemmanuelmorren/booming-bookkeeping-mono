@@ -29,6 +29,7 @@ import {
   IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX,
   IdentityManifestNotVisibleError,
   isIdentityManifestMissingError,
+  isIdentityManifestOutputIncomplete,
   processIdentityWorkerBatch,
 } from "./identity-worker";
 import { recoveredIdentityBatchId } from "./identity-batch-recovery";
@@ -371,19 +372,41 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
       }
 
       let replacementBatchId: string | null = null;
+      let recoveryLastError: string | null = null;
       if (
         state.identity_phase === "compute"
         && state.last_error === "Identity Worker manifest is invalid."
         && state.identity_batch_id !== null
+        && state.identity_batch_version !== null
       ) {
-        replacementBatchId = recoveredIdentityBatchId(
-          state.identity_batch_id,
-          Date.now(),
-        );
+        try {
+          const manifest = await readIdentityCompactionManifest(
+            IDENTITY_TENANT_ID,
+            state.identity_batch_version,
+            state.identity_batch_id,
+            this.tinybirdConfig(),
+          );
+          if (manifest.isValid || isIdentityManifestOutputIncomplete(manifest)) {
+            recoveryLastError =
+              `${IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX}${state.identity_batch_id}.`;
+          } else {
+            replacementBatchId = recoveredIdentityBatchId(
+              state.identity_batch_id,
+              Date.now(),
+            );
+          }
+        } catch (error) {
+          if (!isIdentityManifestMissingError(error)) throw error;
+          recoveryLastError =
+            `${IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX}${state.identity_batch_id}.`;
+        }
       }
 
-      let recoveryLastError: string | null = null;
-      if (state.identity_batch_id !== null && replacementBatchId === null) {
+      if (
+        state.identity_batch_id !== null
+        && replacementBatchId === null
+        && recoveryLastError === null
+      ) {
         if (
           state.identity_phase === "compute"
           && state.last_error === LEGACY_MANIFEST_VISIBILITY_ERROR
@@ -1716,6 +1739,9 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
       throw error;
     }
 
+    if (isIdentityManifestOutputIncomplete(manifest)) {
+      throw new IdentityManifestNotVisibleError(batch.id);
+    }
     this.assertIdentityManifest(batch, manifest);
     this.updateState({
       identity_phase: "validate",
