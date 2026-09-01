@@ -1335,6 +1335,65 @@ describe("publication coordinator", () => {
     });
   });
 
+  it("translates a pre-deploy activation timeout into no-rewrite recovery", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("legacy-activation-recovery-test");
+    const generationId = "generation_legacy_activation";
+    const scheduledAt = "2026-08-26T12:34:00.000Z";
+    const batchVersion = new Date(scheduledAt).valueOf();
+    const batchId = `${generationId}_identity_${batchVersion}`;
+    const checkpointAt = "2026-08-26 12:34:59.123456";
+    const checkpointEventId = "c".repeat(64);
+    const outputHash = "d".repeat(64);
+    const manifest = {
+      tenantId: "boom",
+      batchVersion,
+      batchId,
+      inputEventCount: 1000,
+      inputHash: "b".repeat(64),
+      checkpointIngestedAt: checkpointAt,
+      checkpointEventId,
+      expectedOutputRowCount: 43,
+      expectedOutputHash: outputHash,
+      actualOutputRowCount: 43,
+      actualOutputHash: outputHash,
+      isValid: true,
+    };
+
+    mockCursor(batchVersion, checkpointAt, checkpointEventId, batchId);
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedPreparedIdentityPhase(
+        state,
+        generationId,
+        "activate",
+        scheduledAt,
+        batchVersion,
+        batchId,
+      );
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET phase = 'failed', identity_manifest_json = ?, last_error = ?
+          WHERE id = 1
+        `,
+        JSON.stringify(manifest),
+        "Identity activation was not visible before the retry deadline.",
+      );
+
+      const recovered = await instance.recoverFailed("retry_known_job_or_raw");
+      expect(recovered.phase).toBe("copying");
+      expect(recovered.lastError).toContain("not visible yet for batch");
+
+      await instance.alarm();
+      await state.storage.deleteAlarm();
+
+      const status = await instance.status();
+      expect(status.identityPhase).toBe("compute");
+      expect(status.identityBatch).toBeNull();
+      expect(status.lastError).toBeNull();
+    });
+  });
+
   it("skips activation cleanly when the bounded batch has no events", async () => {
     const stub = env.PUBLICATION_COORDINATOR.getByName("empty-identity-batch-test");
     const generationId = "generation_empty_identity";

@@ -42,6 +42,10 @@ const COORDINATOR_BACKPRESSURE_MS = 60_000;
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const IDENTITY_EPOCH = "1970-01-01 00:00:00";
 const IDENTITY_TENANT_ID = "boom";
+const LEGACY_MANIFEST_VISIBILITY_ERROR =
+  "Tinybird identity compaction manifest query returned no rows.";
+const LEGACY_ACTIVATION_VISIBILITY_ERROR =
+  "Identity activation was not visible before the retry deadline.";
 // Keep the graph working set comfortably below the Durable Object memory limit.
 // The coordinator keeps producing batches until the pending stream is empty.
 const IDENTITY_BATCH_LIMIT = 1_000;
@@ -378,9 +382,27 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
         );
       }
 
+      let recoveryLastError: string | null = null;
+      if (state.identity_batch_id !== null && replacementBatchId === null) {
+        if (
+          state.identity_phase === "compute"
+          && state.last_error === LEGACY_MANIFEST_VISIBILITY_ERROR
+        ) {
+          recoveryLastError =
+            `${IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX}${state.identity_batch_id}.`;
+        }
+        if (
+          state.identity_phase === "activate"
+          && state.last_error === LEGACY_ACTIVATION_VISIBILITY_ERROR
+        ) {
+          recoveryLastError =
+            `${IDENTITY_ACTIVATION_NOT_VISIBLE_PREFIX}${state.identity_batch_id}.`;
+        }
+      }
+
       this.updateState({
         phase: "copying",
-        last_error: null,
+        last_error: recoveryLastError,
         ...(replacementBatchId === null
           ? {}
           : {
