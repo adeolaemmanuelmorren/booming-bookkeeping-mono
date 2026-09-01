@@ -950,6 +950,44 @@ describe("publication coordinator", () => {
     });
   });
 
+  it("resumes a committed identity batch without writing it again", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("resume-committed-identity-batch-test");
+    const generationId = "generation_resume_committed";
+    const scheduledAt = "2026-08-26T12:34:00.000Z";
+    const batchVersion = new Date(scheduledAt).valueOf();
+    const batchId = `${generationId}_identity_${batchVersion}_engine1_limit1000`;
+
+    mockCursor(1, "1970-01-01 00:00:00.000000", zeroHash);
+    mockManifest({ batchId, batchVersion, inputEventCount: 1000 });
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedIdentityPhase(state, generationId, "compute", scheduledAt);
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET
+            identity_batch_version = ?,
+            identity_batch_id = ?,
+            identity_cursor_ingested_at = '1970-01-01 00:00:00.000000',
+            identity_cursor_event_id = ?,
+            last_error = ?
+          WHERE id = 1
+        `,
+        batchVersion,
+        batchId,
+        zeroHash,
+        `Tinybird identity compaction manifest is not visible yet for batch ${batchId}.`,
+      );
+
+      await instance.alarm();
+      await state.storage.deleteAlarm();
+
+      const status = await instance.status();
+      expect(status.identityPhase).toBe("validate");
+      expect(status.lastError).toBeNull();
+    });
+  });
+
   it("advances without rewriting a prepared batch that is already active", async () => {
     const stub = env.PUBLICATION_COORDINATOR.getByName("already-activated-worker-batch-test");
     const generationId = "generation_already_activated";

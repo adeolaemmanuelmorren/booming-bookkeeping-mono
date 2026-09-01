@@ -24,7 +24,9 @@ import {
   type TinybirdApiConfig,
 } from "./tinybird-api";
 import {
+  IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX,
   IdentityManifestNotVisibleError,
+  isIdentityManifestMissingError,
   processIdentityWorkerBatch,
 } from "./identity-worker";
 import { recoveredIdentityBatchId } from "./identity-batch-recovery";
@@ -1635,6 +1637,10 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
 
     const batch = this.preparedIdentityBatch(state);
     if (await this.skipAlreadyActivatedIdentityBatch(state, batch)) return;
+    if (state.last_error?.startsWith(IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX)) {
+      await this.resumeCommittedIdentityBatch(state, batch);
+      return;
+    }
 
     const result = await processIdentityWorkerBatch({
       tenantId: IDENTITY_TENANT_ID,
@@ -1651,6 +1657,7 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
     this.updateState({
       identity_phase: "validate",
       identity_manifest_json: JSON.stringify(result.manifest),
+      last_error: null,
       journey_profile_ids_json: "[]",
       journey_profile_index: 0,
       journey_conversion_ids_json: "[]",
@@ -1662,6 +1669,39 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
       batchVersion: batch.version,
       inputEventCount: result.manifest.inputEventCount,
       outputRowCount: result.manifest.actualOutputRowCount,
+    });
+    await this.ensureAlarm();
+  }
+
+  private async resumeCommittedIdentityBatch(
+    state: CoordinatorState,
+    batch: PreparedIdentityBatch,
+  ): Promise<void> {
+    let manifest: IdentityCompactionManifest;
+    try {
+      manifest = await readIdentityCompactionManifest(
+        IDENTITY_TENANT_ID,
+        batch.version,
+        batch.id,
+        this.tinybirdConfig(),
+      );
+    } catch (error) {
+      if (isIdentityManifestMissingError(error)) {
+        throw new IdentityManifestNotVisibleError(batch.id);
+      }
+      throw error;
+    }
+
+    this.assertIdentityManifest(batch, manifest);
+    this.updateState({
+      identity_phase: "validate",
+      identity_manifest_json: JSON.stringify(manifest),
+      last_error: null,
+    });
+    logEvent("identity_batch_commit_resumed", {
+      generationId: state.active_raw_generation,
+      batchId: batch.id,
+      batchVersion: batch.version,
     });
     await this.ensureAlarm();
   }

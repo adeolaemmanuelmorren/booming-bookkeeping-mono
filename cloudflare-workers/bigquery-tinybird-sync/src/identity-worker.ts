@@ -36,9 +36,12 @@ export interface IdentityWorkerBatchResult {
   journeyConversionIds: string[];
 }
 
+export const IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX =
+  "Tinybird identity compaction manifest is not visible yet for batch ";
+
 export class IdentityManifestNotVisibleError extends Error {
   constructor(batchId: string) {
-    super(`Tinybird identity compaction manifest is not visible yet for batch ${batchId}.`);
+    super(`${IDENTITY_MANIFEST_NOT_VISIBLE_PREFIX}${batchId}.`);
     this.name = "IdentityManifestNotVisibleError";
   }
 }
@@ -272,14 +275,14 @@ async function waitForIdentityManifest(
     }
   }
 
-  if (isMissingManifestError(finalError)) {
+  if (isIdentityManifestMissingError(finalError)) {
     throw new IdentityManifestNotVisibleError(input.batchId);
   }
 
   throw finalError;
 }
 
-function isMissingManifestError(error: unknown): boolean {
+export function isIdentityManifestMissingError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return error.message === "Tinybird identity compaction manifest query returned no rows.";
 }
