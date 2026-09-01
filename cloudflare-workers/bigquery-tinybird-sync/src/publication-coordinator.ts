@@ -19,6 +19,7 @@ import {
   readIdentityCompactionManifest,
   readSourceIdentityFacts,
   submitCopyJob,
+  TinybirdRequestError,
   type IdentityCompactionManifest,
   type TinybirdApiConfig,
 } from "./tinybird-api";
@@ -30,6 +31,7 @@ const RAW_RUN_MAX_ATTEMPTS = 3;
 const RAW_RUN_LEASE_MS = 5 * 60_000;
 const REQUIRED_IDLE_INGESTION_POLLS = 2;
 const MIN_ALARM_DELAY_MS = 100;
+const COORDINATOR_BACKPRESSURE_MS = 60_000;
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const IDENTITY_EPOCH = "1970-01-01 00:00:00";
 const IDENTITY_TENANT_ID = "boom";
@@ -730,8 +732,30 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
           return;
       }
     } catch (error) {
-      this.failCoordinator(errorMessage(error));
+      await this.handleAlarmError(error);
     }
+  }
+
+  // Rate limits, upstream 5xx responses, and timeouts are backpressure, not
+  // failure: every phase resumes from durable checkpoints, so the safe move
+  // is to wait and retry. Terminal `failed` is reserved for correctness
+  // errors that need a human.
+  private async handleAlarmError(error: unknown): Promise<void> {
+    const message = errorMessage(error);
+    if (!isTransientUpstreamError(error)) {
+      this.failCoordinator(message);
+      return;
+    }
+
+    const delayMs = error instanceof TinybirdRequestError
+      ? error.retryAfterMs ?? COORDINATOR_BACKPRESSURE_MS
+      : COORDINATOR_BACKPRESSURE_MS;
+    this.updateState({ last_error: message.slice(0, 2_000) });
+    logEvent("coordinator_backpressure", {
+      message: message.slice(0, 500),
+      delayMs,
+    });
+    await this.ensureAlarm(delayMs);
   }
 
   private async migrate(): Promise<void> {
@@ -2841,6 +2865,13 @@ function positiveInteger(value: string, name: string): number {
 function requireValue(value: string, name: string): void {
   if (typeof value === "string" && value.trim()) return;
   throw new Error(`${name} is required.`);
+}
+
+function isTransientUpstreamError(error: unknown): boolean {
+  if (error instanceof TinybirdRequestError) {
+    return error.status === 429 || error.status >= 500;
+  }
+  return error instanceof DOMException && error.name === "TimeoutError";
 }
 
 function errorMessage(error: unknown): string {

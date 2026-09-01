@@ -210,6 +210,43 @@ describe("publication coordinator", () => {
     });
   });
 
+  it("treats an upstream 502 during identity enqueue as backpressure", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("identity-enqueue-backpressure-test");
+    const generationId = "generation_identity_backpressure";
+
+    fetchMock.get(tinybirdOrigin)
+      .intercept({
+        method: "GET",
+        path: (path) => path.startsWith("/v0/pipes/identity_worker_source_facts.json"),
+      })
+      .reply(502, "upstream error", { headers: { "Retry-After": "30" } });
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedAwaitingPublication(
+        state,
+        generationId,
+        "2026-08-31T15:00:00.000Z",
+      );
+
+      await instance.configureBootstrap("run");
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET publication_section = 'identity', identity_phase = 'enqueue'
+          WHERE id = 1
+        `,
+      );
+      await instance.alarm();
+
+      const status = await instance.status();
+      expect(status.phase).not.toBe("failed");
+      expect(status.identityPhase).toBe("enqueue");
+      expect(status.lastError).toContain("502");
+      expect(await state.storage.getAlarm()).not.toBeNull();
+      await state.storage.deleteAlarm();
+    });
+  });
+
   it("keeps the generation overlap cutoff for recurring identity enqueue", async () => {
     const stub = env.PUBLICATION_COORDINATOR.getByName("recurring-identity-cutoff-test");
     const generationId = "generation_recurring_identity_cutoff";
