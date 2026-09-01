@@ -15,6 +15,7 @@ import {
 } from "../src/publication-coordinator";
 import { IDENTITY_ENQUEUE_BATCHES } from "../src/copy-plan";
 import { IdentityManifestNotVisibleError } from "../src/identity-worker";
+import { IdentityActivationNotVisibleError } from "../src/tinybird-api";
 
 const tinybirdOrigin = "https://api.us-east.tinybird.co";
 const zeroHash = "0".repeat(64);
@@ -31,6 +32,12 @@ afterEach(() => {
 describe("publication coordinator", () => {
   it("treats delayed manifest visibility as backpressure", () => {
     const error = new IdentityManifestNotVisibleError("identity-batch-1");
+
+    expect(isTransientUpstreamError(error)).toBe(true);
+  });
+
+  it("treats delayed activation visibility as backpressure", () => {
+    const error = new IdentityActivationNotVisibleError("identity-batch-1");
 
     expect(isTransientUpstreamError(error)).toBe(true);
   });
@@ -1270,6 +1277,61 @@ describe("publication coordinator", () => {
       expect(status.phase).toBe("failed");
       expect(status.identityPhase).toBe("validate");
       expect(status.lastError).toContain("failed validation");
+    });
+  });
+
+  it("resumes a visible activation without appending it again", async () => {
+    const stub = env.PUBLICATION_COORDINATOR.getByName("resume-visible-activation-test");
+    const generationId = "generation_resume_activation";
+    const scheduledAt = "2026-08-26T12:34:00.000Z";
+    const batchVersion = new Date(scheduledAt).valueOf();
+    const batchId = `${generationId}_identity_${batchVersion}`;
+    const checkpointAt = "2026-08-26 12:34:59.123456";
+    const checkpointEventId = "c".repeat(64);
+    const outputHash = "d".repeat(64);
+    const manifest = {
+      tenantId: "boom",
+      batchVersion,
+      batchId,
+      inputEventCount: 1000,
+      inputHash: "b".repeat(64),
+      checkpointIngestedAt: checkpointAt,
+      checkpointEventId,
+      expectedOutputRowCount: 43,
+      expectedOutputHash: outputHash,
+      actualOutputRowCount: 43,
+      actualOutputHash: outputHash,
+      isValid: true,
+    };
+
+    mockCursor(batchVersion, checkpointAt, checkpointEventId, batchId);
+
+    await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
+      seedPreparedIdentityPhase(
+        state,
+        generationId,
+        "activate",
+        scheduledAt,
+        batchVersion,
+        batchId,
+      );
+      state.storage.sql.exec(
+        `
+          UPDATE coordinator_state
+          SET identity_manifest_json = ?, last_error = ?
+          WHERE id = 1
+        `,
+        JSON.stringify(manifest),
+        `Identity activation is not visible yet for batch ${batchId}.`,
+      );
+
+      await instance.alarm();
+      await state.storage.deleteAlarm();
+
+      const status = await instance.status();
+      expect(status.identityPhase).toBe("compute");
+      expect(status.identityBatch).toBeNull();
+      expect(status.lastError).toBeNull();
     });
   });
 

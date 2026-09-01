@@ -14,6 +14,8 @@ import {
   appendIdentityActivation,
   countActiveIngestionJobs,
   getCopyJob,
+  IDENTITY_ACTIVATION_NOT_VISIBLE_PREFIX,
+  IdentityActivationNotVisibleError,
   readCurrentIdentityFacts,
   readIdentityCompactionCursor,
   readIdentityCompactionManifest,
@@ -1804,10 +1806,45 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
     const manifest = parseIdentityManifest(state.identity_manifest_json);
     this.assertIdentityManifest(batch, manifest);
 
+    if (state.last_error?.startsWith(IDENTITY_ACTIVATION_NOT_VISIBLE_PREFIX)) {
+      await this.resumeIdentityActivation(state, batch, manifest);
+      return;
+    }
+
     await appendIdentityActivation(
       { tenantId: IDENTITY_TENANT_ID, manifest },
       this.tinybirdConfig(),
     );
+    await this.completeIdentityActivation(state, batch, manifest);
+  }
+
+  private async resumeIdentityActivation(
+    state: CoordinatorState,
+    batch: PreparedIdentityBatch,
+    manifest: IdentityCompactionManifest,
+  ): Promise<void> {
+    const cursor = await readIdentityCompactionCursor(
+      IDENTITY_TENANT_ID,
+      this.tinybirdConfig(),
+    );
+    if (
+      cursor.activeBatchVersion === batch.version
+      && cursor.activeBatchId === batch.id
+    ) {
+      await this.completeIdentityActivation(state, batch, manifest);
+      return;
+    }
+    if (cursor.activeBatchVersion < batch.version) {
+      throw new IdentityActivationNotVisibleError(batch.id);
+    }
+    throw new Error("A different identity batch became active during activation.");
+  }
+
+  private async completeIdentityActivation(
+    state: CoordinatorState,
+    batch: PreparedIdentityBatch,
+    manifest: IdentityCompactionManifest,
+  ): Promise<void> {
     logEvent("identity_batch_activated", {
       generationId: state.active_raw_generation,
       batchId: batch.id,
@@ -1847,6 +1884,7 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
       journey_profile_index: 0,
       journey_conversion_ids_json: "[]",
       journey_conversion_index: 0,
+      last_error: null,
     });
   }
 
@@ -2912,6 +2950,7 @@ function requireValue(value: string, name: string): void {
 
 export function isTransientUpstreamError(error: unknown): boolean {
   if (error instanceof IdentityManifestNotVisibleError) return true;
+  if (error instanceof IdentityActivationNotVisibleError) return true;
   if (error instanceof TinybirdRequestError) {
     return error.status === 429 || error.status >= 500;
   }

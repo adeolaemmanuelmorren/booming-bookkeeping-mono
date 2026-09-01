@@ -27,6 +27,16 @@ export class TinybirdRequestError extends Error {
   }
 }
 
+export const IDENTITY_ACTIVATION_NOT_VISIBLE_PREFIX =
+  "Identity activation is not visible yet for batch ";
+
+export class IdentityActivationNotVisibleError extends Error {
+  constructor(batchId: string) {
+    super(`${IDENTITY_ACTIVATION_NOT_VISIBLE_PREFIX}${batchId}.`);
+    this.name = "IdentityActivationNotVisibleError";
+  }
+}
+
 export interface PendingJourneyBatch {
   tenantId: string;
   batchVersion: number;
@@ -323,7 +333,7 @@ async function waitForIdentityActivation(
     throw new Error("A newer identity batch became active during activation.");
   }
 
-  throw new Error("Identity activation was not visible before the retry deadline.");
+  throw new IdentityActivationNotVisibleError(input.manifest.batchId);
 }
 
 export async function readPendingIdentityFacts(
