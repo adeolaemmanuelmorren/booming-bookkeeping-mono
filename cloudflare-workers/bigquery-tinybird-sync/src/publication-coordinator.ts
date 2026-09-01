@@ -23,7 +23,10 @@ import {
   type IdentityCompactionManifest,
   type TinybirdApiConfig,
 } from "./tinybird-api";
-import { processIdentityWorkerBatch } from "./identity-worker";
+import {
+  IdentityManifestNotVisibleError,
+  processIdentityWorkerBatch,
+} from "./identity-worker";
 import { recoveredIdentityBatchId } from "./identity-batch-recovery";
 
 const RAW_SLOT_COUNT = SHARD_COUNT;
@@ -2867,7 +2870,8 @@ function requireValue(value: string, name: string): void {
   throw new Error(`${name} is required.`);
 }
 
-function isTransientUpstreamError(error: unknown): boolean {
+export function isTransientUpstreamError(error: unknown): boolean {
+  if (error instanceof IdentityManifestNotVisibleError) return true;
   if (error instanceof TinybirdRequestError) {
     return error.status === 429 || error.status >= 500;
   }

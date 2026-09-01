@@ -36,6 +36,13 @@ export interface IdentityWorkerBatchResult {
   journeyConversionIds: string[];
 }
 
+export class IdentityManifestNotVisibleError extends Error {
+  constructor(batchId: string) {
+    super(`Tinybird identity compaction manifest is not visible yet for batch ${batchId}.`);
+    this.name = "IdentityManifestNotVisibleError";
+  }
+}
+
 export async function processIdentityWorkerBatch(
   input: IdentityWorkerBatchInput,
   config: TinybirdApiConfig,
@@ -265,7 +272,16 @@ async function waitForIdentityManifest(
     }
   }
 
+  if (isMissingManifestError(finalError)) {
+    throw new IdentityManifestNotVisibleError(input.batchId);
+  }
+
   throw finalError;
+}
+
+function isMissingManifestError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return error.message === "Tinybird identity compaction manifest query returned no rows.";
 }
 
 function batchCheckpoint(

@@ -8,11 +8,13 @@ import {
   applyWorkerIdentityCursorResetMigration,
   applyBootstrapIdentityCutoffMigration,
   bootstrapIdentityCutoffMigrationValue,
+  isTransientUpstreamError,
   shouldEnqueueSourceFact,
   validateTinybirdDateTime,
   type PublicationCoordinator,
 } from "../src/publication-coordinator";
 import { IDENTITY_ENQUEUE_BATCHES } from "../src/copy-plan";
+import { IdentityManifestNotVisibleError } from "../src/identity-worker";
 
 const tinybirdOrigin = "https://api.us-east.tinybird.co";
 const zeroHash = "0".repeat(64);
@@ -27,6 +29,12 @@ afterEach(() => {
 });
 
 describe("publication coordinator", () => {
+  it("treats delayed manifest visibility as backpressure", () => {
+    const error = new IdentityManifestNotVisibleError("identity-batch-1");
+
+    expect(isTransientUpstreamError(error)).toBe(true);
+  });
+
   it("skips source-version churn when identity semantics are unchanged", () => {
     const stable = {
       factKind: "identity_observation",
