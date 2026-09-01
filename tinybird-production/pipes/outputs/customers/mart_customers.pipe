@@ -1,0 +1,54 @@
+DESCRIPTION >
+    Resolved customer profiles with form and payment activity across Boom sources.
+
+NODE customer_payment_rollup
+SQL >
+    SELECT
+        profile_id,
+        count() AS successful_payment_count,
+        countIf(is_repeat_payment = 0) AS initial_or_one_time_payment_count,
+        min(payment_time) AS first_payment_at,
+        max(payment_time) AS last_payment_at,
+        sum(net_amount) AS lifetime_net_revenue
+    FROM mart_payments
+    WHERE profile_id IS NOT NULL
+    GROUP BY profile_id
+
+NODE customer_form_rollup
+SQL >
+    SELECT
+        profile_id,
+        count() AS server_form_submission_count,
+        min(submitted_at) AS first_server_form_at,
+        max(submitted_at) AS last_server_form_at
+    FROM mart_form_submissions_server_side
+    WHERE profile_id IS NOT NULL
+    GROUP BY profile_id
+
+NODE customer_rows
+SQL >
+    SELECT
+        profiles.profile_id AS profile_id,
+        profiles.profile_key AS profile_key,
+        profiles.anonymous_ids AS anonymous_ids,
+        profiles.user_ids AS user_ids,
+        profiles.emails AS emails,
+        profiles.phones AS phones,
+        nullIf(profiles.first_name, '') AS first_name,
+        nullIf(profiles.last_name, '') AS last_name,
+        profiles.first_seen_at AS first_seen_at,
+        profiles.last_seen_at AS last_seen_at,
+        ifNull(forms.server_form_submission_count, toUInt64(0)) AS server_form_submissions,
+        forms.first_server_form_at AS first_server_form_at,
+        forms.last_server_form_at AS last_server_form_at,
+        ifNull(payment_rollup.successful_payment_count, toUInt64(0)) AS successful_payments,
+        ifNull(
+            payment_rollup.initial_or_one_time_payment_count, toUInt64(0)
+        ) AS initial_or_one_time_payments,
+        payment_rollup.first_payment_at AS first_payment_at,
+        payment_rollup.last_payment_at AS last_payment_at,
+        ifNull(payment_rollup.lifetime_net_revenue, toDecimal128(0, 9)) AS lifetime_net_revenue
+    FROM reporting_current_identity_profiles_direct AS profiles
+    LEFT JOIN
+        customer_payment_rollup AS payment_rollup ON profiles.profile_id = payment_rollup.profile_id
+    LEFT JOIN customer_form_rollup AS forms ON profiles.profile_id = forms.profile_id

@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Retry-safe preparation rows for one identity compaction batch. Rows are immutable,
+    batch-keyed, and never visible to identity readers.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `stage_kind` LowCardinality(String) `json:$.stage_kind`,
+    `stage_key` String `json:$.stage_key`,
+    `staged_at` DateTime64(6) `json:$.staged_at`,
+    `stage_hash` FixedString(64) `json:$.stage_hash`,
+    `input_event_count` UInt64 `json:$.input_event_count`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `checkpoint_ingested_at` DateTime64(6) `json:$.checkpoint_ingested_at`,
+    `checkpoint_event_id` FixedString(64) `json:$.checkpoint_event_id`,
+    `active_batch_version` UInt64 `json:$.active_batch_version`,
+    `active_batch_id` String `json:$.active_batch_id`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_deleted` UInt8 `json:$.fact_deleted`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`,
+    `evidence_keys` Array(String) `json:$.evidence_keys[:]`,
+    `stable_is_deleted` UInt8 `json:$.stable_is_deleted`,
+    `stable_fact_deleted` UInt8 `json:$.stable_fact_deleted`,
+    `stable_fact_observed_at` DateTime64(6) `json:$.stable_fact_observed_at`,
+    `stable_evidence_keys` Array(String) `json:$.stable_evidence_keys[:]`,
+    `prior_profile_id` String `json:$.prior_profile_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, stage_kind, stage_key, staged_at, stage_hash

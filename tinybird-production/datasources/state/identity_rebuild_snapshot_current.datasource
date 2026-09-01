@@ -1,0 +1,14 @@
+DESCRIPTION >
+    One-row manifest for the current frozen shadow rebuild. Keeping metadata separate from
+    fact rows makes an exact rebuild of an empty source universe representable.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `rebuild_id` FixedString(64) `json:$.rebuild_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `snapshot_at` DateTime64(6) `json:$.snapshot_at`,
+    `input_event_count` UInt64 `json:$.input_event_count`,
+    `input_hash` FixedString(64) `json:$.input_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, rebuild_id

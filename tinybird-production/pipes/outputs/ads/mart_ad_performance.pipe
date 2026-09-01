@@ -1,0 +1,7 @@
+DESCRIPTION >
+    Shallow current reader for the exact 19-column daily ad-performance mart.
+
+NODE current_daily_ad_performance_rows
+SQL >
+    SELECT * EXCEPT (__tb_sort_campaign_id, __tb_sort_adset_id)
+    FROM mart_ad_performance_current

@@ -1,0 +1,712 @@
+DESCRIPTION >
+    Hourly Meta delivery joined to warehouse-attributed conversions at the exact ad-hour grain.
+
+NODE hourly_meta_ad_delivery_rollup
+SQL >
+    SELECT
+        CAST(assumeNotNull(hour_start), 'DateTime64(6)') AS hour_start,
+        date,
+        source AS ad_source,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any (campaign_name) AS campaign_name,
+        any (adset_name) AS adset_name,
+        any (ad_name) AS ad_name,
+        any (currency) AS currency,
+        sum(impressions) AS impressions,
+        sum(clicks) AS clicks,
+        sum(spend) AS spend,
+        toUInt8(1) AS has_ad_row
+    FROM model_mart_ad_performance_hourly
+    GROUP BY hour_start, date, ad_source, campaign_id, adset_id, ad_id
+
+NODE hourly_paid_conversion_rollup
+SQL >
+    SELECT
+        CAST(
+            toStartOfHour(
+                assumeNotNull(coalesce(session_start_timestamp, conversion_time)), 'America/Los_Angeles'
+            ),
+            'DateTime64(6)'
+        ) AS hour_start,
+        toDate(
+            assumeNotNull(coalesce(session_start_timestamp, conversion_time)), 'America/Los_Angeles'
+        ) AS date,
+        source AS conversion_source,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any (campaign_name) AS campaign_name,
+        any (adset_name) AS adset_name,
+        any (ad_name) AS ad_name,
+        sum(
+            form_submissions_server_side * paid_multi_touch_weight
+        ) AS conversion_form_submissions_server_side_mt,
+        sum(
+            form_submissions_server_side * paid_first_touch_weight
+        ) AS conversion_form_submissions_server_side_ft,
+        sum(
+            form_submissions_server_side * paid_last_touch_weight
+        ) AS conversion_form_submissions_server_side_lt,
+        sum(
+            krc_registrations_server_side * paid_multi_touch_weight
+        ) AS conversion_krc_registrations_server_side_mt,
+        sum(
+            krc_registrations_server_side * paid_first_touch_weight
+        ) AS conversion_krc_registrations_server_side_ft,
+        sum(
+            krc_registrations_server_side * paid_last_touch_weight
+        ) AS conversion_krc_registrations_server_side_lt,
+        sum(
+            form_submissions_client_side * paid_multi_touch_weight
+        ) AS conversion_form_submissions_client_side_mt,
+        sum(
+            form_submissions_client_side * paid_first_touch_weight
+        ) AS conversion_form_submissions_client_side_ft,
+        sum(
+            form_submissions_client_side * paid_last_touch_weight
+        ) AS conversion_form_submissions_client_side_lt,
+        sum(
+            order_completed_server_side * paid_multi_touch_weight
+        ) AS conversion_order_completed_server_side_mt,
+        sum(
+            order_completed_server_side * paid_first_touch_weight
+        ) AS conversion_order_completed_server_side_ft,
+        sum(
+            order_completed_server_side * paid_last_touch_weight
+        ) AS conversion_order_completed_server_side_lt,
+        sum(
+            order_completed_client_side * paid_multi_touch_weight
+        ) AS conversion_order_completed_client_side_mt,
+        sum(
+            order_completed_client_side * paid_first_touch_weight
+        ) AS conversion_order_completed_client_side_ft,
+        sum(
+            order_completed_client_side * paid_last_touch_weight
+        ) AS conversion_order_completed_client_side_lt,
+        sum(payments_server_side * paid_multi_touch_weight) AS conversion_payments_server_side_mt,
+        sum(payments_server_side * paid_first_touch_weight) AS conversion_payments_server_side_ft,
+        sum(payments_server_side * paid_last_touch_weight) AS conversion_payments_server_side_lt,
+        sum(payments_client_side * paid_multi_touch_weight) AS conversion_payments_client_side_mt,
+        sum(payments_client_side * paid_first_touch_weight) AS conversion_payments_client_side_ft,
+        sum(payments_client_side * paid_last_touch_weight) AS conversion_payments_client_side_lt,
+        sum(revenue_server_side * paid_multi_touch_weight) AS conversion_revenue_server_side_mt,
+        sum(revenue_server_side * paid_first_touch_weight) AS conversion_revenue_server_side_ft,
+        sum(revenue_server_side * paid_last_touch_weight) AS conversion_revenue_server_side_lt,
+        sum(revenue_client_side * paid_multi_touch_weight) AS conversion_revenue_client_side_mt,
+        sum(revenue_client_side * paid_first_touch_weight) AS conversion_revenue_client_side_ft,
+        sum(revenue_client_side * paid_last_touch_weight) AS conversion_revenue_client_side_lt,
+        sum(customers_server_side * paid_multi_touch_weight) AS conversion_customers_server_side_mt,
+        sum(customers_server_side * paid_first_touch_weight) AS conversion_customers_server_side_ft,
+        sum(customers_server_side * paid_last_touch_weight) AS conversion_customers_server_side_lt,
+        sum(bbb_buyers_server_side * paid_multi_touch_weight) AS conversion_bbb_buyers_server_side_mt,
+        sum(bbb_buyers_server_side * paid_first_touch_weight) AS conversion_bbb_buyers_server_side_ft,
+        sum(bbb_buyers_server_side * paid_last_touch_weight) AS conversion_bbb_buyers_server_side_lt,
+        sum(bbb_revenue_server_side * paid_multi_touch_weight) AS conversion_bbb_revenue_server_side_mt,
+        sum(bbb_revenue_server_side * paid_first_touch_weight) AS conversion_bbb_revenue_server_side_ft,
+        sum(bbb_revenue_server_side * paid_last_touch_weight) AS conversion_bbb_revenue_server_side_lt,
+        sum(
+            payments_vip_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_vip_server_side_mt,
+        sum(
+            payments_vip_server_side * paid_first_touch_weight
+        ) AS conversion_payments_vip_server_side_ft,
+        sum(
+            payments_vip_server_side * paid_last_touch_weight
+        ) AS conversion_payments_vip_server_side_lt,
+        sum(
+            payments_book_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_book_server_side_mt,
+        sum(
+            payments_book_server_side * paid_first_touch_weight
+        ) AS conversion_payments_book_server_side_ft,
+        sum(
+            payments_book_server_side * paid_last_touch_weight
+        ) AS conversion_payments_book_server_side_lt,
+        sum(
+            payments_mentorship_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_mentorship_server_side_mt,
+        sum(
+            payments_mentorship_server_side * paid_first_touch_weight
+        ) AS conversion_payments_mentorship_server_side_ft,
+        sum(
+            payments_mentorship_server_side * paid_last_touch_weight
+        ) AS conversion_payments_mentorship_server_side_lt,
+        sum(
+            payments_kajabi_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_kajabi_server_side_mt,
+        sum(
+            payments_kajabi_server_side * paid_first_touch_weight
+        ) AS conversion_payments_kajabi_server_side_ft,
+        sum(
+            payments_kajabi_server_side * paid_last_touch_weight
+        ) AS conversion_payments_kajabi_server_side_lt,
+        sum(
+            payments_catalog_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_catalog_server_side_mt,
+        sum(
+            payments_catalog_server_side * paid_first_touch_weight
+        ) AS conversion_payments_catalog_server_side_ft,
+        sum(
+            payments_catalog_server_side * paid_last_touch_weight
+        ) AS conversion_payments_catalog_server_side_lt,
+        sum(
+            payments_unknown_server_side * paid_multi_touch_weight
+        ) AS conversion_payments_unknown_server_side_mt,
+        sum(
+            payments_unknown_server_side * paid_first_touch_weight
+        ) AS conversion_payments_unknown_server_side_ft,
+        sum(
+            payments_unknown_server_side * paid_last_touch_weight
+        ) AS conversion_payments_unknown_server_side_lt,
+        sum(revenue_vip_server_side * paid_multi_touch_weight) AS conversion_revenue_vip_server_side_mt,
+        sum(revenue_vip_server_side * paid_first_touch_weight) AS conversion_revenue_vip_server_side_ft,
+        sum(revenue_vip_server_side * paid_last_touch_weight) AS conversion_revenue_vip_server_side_lt,
+        sum(
+            revenue_book_server_side * paid_multi_touch_weight
+        ) AS conversion_revenue_book_server_side_mt,
+        sum(
+            revenue_book_server_side * paid_first_touch_weight
+        ) AS conversion_revenue_book_server_side_ft,
+        sum(
+            revenue_book_server_side * paid_last_touch_weight
+        ) AS conversion_revenue_book_server_side_lt,
+        sum(
+            revenue_mentorship_server_side * paid_multi_touch_weight
+        ) AS conversion_revenue_mentorship_server_side_mt,
+        sum(
+            revenue_mentorship_server_side * paid_first_touch_weight
+        ) AS conversion_revenue_mentorship_server_side_ft,
+        sum(
+            revenue_mentorship_server_side * paid_last_touch_weight
+        ) AS conversion_revenue_mentorship_server_side_lt,
+        sum(
+            revenue_kajabi_server_side * paid_multi_touch_weight
+        ) AS conversion_revenue_kajabi_server_side_mt,
+        sum(
+            revenue_kajabi_server_side * paid_first_touch_weight
+        ) AS conversion_revenue_kajabi_server_side_ft,
+        sum(
+            revenue_kajabi_server_side * paid_last_touch_weight
+        ) AS conversion_revenue_kajabi_server_side_lt,
+        sum(
+            revenue_catalog_server_side * paid_multi_touch_weight
+        ) AS conversion_revenue_catalog_server_side_mt,
+        sum(
+            revenue_catalog_server_side * paid_first_touch_weight
+        ) AS conversion_revenue_catalog_server_side_ft,
+        sum(
+            revenue_catalog_server_side * paid_last_touch_weight
+        ) AS conversion_revenue_catalog_server_side_lt,
+        sum(
+            revenue_unknown_server_side * paid_multi_touch_weight
+        ) AS conversion_revenue_unknown_server_side_mt,
+        sum(
+            revenue_unknown_server_side * paid_first_touch_weight
+        ) AS conversion_revenue_unknown_server_side_ft,
+        sum(
+            revenue_unknown_server_side * paid_last_touch_weight
+        ) AS conversion_revenue_unknown_server_side_lt,
+        toUInt8(1) AS has_conversion_row
+    FROM mart_conversions_with_touchpoints
+    WHERE source = 'meta' AND medium IN ('cpc', 'paid', 'paid_social')
+    GROUP BY hour_start, date, conversion_source, campaign_id, adset_id, ad_id
+
+NODE mart_conversions_ad_performance_hourly_rows
+SQL >
+    SELECT
+        if(ad_rows.has_ad_row = 1, ad_rows.hour_start, conversion_rows.hour_start) AS hour_start,
+        if(ad_rows.has_ad_row = 1, ad_rows.date, conversion_rows.date) AS date,
+        if(ad_rows.has_ad_row = 1, ad_rows.ad_source, conversion_rows.conversion_source) AS source,
+        if(ad_rows.has_ad_row = 1, ad_rows.campaign_id, conversion_rows.campaign_id) AS campaign_id,
+        if(ad_rows.has_ad_row = 1, ad_rows.adset_id, conversion_rows.adset_id) AS adset_id,
+        if(ad_rows.has_ad_row = 1, ad_rows.ad_id, conversion_rows.ad_id) AS ad_id,
+        coalesce(
+            if(ad_rows.has_ad_row = 1, ad_rows.campaign_name, CAST(NULL AS Nullable(String))),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                conversion_rows.campaign_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'unknown'
+        ) AS campaign_name,
+        coalesce(
+            if(ad_rows.has_ad_row = 1, ad_rows.adset_name, CAST(NULL AS Nullable(String))),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                conversion_rows.adset_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'unknown'
+        ) AS adset_name,
+        coalesce(
+            if(ad_rows.has_ad_row = 1, ad_rows.ad_name, CAST(NULL AS Nullable(String))),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                conversion_rows.ad_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'unknown'
+        ) AS ad_name,
+        'cpc' AS medium,
+        coalesce(
+            if(ad_rows.has_ad_row = 1, ad_rows.adset_name, CAST(NULL AS Nullable(String))),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                conversion_rows.adset_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'unknown'
+        ) AS secondary_drill_down,
+        coalesce(
+            if(ad_rows.has_ad_row = 1, ad_rows.ad_name, CAST(NULL AS Nullable(String))),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                conversion_rows.ad_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'unknown'
+        ) AS tertiary_drill_down,
+        if(ad_rows.has_ad_row = 1, coalesce(ad_rows.currency, 'USD'), 'USD') AS currency,
+        if(ad_rows.has_ad_row = 1, coalesce(ad_rows.impressions, 0), 0) AS impressions,
+        if(ad_rows.has_ad_row = 1, coalesce(ad_rows.clicks, 0), 0) AS clicks,
+        if(ad_rows.has_ad_row = 1, coalesce(ad_rows.spend, 0), 0) AS spend,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_server_side_mt, 0),
+            0
+        ) AS form_submissions_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_server_side_ft, 0),
+            0
+        ) AS form_submissions_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_server_side_lt, 0),
+            0
+        ) AS form_submissions_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_krc_registrations_server_side_mt, 0),
+            0
+        ) AS krc_registrations_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_krc_registrations_server_side_ft, 0),
+            0
+        ) AS krc_registrations_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_krc_registrations_server_side_lt, 0),
+            0
+        ) AS krc_registrations_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_client_side_mt, 0),
+            0
+        ) AS form_submissions_client_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_client_side_ft, 0),
+            0
+        ) AS form_submissions_client_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_form_submissions_client_side_lt, 0),
+            0
+        ) AS form_submissions_client_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_server_side_mt, 0),
+            0
+        ) AS order_completed_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_server_side_ft, 0),
+            0
+        ) AS order_completed_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_server_side_lt, 0),
+            0
+        ) AS order_completed_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_client_side_mt, 0),
+            0
+        ) AS order_completed_client_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_client_side_ft, 0),
+            0
+        ) AS order_completed_client_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_order_completed_client_side_lt, 0),
+            0
+        ) AS order_completed_client_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_server_side_mt, 0),
+            0
+        ) AS payments_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_server_side_ft, 0),
+            0
+        ) AS payments_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_server_side_lt, 0),
+            0
+        ) AS payments_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_client_side_mt, 0),
+            0
+        ) AS payments_client_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_client_side_ft, 0),
+            0
+        ) AS payments_client_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_client_side_lt, 0),
+            0
+        ) AS payments_client_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_server_side_mt, 0),
+            0
+        ) AS revenue_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_server_side_ft, 0),
+            0
+        ) AS revenue_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_server_side_lt, 0),
+            0
+        ) AS revenue_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_client_side_mt, 0),
+            0
+        ) AS revenue_client_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_client_side_ft, 0),
+            0
+        ) AS revenue_client_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_client_side_lt, 0),
+            0
+        ) AS revenue_client_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_customers_server_side_mt, 0),
+            0
+        ) AS customers_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_customers_server_side_ft, 0),
+            0
+        ) AS customers_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_customers_server_side_lt, 0),
+            0
+        ) AS customers_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_buyers_server_side_mt, 0),
+            0
+        ) AS bbb_buyers_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_buyers_server_side_ft, 0),
+            0
+        ) AS bbb_buyers_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_buyers_server_side_lt, 0),
+            0
+        ) AS bbb_buyers_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_revenue_server_side_mt, 0),
+            0
+        ) AS bbb_revenue_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_revenue_server_side_ft, 0),
+            0
+        ) AS bbb_revenue_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_bbb_revenue_server_side_lt, 0),
+            0
+        ) AS bbb_revenue_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_vip_server_side_mt, 0),
+            0
+        ) AS payments_vip_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_vip_server_side_ft, 0),
+            0
+        ) AS payments_vip_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_vip_server_side_lt, 0),
+            0
+        ) AS payments_vip_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_book_server_side_mt, 0),
+            0
+        ) AS payments_book_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_book_server_side_ft, 0),
+            0
+        ) AS payments_book_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_book_server_side_lt, 0),
+            0
+        ) AS payments_book_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_mentorship_server_side_mt, 0),
+            0
+        ) AS payments_mentorship_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_mentorship_server_side_ft, 0),
+            0
+        ) AS payments_mentorship_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_mentorship_server_side_lt, 0),
+            0
+        ) AS payments_mentorship_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_kajabi_server_side_mt, 0),
+            0
+        ) AS payments_kajabi_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_kajabi_server_side_ft, 0),
+            0
+        ) AS payments_kajabi_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_kajabi_server_side_lt, 0),
+            0
+        ) AS payments_kajabi_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_catalog_server_side_mt, 0),
+            0
+        ) AS payments_catalog_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_catalog_server_side_ft, 0),
+            0
+        ) AS payments_catalog_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_catalog_server_side_lt, 0),
+            0
+        ) AS payments_catalog_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_unknown_server_side_mt, 0),
+            0
+        ) AS payments_unknown_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_unknown_server_side_ft, 0),
+            0
+        ) AS payments_unknown_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_payments_unknown_server_side_lt, 0),
+            0
+        ) AS payments_unknown_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_vip_server_side_mt, 0),
+            0
+        ) AS revenue_vip_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_vip_server_side_ft, 0),
+            0
+        ) AS revenue_vip_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_vip_server_side_lt, 0),
+            0
+        ) AS revenue_vip_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_book_server_side_mt, 0),
+            0
+        ) AS revenue_book_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_book_server_side_ft, 0),
+            0
+        ) AS revenue_book_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_book_server_side_lt, 0),
+            0
+        ) AS revenue_book_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_mentorship_server_side_mt, 0),
+            0
+        ) AS revenue_mentorship_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_mentorship_server_side_ft, 0),
+            0
+        ) AS revenue_mentorship_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_mentorship_server_side_lt, 0),
+            0
+        ) AS revenue_mentorship_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_kajabi_server_side_mt, 0),
+            0
+        ) AS revenue_kajabi_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_kajabi_server_side_ft, 0),
+            0
+        ) AS revenue_kajabi_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_kajabi_server_side_lt, 0),
+            0
+        ) AS revenue_kajabi_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_catalog_server_side_mt, 0),
+            0
+        ) AS revenue_catalog_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_catalog_server_side_ft, 0),
+            0
+        ) AS revenue_catalog_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_catalog_server_side_lt, 0),
+            0
+        ) AS revenue_catalog_server_side_lt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_unknown_server_side_mt, 0),
+            0
+        ) AS revenue_unknown_server_side_mt,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_unknown_server_side_ft, 0),
+            0
+        ) AS revenue_unknown_server_side_ft,
+        if(
+            conversion_rows.has_conversion_row = 1,
+            coalesce(conversion_rows.conversion_revenue_unknown_server_side_lt, 0),
+            0
+        ) AS revenue_unknown_server_side_lt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_vip_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_vip_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_book_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_book_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_mentorship_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_mentorship_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_kajabi_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_kajabi_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_catalog_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_catalog_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_unknown_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_unknown_mt,
+        if(
+            ad_rows.has_ad_row = 0 OR coalesce(ad_rows.spend, 0) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            if(
+                conversion_rows.has_conversion_row = 1,
+                coalesce(conversion_rows.conversion_revenue_server_side_mt, 0),
+                0
+            )
+            / toFloat64(ad_rows.spend)
+        ) AS roas_all_payments_mt
+    FROM hourly_meta_ad_delivery_rollup AS ad_rows
+    FULL OUTER JOIN
+        hourly_paid_conversion_rollup AS conversion_rows
+        ON ad_rows.hour_start = conversion_rows.hour_start
+        AND ad_rows.ad_source = conversion_rows.conversion_source
+        AND isNotDistinctFrom(ad_rows.campaign_id, conversion_rows.campaign_id)
+        AND isNotDistinctFrom(ad_rows.adset_id, conversion_rows.adset_id)
+        AND isNotDistinctFrom(ad_rows.ad_id, conversion_rows.ad_id)

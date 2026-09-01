@@ -1,0 +1,44 @@
+DESCRIPTION >
+    Current reverse evidence index. Activated delta rows replace or delete matching
+    identifier-to-fact pairs from the flat snapshot.
+
+NODE current_identity_evidence_rows
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
+        if(delta.state_key = '', base.fact_key, delta.fact_key) AS fact_key,
+        if(delta.state_key = '', base.base_batch_version, delta.batch_version) AS batch_version,
+        if(delta.state_key = '', base.committed_at, delta.committed_at) AS committed_at,
+        if(delta.state_key = '', base.row_hash, delta.row_hash) AS row_hash
+    FROM identity_fact_evidence_seed AS base
+    FULL OUTER JOIN
+        (
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.state_key AS state_key,
+                journal.is_deleted AS is_deleted,
+                journal.identifier_key AS identifier_key,
+                journal.fact_key AS fact_key,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE journal.state_kind = 'evidence'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY journal.tenant_id, journal.lookup_key, journal.sub_key
+                    ORDER BY
+                        journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+                )
+                = 1
+        ) AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.identifier_key = delta.identifier_key
+        AND base.fact_key = delta.fact_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0

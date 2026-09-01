@@ -1,0 +1,54 @@
+DESCRIPTION >
+    Current active reverse evidence pairs for literal identifier keys.
+
+NODE requested_identity_worker_evidence_heads
+SQL >
+    %
+    WITH candidates AS (
+        SELECT
+            identifier_key,
+            fact_key,
+            toUInt8(0) AS is_deleted,
+            base_batch_version AS batch_version,
+            committed_at,
+            row_hash
+        FROM identity_fact_evidence_seed
+        WHERE
+            tenant_id = {{ String(p_tenant_id, 'boom') }}
+            {% if defined(p_identifier_key) %}
+                AND identifier_key = {{ String(p_identifier_key) }}
+            {% else %}
+                AND identifier_key IN {{ Array(p_identifier_keys, 'String') }}
+            {% end %}
+        UNION ALL
+        SELECT
+            journal.identifier_key,
+            journal.fact_key,
+            journal.is_deleted,
+            journal.batch_version,
+            journal.committed_at,
+            journal.row_hash
+        FROM identity_state_delta_versions AS journal
+        INNER JOIN activated_identity_batches AS activated
+            ON journal.tenant_id = activated.tenant_id
+            AND journal.batch_version = activated.batch_version
+            AND journal.batch_id = activated.batch_id
+        WHERE
+            journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+            AND journal.state_kind = 'evidence'
+            {% if defined(p_identifier_key) %}
+                AND journal.lookup_key = {{ String(p_identifier_key) }}
+            {% else %}
+                AND journal.lookup_key IN {{ Array(p_identifier_keys, 'String') }}
+            {% end %}
+    )
+    SELECT identifier_key, fact_key
+    FROM candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identifier_key, fact_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        ) = 1
+        AND is_deleted = 0
+
+TYPE ENDPOINT

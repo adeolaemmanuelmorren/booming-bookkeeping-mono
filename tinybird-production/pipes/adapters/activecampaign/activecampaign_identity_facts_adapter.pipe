@@ -1,0 +1,217 @@
+DESCRIPTION >
+    Current ActiveCampaign identity facts with explicit tombstones. Every assignment
+    carries the newest Fivetran version that can change its registration eligibility,
+    including competing assignments for the same contact. Identity enqueue first finds
+    contacts touched since its cutoff, then evaluates every assignment for only those contacts.
+
+NODE activecampaign_tag_semantic_transitions
+SQL >
+    %
+    {% if defined(p_identity_producer) and p_identity_producer == 'source_identity:activecampaign' %}
+        SELECT
+            tag_id,
+            max(candidate_source_version) AS source_version
+        FROM (
+            SELECT
+                tag_id,
+                source_version AS candidate_source_version,
+                semantic_hash,
+                lagInFrame(semantic_hash, 1, semantic_hash) OVER (
+                    PARTITION BY tag_id
+                    ORDER BY source_version
+                    ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                ) AS previous_semantic_hash
+            FROM activecampaign_tag_semantic_versions FINAL
+        )
+        WHERE
+            candidate_source_version
+                >= toDateTime64(
+                    {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC'
+                )
+            {% if defined(p_source_ingested_to) %}
+                AND candidate_source_version < toDateTime64(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6, 'UTC'
+                )
+            {% end %}
+            AND semantic_hash != previous_semantic_hash
+        GROUP BY tag_id
+    {% else %}
+        SELECT
+            CAST('' AS String) AS tag_id,
+            toDateTime64(0, 6) AS source_version
+        WHERE 0
+    {% end %}
+
+NODE recently_changed_activecampaign_contact_ids
+SQL >
+    %
+    {% if defined(p_identity_producer) and p_identity_producer == 'source_identity:activecampaign' %}
+        SELECT contact_id
+        FROM (
+            SELECT contact_id
+            FROM activecampaign_contact_tags_adapter
+            WHERE source_version
+                >= toDateTime64(
+                    {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC'
+                )
+                {% if defined(p_source_ingested_to) %}
+                    AND source_version < toDateTime64(
+                        {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6, 'UTC'
+                    )
+                {% end %}
+            UNION ALL
+            SELECT contact_id
+            FROM activecampaign_contacts_adapter
+            WHERE contact_updated_at
+                >= toDateTime64(
+                    {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC'
+                )
+                {% if defined(p_source_ingested_to) %}
+                    AND contact_updated_at < toDateTime64(
+                        {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6, 'UTC'
+                    )
+                {% end %}
+            UNION ALL
+            SELECT assignment.contact_id AS contact_id
+            FROM activecampaign_contact_tags_adapter AS assignment
+            INNER JOIN activecampaign_tag_semantic_transitions AS tag
+                ON tag.tag_id = assignment.tag_id
+        )
+        WHERE contact_id != ''
+        GROUP BY contact_id
+    {% else %}
+        SELECT CAST('' AS String) AS contact_id WHERE 0
+    {% end %}
+
+NODE activecampaign_identity_assignment_rows
+SQL >
+    %
+    SELECT
+        contact_tag.contact_tag_id AS form_submission_id,
+        contact_tag.contact_id AS contact_id,
+        contact_tag.tag_id AS tag_id,
+        contact_tag.assigned_at AS submitted_at,
+        contact_tag.source_version AS assignment_source_version,
+        contact_tag.is_deleted AS assignment_is_deleted,
+        contact.contact_id AS matched_contact_id,
+        contact.email AS email,
+        contact.phone AS phone,
+        contact.first_name AS first_name,
+        contact.last_name AS last_name,
+        contact.contact_updated_at AS contact_source_version,
+        contact.is_deleted AS contact_is_deleted,
+        tag.tag_id AS matched_tag_id,
+        tag.tag_name AS tag_name,
+        tag.source_version AS tag_source_version,
+        tag.is_deleted AS tag_is_deleted,
+        semantic_transition.source_version AS tag_semantic_source_version,
+        greatest(
+            contact_tag.source_version,
+            ifNull(contact.contact_updated_at, toDateTime64(0, 6)),
+            ifNull(semantic_transition.source_version, toDateTime64(0, 6))
+        ) AS local_source_version
+    FROM activecampaign_contact_tags_adapter AS contact_tag
+    LEFT JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = contact_tag.tag_id
+    LEFT JOIN activecampaign_contacts_adapter AS contact ON contact.contact_id = contact_tag.contact_id
+    LEFT JOIN activecampaign_tag_semantic_transitions AS semantic_transition
+        ON semantic_transition.tag_id = contact_tag.tag_id
+    WHERE
+        contact_tag.contact_tag_id != '0'
+        AND (
+            {{ String(p_identity_producer, 'all') }} != 'source_identity:activecampaign'
+            OR contact_tag.contact_id
+            IN (SELECT contact_id FROM recently_changed_activecampaign_contact_ids)
+        )
+
+NODE activecampaign_identity_assignment_inputs
+SQL >
+    SELECT
+        *,
+        if(
+            contact_id = '',
+            local_source_version,
+            max(local_source_version) OVER (PARTITION BY contact_id)
+        ) AS contact_source_version
+    FROM activecampaign_identity_assignment_rows
+
+NODE matched_activecampaign_identity_policies
+SQL >
+    SELECT
+        assignment.form_submission_id AS form_submission_id,
+        policy.registration_type AS registration_type,
+        policy.tag_match_type AS tag_match_type
+    FROM activecampaign_identity_assignment_inputs AS assignment
+    CROSS JOIN activecampaign_registration_tag_policy AS policy
+    WHERE
+        assignment.matched_tag_id != ''
+        AND (
+            (policy.tag_match_operator = 'exact' AND assignment.tag_name = policy.tag_match_value)
+            OR (
+                policy.tag_match_operator = 'prefix'
+                AND startsWith(assignment.tag_name, policy.tag_match_value)
+            )
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY assignment.form_submission_id
+            ORDER BY policy.registration_priority, policy.tag_match_priority
+        )
+        = 1
+
+NODE activecampaign_identity_assignments_with_policy
+SQL >
+    SELECT
+        assignment.*,
+        policy.registration_type AS registration_type,
+        policy.tag_match_type AS tag_match_type
+    FROM activecampaign_identity_assignment_inputs AS assignment
+    LEFT JOIN
+        matched_activecampaign_identity_policies AS policy
+        ON policy.form_submission_id = assignment.form_submission_id
+
+NODE activecampaign_identity_assignments_with_primary_state
+SQL >
+    SELECT
+        *,
+        max(
+            toUInt8(
+                assignment_is_deleted = false
+                AND contact_is_deleted = false
+                AND tag_is_deleted = false
+                AND matched_contact_id != ''
+                AND matched_tag_id != ''
+                AND registration_type != ''
+                AND tag_match_type = 'primary'
+            )
+        ) OVER (PARTITION BY contact_id, registration_type) AS has_live_primary
+    FROM activecampaign_identity_assignments_with_policy
+
+NODE evaluated_activecampaign_identity_assignments
+SQL >
+    SELECT
+        assignment.*,
+        greatest(assignment.local_source_version, assignment.contact_source_version) AS source_version,
+        assignment.assignment_is_deleted = false
+        AND assignment.contact_is_deleted = false
+        AND assignment.tag_is_deleted = false
+        AND assignment.matched_contact_id != ''
+        AND assignment.matched_tag_id != ''
+        AND assignment.registration_type != ''
+        AND (
+            assignment.tag_match_type = 'primary'
+            OR (assignment.tag_match_type = 'fallback' AND assignment.has_live_primary = 0)
+        ) AS is_live
+    FROM activecampaign_identity_assignments_with_primary_state AS assignment
+
+NODE current_activecampaign_identity_facts
+SQL >
+    SELECT
+        form_submission_id,
+        submitted_at AS observed_at,
+        source_version,
+        toUInt8(NOT is_live) AS fact_deleted,
+        if(is_live, email, CAST(NULL AS Nullable(String))) AS email,
+        if(is_live, phone, CAST(NULL AS Nullable(String))) AS phone,
+        if(is_live, first_name, CAST(NULL AS Nullable(String))) AS first_name,
+        if(is_live, last_name, CAST(NULL AS Nullable(String))) AS last_name
+    FROM evaluated_activecampaign_identity_assignments

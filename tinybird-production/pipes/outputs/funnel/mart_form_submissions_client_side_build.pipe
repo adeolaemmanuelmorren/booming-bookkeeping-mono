@@ -1,0 +1,136 @@
+DESCRIPTION >
+    Client-side Jitsu form submissions with lead-versus-checkout classification and
+    deterministic email, phone, then anonymous identity resolution.
+
+NODE ranked_client_form_versions_for_reporting
+SQL >
+    SELECT
+        form_versions_for_reporting.*,
+        row_number() OVER (
+            PARTITION BY
+                form_versions_for_reporting.tenant_id,
+                form_versions_for_reporting.form_submission_id
+            ORDER BY
+                form_versions_for_reporting.source_priority DESC,
+                form_versions_for_reporting.source_fact_version DESC,
+                form_versions_for_reporting.source_ingested_at DESC,
+                form_versions_for_reporting.payload_hash DESC
+        ) AS reporting_version_rank
+    FROM jitsu_form_submission_versions AS form_versions_for_reporting
+    WHERE form_versions_for_reporting.tenant_id = 'boom'
+
+NODE current_client_form_facts_for_reporting
+SQL >
+    SELECT *
+    FROM ranked_client_form_versions_for_reporting
+    WHERE reporting_version_rank = 1 AND source_deleted = 0
+
+NODE client_form_phone_digits
+SQL >
+    SELECT forms.*, replaceRegexpAll(trimBoth(ifNull(forms.phone, '')), '[^0-9]', '') AS phone_digits
+    FROM current_client_form_facts_for_reporting AS forms
+
+NODE client_form_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM client_form_phone_digits
+
+NODE normalized_client_form_identifiers
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(
+                national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS normalized_phone
+    FROM client_form_national_phones
+
+NODE resolved_client_form_candidates
+SQL >
+    SELECT
+        forms.form_submission_id AS form_submission_id,
+        forms.source_system AS source_system,
+        forms.event_id AS event_id,
+        forms.submitted_at AS submitted_at,
+        forms.anonymous_id AS anonymous_id,
+        forms.user_id AS user_id,
+        forms.email AS email,
+        forms.phone AS phone,
+        forms.first_name AS first_name,
+        forms.checkout_member_name AS checkout_member_name,
+        forms.form_id AS form_id,
+        forms.form_name AS form_name,
+        forms.form_action AS form_action,
+        forms.form_method AS form_method,
+        forms.page_url AS page_url,
+        forms.page_path AS page_path,
+        forms.page_referrer AS page_referrer,
+        forms.ip_address AS ip_address,
+        forms.user_agent AS user_agent,
+        forms.geo_city AS geo_city,
+        forms.geo_region AS geo_region,
+        forms.geo_country AS geo_country,
+        forms.stripe_payment_method_id AS stripe_payment_method_id,
+        forms.payment_method_type AS payment_method_type,
+        forms.payment_provider AS payment_provider,
+        forms.payment_type AS payment_type,
+        forms.coupon AS coupon,
+        forms.gclid AS gclid,
+        forms.gbraid AS gbraid,
+        forms.fbclid AS fbclid,
+        forms.fbc AS fbc,
+        forms.fbp AS fbp,
+        forms.ttp AS ttp,
+        forms.uetsid AS uetsid,
+        forms.uetvid AS uetvid,
+        forms.utm_source AS utm_source,
+        forms.utm_medium AS utm_medium,
+        forms.utm_campaign AS utm_campaign,
+        forms.utm_content AS utm_content,
+        forms.utm_term AS utm_term,
+        forms.active_campaign_form_id AS active_campaign_form_id,
+        forms.registration_type AS registration_type,
+        forms.content_name AS content_name,
+        forms.canonical_event_id AS canonical_event_id,
+        forms.is_checkout_form AS is_checkout_form,
+        forms.form_type AS form_type,
+        forms.offer_id AS offer_id,
+        nullIf(identity_mapping.profile_id, '') AS profile_id
+    FROM normalized_client_form_identifiers AS forms
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = forms.tenant_id
+        AND identity_mapping.identifier_key = coalesce(
+            if(forms.email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', forms.email)),
+            if(
+                forms.normalized_phone IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('phone:', forms.normalized_phone)
+            ),
+            if(
+                forms.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', forms.anonymous_id)
+            )
+        )
+
+NODE client_form_submission_rows
+SQL >
+    SELECT *
+    FROM resolved_client_form_candidates
+    QUALIFY row_number() OVER (PARTITION BY form_submission_id ORDER BY profile_id ASC NULLS FIRST) = 1

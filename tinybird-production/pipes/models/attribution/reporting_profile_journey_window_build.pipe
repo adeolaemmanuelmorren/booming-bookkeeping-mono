@@ -1,0 +1,561 @@
+DESCRIPTION >
+    Identifier-scoped journey window calculation used only by the incremental
+    journey Worker. Reporting endpoints never execute this pipe directly.
+
+NODE scoped_seed_identity_mappings
+SQL >
+    %
+    SELECT tenant_id, identifier_key, profile_id
+    FROM identity_mapping_serving_seed
+    WHERE tenant_id = 'boom'
+        {% if defined(p_identifier_key) %}
+        AND identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_keys) %}
+        AND identifier_key IN {{ Array(p_identifier_keys, 'String') }}
+        {% else %}
+        AND 0
+        {% end %}
+
+NODE scoped_delta_identity_mappings
+SQL >
+    %
+    SELECT
+        journal.tenant_id,
+        journal.state_key,
+        journal.identifier_key,
+        journal.profile_id,
+        journal.is_deleted
+    FROM identity_mapping_delta_lookup AS journal
+    INNER JOIN activated_identity_batches AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+    WHERE journal.tenant_id = 'boom'
+        {% if defined(p_identifier_key) %}
+        AND journal.identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_keys) %}
+        AND journal.identifier_key IN {{ Array(p_identifier_keys, 'String') }}
+        {% else %}
+        AND 0
+        {% end %}
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY journal.tenant_id, journal.identifier_key
+            ORDER BY journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+        ) = 1
+
+NODE scoped_current_identity_mappings
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
+        if(delta.state_key = '', base.profile_id, delta.profile_id) AS profile_id
+    FROM scoped_seed_identity_mappings AS base
+    FULL OUTER JOIN scoped_delta_identity_mappings AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.identifier_key = delta.identifier_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0
+
+NODE scoped_conversion_fact_candidates
+SQL >
+    %
+    SELECT *
+    FROM reporting_conversion_facts_v2_current
+    WHERE tenant_id = 'boom'
+        {% if defined(p_identifier_key) %}
+        AND (
+            identity_anchor_key = {{ String(p_identifier_key) }}
+            {% if defined(p_conversion_ids) %}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+            {% end %}
+        )
+        {% elif defined(p_identifier_keys) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_keys) %}
+        AND identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+        {% elif defined(p_conversion_ids) %}
+        AND conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        {% else %}
+        AND 0
+        {% end %}
+
+NODE scoped_resolved_conversion_candidates
+SQL >
+    SELECT
+        facts.*,
+        identity_mapping.profile_id AS automatic_profile_id,
+        coalesce(nullIf(facts.manual_profile_id, ''), automatic_profile_id) AS profile_id
+    FROM scoped_conversion_fact_candidates AS facts
+    LEFT ANY JOIN scoped_current_identity_mappings AS identity_mapping
+        ON identity_mapping.tenant_id = facts.tenant_id
+        AND identity_mapping.identifier_key = facts.identity_anchor_key
+
+NODE scoped_ranked_conversion_facts
+SQL >
+    SELECT
+        facts.*,
+        row_number() OVER (
+            PARTITION BY
+                if(
+                    fact_kind = 'server_payment',
+                    coalesce(
+                        profile_id,
+                        concat(payment_source, ':customer:', payment_customer_id),
+                        concat(payment_source, ':payment:', payment_id),
+                        conversion_id
+                    ),
+                    conversion_id
+                )
+            ORDER BY conversion_time ASC NULLS FIRST, payment_id ASC NULLS FIRST
+        ) AS customer_payment_number,
+        countIf(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+        ) OVER (
+            PARTITION BY
+                if(
+                    fact_kind = 'server_payment',
+                    coalesce(
+                        profile_id,
+                        concat(payment_source, ':customer:', payment_customer_id),
+                        concat(payment_source, ':email:', lowerUTF8(payment_email)),
+                        concat(payment_source, ':payment:', payment_id),
+                        conversion_id
+                    ),
+                    conversion_id
+                )
+            ORDER BY conversion_time ASC NULLS FIRST, payment_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS bbb_payment_number
+    FROM scoped_resolved_conversion_candidates AS facts
+
+NODE scoped_conversion_events
+SQL >
+    SELECT
+        conversion_id,
+        profile_id,
+        conversion_time,
+        conversion_source,
+        conversion_type,
+        if(fact_kind = 'server_form', toFloat64(1), toFloat64(0))
+            AS form_submissions_server_side,
+        if(
+            fact_kind = 'server_form' AND registration_type = 'krc',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS krc_registrations_server_side,
+        if(fact_kind = 'client_form', toFloat64(1), toFloat64(0))
+            AS form_submissions_client_side,
+        if(
+            fact_kind = 'server_payment' AND is_repeat_payment = 0,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS order_completed_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            toFloat64(1),
+            toFloat64(0)
+        ) AS order_completed_client_side,
+        if(fact_kind = 'server_payment', toFloat64(1), toFloat64(0))
+            AS payments_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_client_side,
+        if(fact_kind = 'server_payment', net_amount, toFloat64(0))
+            AS revenue_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            client_payment_amount,
+            toFloat64(0)
+        ) AS revenue_client_side,
+        if(
+            fact_kind = 'server_payment' AND customer_payment_number = 1,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS customers_server_side,
+        if(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+            AND bbb_payment_number = 1,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS bbb_buyers_server_side,
+        if(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+            AND bbb_payment_number = 1,
+            net_amount,
+            toFloat64(0)
+        ) AS bbb_revenue_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'vip', toFloat64(1), toFloat64(0))
+            AS payments_vip_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'book', toFloat64(1), toFloat64(0))
+            AS payments_book_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'mentorship',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_mentorship_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'kajabi', toFloat64(1), toFloat64(0))
+            AS payments_kajabi_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'catalog', toFloat64(1), toFloat64(0))
+            AS payments_catalog_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'unknown', toFloat64(1), toFloat64(0))
+            AS payments_unknown_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'vip', net_amount, toFloat64(0))
+            AS revenue_vip_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'book', net_amount, toFloat64(0))
+            AS revenue_book_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'mentorship', net_amount, toFloat64(0))
+            AS revenue_mentorship_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'kajabi', net_amount, toFloat64(0))
+            AS revenue_kajabi_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'catalog', net_amount, toFloat64(0))
+            AS revenue_catalog_server_side,
+        if(fact_kind = 'server_payment' AND payment_category = 'unknown', net_amount, toFloat64(0))
+            AS revenue_unknown_server_side
+    FROM scoped_ranked_conversion_facts
+
+NODE scoped_touchpoint_facts
+SQL >
+    %
+    SELECT
+        facts.touchpoint_id AS touchpoint_id,
+        facts.session_id AS session_id,
+        coalesce(identity_mapping.profile_id, facts.identity_base_profile_id) AS profile_id,
+        facts.session_start_timestamp AS session_start_timestamp,
+        facts.touchpoint_time AS touchpoint_time,
+        facts.first_page_host AS first_page_host,
+        facts.first_page_path AS first_page_path,
+        facts.utm_source AS utm_source,
+        facts.utm_medium AS utm_medium,
+        facts.utm_campaign AS utm_campaign,
+        facts.utm_content AS utm_content,
+        facts.utm_term AS utm_term,
+        facts.campaign_id AS campaign_id,
+        facts.adset_id AS adset_id,
+        facts.ad_id AS ad_id,
+        facts.channel_source AS channel_source,
+        facts.channel_medium AS channel_medium
+    FROM mart_touchpoints_all_facts_v3_current AS facts
+    LEFT ANY JOIN scoped_current_identity_mappings AS identity_mapping
+        ON identity_mapping.tenant_id = 'boom'
+        AND identity_mapping.identifier_key = facts.identity_anchor_key
+    {% if defined(p_identifier_key) %}
+        WHERE facts.identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_keys) %}
+        WHERE facts.identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+    {% else %}
+        WHERE 0
+    {% end %}
+
+NODE conversion_touchpoint_candidates
+SQL >
+    %
+    SELECT
+        conversion_rows.conversion_id AS conversion_id,
+        conversion_rows.profile_id AS profile_id,
+        conversion_rows.conversion_time AS conversion_time,
+        conversion_rows.conversion_source AS conversion_source,
+        conversion_rows.conversion_type AS conversion_type,
+        conversion_rows.form_submissions_server_side AS form_submissions_server_side,
+        conversion_rows.krc_registrations_server_side AS krc_registrations_server_side,
+        conversion_rows.form_submissions_client_side AS form_submissions_client_side,
+        conversion_rows.order_completed_server_side AS order_completed_server_side,
+        conversion_rows.order_completed_client_side AS order_completed_client_side,
+        conversion_rows.payments_server_side AS payments_server_side,
+        conversion_rows.payments_client_side AS payments_client_side,
+        conversion_rows.revenue_server_side AS revenue_server_side,
+        conversion_rows.revenue_client_side AS revenue_client_side,
+        conversion_rows.customers_server_side AS customers_server_side,
+        conversion_rows.bbb_buyers_server_side AS bbb_buyers_server_side,
+        conversion_rows.bbb_revenue_server_side AS bbb_revenue_server_side,
+        conversion_rows.payments_vip_server_side AS payments_vip_server_side,
+        conversion_rows.payments_book_server_side AS payments_book_server_side,
+        conversion_rows.payments_mentorship_server_side AS payments_mentorship_server_side,
+        conversion_rows.payments_kajabi_server_side AS payments_kajabi_server_side,
+        conversion_rows.payments_catalog_server_side AS payments_catalog_server_side,
+        conversion_rows.payments_unknown_server_side AS payments_unknown_server_side,
+        conversion_rows.revenue_vip_server_side AS revenue_vip_server_side,
+        conversion_rows.revenue_book_server_side AS revenue_book_server_side,
+        conversion_rows.revenue_mentorship_server_side AS revenue_mentorship_server_side,
+        conversion_rows.revenue_kajabi_server_side AS revenue_kajabi_server_side,
+        conversion_rows.revenue_catalog_server_side AS revenue_catalog_server_side,
+        conversion_rows.revenue_unknown_server_side AS revenue_unknown_server_side,
+        resolved_touchpoints_for_conversion.touchpoint_id AS touchpoint_id,
+        resolved_touchpoints_for_conversion.session_id AS session_id,
+        resolved_touchpoints_for_conversion.session_start_timestamp AS session_start_timestamp,
+        resolved_touchpoints_for_conversion.first_page_host AS landing_page_host,
+        resolved_touchpoints_for_conversion.first_page_path AS landing_page_path,
+        coalesce(
+            resolved_touchpoints_for_conversion.utm_source,
+            resolved_touchpoints_for_conversion.channel_source,
+            'offline'
+        ) AS journey_source,
+        coalesce(
+            resolved_touchpoints_for_conversion.utm_medium,
+            resolved_touchpoints_for_conversion.channel_medium,
+            'offline'
+        ) AS journey_medium,
+        resolved_touchpoints_for_conversion.utm_source AS ad_source_key,
+        resolved_touchpoints_for_conversion.utm_campaign AS utm_campaign,
+        resolved_touchpoints_for_conversion.utm_content AS utm_content,
+        resolved_touchpoints_for_conversion.utm_term AS utm_term,
+        resolved_touchpoints_for_conversion.campaign_id AS campaign_id,
+        resolved_touchpoints_for_conversion.adset_id AS adset_id,
+        resolved_touchpoints_for_conversion.ad_id AS ad_id
+    FROM scoped_conversion_events AS conversion_rows
+    LEFT JOIN scoped_touchpoint_facts AS resolved_touchpoints_for_conversion
+        ON resolved_touchpoints_for_conversion.profile_id = conversion_rows.profile_id
+        AND resolved_touchpoints_for_conversion.touchpoint_time <= conversion_rows.conversion_time
+
+NODE classified_conversion_touchpoints
+SQL >
+    SELECT
+        *,
+        lowerUTF8(journey_source) = 'direct' AND lowerUTF8(journey_medium) = 'none' AS is_direct_touch,
+        lowerUTF8(journey_source) IN ('google', 'meta')
+        AND lowerUTF8(journey_medium) IN ('cpc', 'paid', 'paid_social')
+        AND campaign_id IS NOT NULL
+        AND ad_id IS NOT NULL AS is_paid_ad_touch
+    FROM conversion_touchpoint_candidates
+
+NODE ordered_conversion_touchpoints
+SQL >
+    SELECT
+        *,
+        count() OVER (PARTITION BY conversion_id) AS total_touchpoints,
+        row_number() OVER (
+            PARTITION BY conversion_id
+            ORDER BY
+                coalesce(session_start_timestamp, conversion_time) ASC NULLS FIRST,
+                touchpoint_id ASC NULLS FIRST
+        ) AS touchpoint_number
+    FROM classified_conversion_touchpoints
+
+NODE eligible_conversion_touchpoints
+SQL >
+    SELECT *, is_direct_touch AND touchpoint_number > 1 AS is_excluded_direct_touch
+    FROM ordered_conversion_touchpoints
+
+NODE ranked_conversion_touchpoint_counts
+SQL >
+    SELECT
+        *,
+        countIf(NOT is_direct_touch) OVER (PARTITION BY conversion_id) AS non_direct_touchpoints,
+        countIf(NOT is_direct_touch) OVER (
+            PARTITION BY conversion_id
+            ORDER BY
+                coalesce(session_start_timestamp, conversion_time) ASC NULLS FIRST,
+                touchpoint_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS non_direct_touchpoint_number,
+        countIf(is_direct_touch AND touchpoint_number = 1) OVER (PARTITION BY conversion_id)
+        > 0 AS first_touch_is_direct,
+        countIf(is_paid_ad_touch) OVER (PARTITION BY conversion_id) AS paid_ad_touchpoints,
+        countIf(is_paid_ad_touch) OVER (
+            PARTITION BY conversion_id
+            ORDER BY
+                coalesce(session_start_timestamp, conversion_time) ASC NULLS FIRST,
+                touchpoint_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS paid_ad_touchpoint_number
+    FROM eligible_conversion_touchpoints
+
+NODE ranked_conversion_touchpoints
+SQL >
+    SELECT
+        *,
+        non_direct_touchpoints + toUInt64(first_touch_is_direct) AS attribution_touchpoints,
+        non_direct_touchpoint_number + toUInt64(first_touch_is_direct)
+            AS attribution_touchpoint_number,
+        total_touchpoints - non_direct_touchpoints - toUInt64(first_touch_is_direct)
+            AS excluded_direct_touchpoints
+    FROM ranked_conversion_touchpoint_counts
+
+NODE weighted_conversion_touchpoints
+SQL >
+    SELECT
+        *,
+        multiIf(
+            first_touch_is_direct,
+            'first_touch_direct',
+            excluded_direct_touchpoints > 0,
+            'later_direct_return',
+            'no_direct'
+        ) AS journey_direct_status,
+        multiIf(
+            is_excluded_direct_touch,
+            toFloat64(0),
+            attribution_touchpoints = 1,
+            toFloat64(1),
+            attribution_touchpoints = 2,
+            toFloat64(0.5),
+            attribution_touchpoint_number = 1,
+            toFloat64(0.4),
+            attribution_touchpoint_number = attribution_touchpoints,
+            toFloat64(0.4),
+            toFloat64(0.2) / (attribution_touchpoints - 2)
+        ) AS multi_touch_weight,
+        if(
+            NOT is_excluded_direct_touch AND attribution_touchpoint_number = 1,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS first_touch_weight,
+        if(
+            NOT is_excluded_direct_touch AND attribution_touchpoint_number = attribution_touchpoints,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS last_touch_weight
+    FROM ranked_conversion_touchpoints
+
+NODE mart_conversion_touchpoint_rows
+SQL >
+    SELECT
+        conversion_id,
+        profile_id,
+        conversion_time,
+        conversion_source,
+        conversion_type,
+        form_submissions_server_side,
+        krc_registrations_server_side,
+        form_submissions_client_side,
+        order_completed_server_side,
+        order_completed_client_side,
+        payments_server_side,
+        payments_client_side,
+        revenue_server_side,
+        revenue_client_side,
+        customers_server_side,
+        bbb_buyers_server_side,
+        bbb_revenue_server_side,
+        payments_vip_server_side,
+        payments_book_server_side,
+        payments_mentorship_server_side,
+        payments_kajabi_server_side,
+        payments_catalog_server_side,
+        payments_unknown_server_side,
+        revenue_vip_server_side,
+        revenue_book_server_side,
+        revenue_mentorship_server_side,
+        revenue_kajabi_server_side,
+        revenue_catalog_server_side,
+        revenue_unknown_server_side,
+        touchpoint_id,
+        session_id,
+        session_start_timestamp,
+        landing_page_host,
+        landing_page_path,
+        journey_source AS source,
+        journey_medium AS medium,
+        ad_source_key,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        campaign_id,
+        adset_id,
+        ad_id,
+        coalesce(utm_campaign, 'unknown') AS campaign_name,
+        'unknown' AS adset_name,
+        'unknown' AS ad_name,
+        is_direct_touch,
+        is_paid_ad_touch,
+        total_touchpoints,
+        touchpoint_number,
+        is_excluded_direct_touch,
+        non_direct_touchpoints,
+        non_direct_touchpoint_number,
+        attribution_touchpoints,
+        attribution_touchpoint_number,
+        first_touch_is_direct,
+        excluded_direct_touchpoints,
+        paid_ad_touchpoints,
+        paid_ad_touchpoint_number,
+        journey_direct_status,
+        multi_touch_weight,
+        first_touch_weight,
+        last_touch_weight,
+        if(is_paid_ad_touch, multi_touch_weight, toFloat64(0)) AS paid_multi_touch_weight,
+        if(is_paid_ad_touch, first_touch_weight, toFloat64(0)) AS paid_first_touch_weight,
+        if(is_paid_ad_touch, last_touch_weight, toFloat64(0)) AS paid_last_touch_weight
+    FROM weighted_conversion_touchpoints AS weighted_rows
+
+NODE requested_profile_journey_rows
+SQL >
+    SELECT
+        window_rows.* EXCEPT (campaign_name, adset_name, ad_name),
+        toDecimal128(toString(window_rows.revenue_server_side), 9)
+            AS revenue_server_side_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(window_rows.revenue_server_side), 9)
+                * toDecimal128(toString(window_rows.first_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_first_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(window_rows.revenue_server_side), 9)
+                * toDecimal128(toString(window_rows.last_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_last_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(window_rows.revenue_server_side), 9)
+                * toDecimal128(toString(window_rows.multi_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_multi_touch_decimal,
+        multiIf(
+            window_rows.touchpoint_id IS NULL,
+            'unattributed',
+            window_rows.source = 'meta'
+                AND window_rows.medium IN ('paid', 'cpc', 'ppc', 'paid_social'),
+            'meta / paid',
+            window_rows.source = 'meta'
+                AND window_rows.medium IN ('referral', 'social', 'organic'),
+            'meta / organic',
+            match(lowerUTF8(window_rows.source), '(^|\\.)(facebook\\.com|instagram\\.com)$'),
+            'meta / organic',
+            window_rows.source = 'google'
+                AND window_rows.medium IN ('referral', 'organic'),
+            'google / organic',
+            match(lowerUTF8(window_rows.source), '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$')
+                OR startsWith(lowerUTF8(window_rows.source), 'com.google.'),
+            'google / organic',
+            window_rows.source = 'bing'
+                AND window_rows.medium IN ('referral', 'organic'),
+            'bing / organic',
+            match(lowerUTF8(window_rows.source), '(^|\\.)(bing\\.com)$'),
+            'bing / organic',
+            window_rows.source = 'youtube'
+                AND window_rows.medium IN ('referral', 'organic'),
+            'youtube / organic',
+            match(lowerUTF8(window_rows.source), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+            'youtube / organic',
+            window_rows.source = 'trustpilot'
+                AND window_rows.medium IN ('company_profile', 'referral'),
+            'trustpilot / referral',
+            match(lowerUTF8(window_rows.source), '(^|\\.)(trustpilot\\.com)$')
+                OR lowerUTF8(window_rows.source) = 'trustpilot',
+            'trustpilot / referral',
+            concat(window_rows.source, ' / ', window_rows.medium)
+        ) AS touchpoint_channel_label
+    FROM mart_conversion_touchpoint_rows AS window_rows
+
+TYPE ENDPOINT

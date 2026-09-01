@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Durable handoff from activated identity batches to the independent journey
+    coordinator. Duplicate retries collapse by deterministic identity batch key.
+    profile_ids carry the touched profiles (expanded to member identifier keys
+    per page at build time, so one profile's keys never split across builds);
+    identifier_keys carry only orphaned keys whose mapping was deleted.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `profile_ids` Array(String) `json:$.profile_ids[:]`,
+    `identifier_keys` Array(String) `json:$.identifier_keys[:]`,
+    `conversion_ids` Array(String) `json:$.conversion_ids[:]`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id
+ENGINE_SETTINGS "index_granularity=2048"

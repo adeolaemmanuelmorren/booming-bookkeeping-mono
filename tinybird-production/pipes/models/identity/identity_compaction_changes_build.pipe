@@ -1,0 +1,195 @@
+DESCRIPTION >
+    Classify one frozen input batch against the active fact heads. This bounded
+    lookup runs once and appends only facts that can change identity state.
+
+NODE classified_identity_compaction_changes
+SQL >
+    %
+    WITH
+        identity_compaction_changes_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        selected_prepare_metadata AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                identity_compaction_changes_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.batch_version, prepared.batch_id
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        selected_input_facts AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                selected_prepare_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            WHERE prepared.stage_kind = 'input_fact'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        selected_input_fact_keys AS (
+            SELECT
+                tenant_id,
+                fact_kind,
+                fact_key,
+                concat('fact:', fact_key) AS state_key
+            FROM selected_input_facts
+            GROUP BY tenant_id, fact_kind, fact_key
+        ),
+        changes_activated_identity_batches AS (
+            SELECT tenant_id, batch_version, batch_id
+            FROM
+                (
+                    SELECT
+                        journal.tenant_id AS tenant_id,
+                        journal.batch_version AS batch_version,
+                        journal.batch_id AS batch_id,
+                        journal.committed_at AS committed_at,
+                        journal.row_hash AS row_hash,
+                        metadata.active_batch_version AS active_batch_version,
+                        metadata.active_batch_id AS active_batch_id
+                    FROM identity_state_delta_versions AS journal
+                    INNER JOIN
+                        selected_prepare_metadata AS metadata
+                        ON journal.tenant_id = metadata.tenant_id
+                    WHERE journal.state_kind = 'activation_audit' AND journal.is_deleted = 0
+                    QUALIFY
+                        row_number() OVER (
+                            PARTITION BY journal.tenant_id, journal.batch_version
+                            ORDER BY
+                                journal.committed_at DESC, journal.row_hash DESC, journal.batch_id DESC
+                        )
+                        = 1
+                ) AS activated
+            WHERE
+                activated.batch_version < activated.active_batch_version
+                OR (
+                    activated.batch_version = activated.active_batch_version
+                    AND activated.batch_id = activated.active_batch_id
+                )
+        ),
+        candidate_active_fact_versions AS (
+            SELECT
+                seed.tenant_id AS tenant_id,
+                seed.fact_kind AS fact_kind,
+                seed.fact_key AS fact_key,
+                seed.source_fact_version AS source_fact_version,
+                seed.fact_deleted AS fact_deleted,
+                seed.fact_observed_at AS fact_observed_at,
+                seed.fact_payload_hash AS fact_payload_hash,
+                seed.evidence_keys AS evidence_keys,
+                seed.is_deleted AS is_deleted,
+                seed.batch_version AS batch_version,
+                seed.committed_at AS committed_at,
+                seed.row_hash AS row_hash
+            FROM identity_state_seed_enriched AS seed
+            WHERE
+                seed.state_kind = 'fact'
+                AND (seed.tenant_id, seed.state_key)
+                IN (SELECT tenant_id, state_key FROM selected_input_fact_keys)
+            UNION ALL
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.fact_kind AS fact_kind,
+                journal.fact_key AS fact_key,
+                journal.source_fact_version AS source_fact_version,
+                journal.fact_deleted AS fact_deleted,
+                journal.fact_observed_at AS fact_observed_at,
+                journal.fact_payload_hash AS fact_payload_hash,
+                journal.evidence_keys AS evidence_keys,
+                journal.is_deleted AS is_deleted,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                changes_activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE
+                journal.state_kind = 'fact'
+                AND (journal.tenant_id, journal.fact_kind, journal.lookup_key)
+                IN (SELECT tenant_id, fact_kind, fact_key FROM selected_input_fact_keys)
+        ),
+        current_active_fact_heads AS (
+            SELECT *
+            FROM candidate_active_fact_versions
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, fact_kind, fact_key
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+                )
+                = 1
+        ),
+        accepted_changed_facts AS (
+            SELECT
+                queued.*,
+                stable.is_deleted AS stable_is_deleted,
+                stable.fact_deleted AS stable_fact_deleted,
+                stable.fact_observed_at AS stable_fact_observed_at,
+                stable.evidence_keys AS stable_evidence_keys
+            FROM selected_input_facts AS queued
+            LEFT JOIN
+                current_active_fact_heads AS stable
+                ON queued.tenant_id = stable.tenant_id
+                AND queued.fact_kind = stable.fact_kind
+                AND queued.fact_key = stable.fact_key
+            WHERE
+                stable.fact_key = ''
+                OR queued.source_fact_version > stable.source_fact_version
+                OR (
+                    queued.source_fact_version = stable.source_fact_version
+                    AND (
+                        queued.fact_deleted != stable.fact_deleted
+                        OR queued.fact_payload_hash != stable.fact_payload_hash
+                    )
+                )
+        )
+    SELECT
+        facts.tenant_id AS tenant_id,
+        facts.batch_version AS batch_version,
+        facts.batch_id AS batch_id,
+        'changed_fact' AS stage_kind,
+        facts.stage_key AS stage_key,
+        facts.staged_at AS staged_at,
+        facts.stage_hash AS stage_hash,
+        facts.input_event_count AS input_event_count,
+        facts.input_hash AS input_hash,
+        facts.checkpoint_ingested_at AS checkpoint_ingested_at,
+        facts.checkpoint_event_id AS checkpoint_event_id,
+        facts.active_batch_version AS active_batch_version,
+        facts.active_batch_id AS active_batch_id,
+        facts.producer_id AS producer_id,
+        facts.observed_at AS observed_at,
+        facts.fact_kind AS fact_kind,
+        facts.fact_key AS fact_key,
+        facts.source_fact_version AS source_fact_version,
+        facts.fact_deleted AS fact_deleted,
+        facts.fact_payload_hash AS fact_payload_hash,
+        facts.fact_payload AS fact_payload,
+        facts.evidence_keys AS evidence_keys,
+        facts.stable_is_deleted AS stable_is_deleted,
+        facts.stable_fact_deleted AS stable_fact_deleted,
+        facts.stable_fact_observed_at AS stable_fact_observed_at,
+        facts.stable_evidence_keys AS stable_evidence_keys,
+        '' AS prior_profile_id
+    FROM accepted_changed_facts AS facts

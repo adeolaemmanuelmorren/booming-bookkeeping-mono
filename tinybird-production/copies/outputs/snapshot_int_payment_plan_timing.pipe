@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Atomically replace payment-plan timing after auxiliary Stripe data and payments refresh.
+
+NODE build_payment_plan_timing_snapshot
+SQL >
+    SELECT timing_rows.*, ifNull(timing_rows.payment_id, '') AS __tb_sort_payment_id
+    FROM int_payment_plan_timing_build AS timing_rows
+
+TYPE COPY
+TARGET_DATASOURCE int_payment_plan_timing_current
+COPY_MODE replace

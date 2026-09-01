@@ -67,3 +67,6 @@ temp/
 /fivetran/docusign/deployment/state.json
 /fivetran/docusign/deployment/files/
 /fivetran/docusign/.venv/
+
+# Tinybird CLI local credentials (contains the workspace admin token)
+.tinyb

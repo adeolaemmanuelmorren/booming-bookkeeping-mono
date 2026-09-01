@@ -1,0 +1,604 @@
+DESCRIPTION >
+    Classified primary Stripe payments. The output matches the primary provider branch
+    of Dataform's common successful-payment contract.
+
+NODE latest_primary_customers_for_payments
+SQL >
+    SELECT
+        id AS customer_id,
+        nullIf(lowerUTF8(replaceRegexpAll(email, '^[[:space:]]+|[[:space:]]+$', '')), '') AS email,
+        nullIf(replaceRegexpAll(name, '^[[:space:]]+|[[:space:]]+$', ''), '') AS name,
+        nullIf(replaceRegexpAll(phone, '^[[:space:]]+|[[:space:]]+$', ''), '') AS phone,
+        address_line_1,
+        address_city,
+        address_state,
+        address_postal_code,
+        address_country,
+        shipping_address_line_1,
+        shipping_address_city,
+        shipping_address_state,
+        shipping_address_postal_code,
+        shipping_address_country
+    FROM raw_stripe_customer
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_intents_for_payments
+SQL >
+    SELECT
+        id AS payment_intent_id,
+        nullIf(
+            lowerUTF8(replaceRegexpAll(receipt_email, '^[[:space:]]+|[[:space:]]+$', '')), ''
+        ) AS receipt_email,
+        description
+    FROM raw_stripe_payment_intent
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_invoices_for_payments
+SQL >
+    SELECT id AS invoice_id, subscription_id, billing_reason, description
+    FROM raw_stripe_invoice
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_checkout_sessions_for_payments
+SQL >
+    SELECT
+        id AS checkout_session_id,
+        payment_intent_id,
+        subscription_id,
+        payment_link AS payment_link_id,
+        mode
+    FROM raw_stripe_checkout_session
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE primary_checkout_summaries
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        argMin(
+            tuple(
+                session.checkout_session_id,
+                session.subscription_id,
+                session.payment_link_id,
+                session.mode
+            ),
+            ifNull(session.checkout_session_id, '')
+        ) AS checkout
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN
+        latest_primary_checkout_sessions_for_payments AS session
+        ON session.payment_intent_id = charge.payment_intent_id
+    GROUP BY charge.payment_id
+
+NODE enriched_primary_stripe_payments
+SQL >
+    WITH
+        concat(
+            '^([[:space:]]|', char(92), 'p{Z})+|([[:space:]]|', char(92), 'p{Z})+$'
+        ) AS unicode_boundary_whitespace_pattern
+    SELECT
+        charge.payment_id AS payment_id,
+        charge.payment_time AS payment_time,
+        toDate(charge.payment_time, 'America/Los_Angeles') AS payment_date,
+        charge.customer_id AS customer_id,
+        coalesce(
+            nullIf(
+                lowerUTF8(
+                    replaceRegexpAll(charge.billing_detail_email, '^[[:space:]]+|[[:space:]]+$', '')
+                ),
+                ''
+            ),
+            nullIf(
+                lowerUTF8(replaceRegexpAll(charge.receipt_email, '^[[:space:]]+|[[:space:]]+$', '')), ''
+            ),
+            customer.email,
+            intent.receipt_email
+        ) AS payment_email,
+        coalesce(
+            nullIf(replaceRegexpAll(charge.billing_detail_name, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            customer.name
+        ) AS payment_name,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(charge.billing_detail_phone, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            ),
+            nullIf(replaceRegexpAll(customer.phone, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            charge.metadata_phone
+        ) AS payment_phone,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(
+                    charge.billing_detail_address_line_1, '^[[:space:]]+|[[:space:]]+$', ''
+                ),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(charge.shipping_address_line_1, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            ),
+            nullIf(replaceRegexpAll(customer.address_line_1, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(
+                replaceRegexpAll(customer.shipping_address_line_1, '^[[:space:]]+|[[:space:]]+$', ''),
+                ''
+            )
+        ) AS billing_address_line_1,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(charge.billing_detail_address_city, '^[[:space:]]+|[[:space:]]+$', ''),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(charge.shipping_address_city, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            ),
+            nullIf(replaceRegexpAll(customer.address_city, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(
+                replaceRegexpAll(customer.shipping_address_city, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            )
+        ) AS billing_address_city,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(
+                    charge.billing_detail_address_state, '^[[:space:]]+|[[:space:]]+$', ''
+                ),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(charge.shipping_address_state, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            ),
+            nullIf(replaceRegexpAll(customer.address_state, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(
+                replaceRegexpAll(customer.shipping_address_state, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            )
+        ) AS billing_address_region,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(
+                    charge.billing_detail_address_postal_code, unicode_boundary_whitespace_pattern, ''
+                ),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(
+                    charge.shipping_address_postal_code, unicode_boundary_whitespace_pattern, ''
+                ),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(customer.address_postal_code, unicode_boundary_whitespace_pattern, ''),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(
+                    customer.shipping_address_postal_code, unicode_boundary_whitespace_pattern, ''
+                ),
+                ''
+            )
+        ) AS billing_address_zip,
+        coalesce(
+            nullIf(
+                replaceRegexpAll(
+                    charge.billing_detail_address_country, '^[[:space:]]+|[[:space:]]+$', ''
+                ),
+                ''
+            ),
+            nullIf(
+                replaceRegexpAll(charge.shipping_address_country, '^[[:space:]]+|[[:space:]]+$', ''), ''
+            ),
+            nullIf(replaceRegexpAll(customer.address_country, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(
+                replaceRegexpAll(customer.shipping_address_country, '^[[:space:]]+|[[:space:]]+$', ''),
+                ''
+            )
+        ) AS billing_address_country,
+        charge.currency AS currency,
+        charge.amount_cents AS amount_cents,
+        toDecimal128(charge.amount_cents, 9) / 100 AS amount_paid,
+        charge.amount_refunded_cents AS amount_refunded_cents,
+        toDecimal128(charge.amount_refunded_cents, 9) / 100 AS refund_amount,
+        toDecimal128(charge.amount_cents - charge.amount_refunded_cents, 9) / 100 AS net_amount,
+        charge.amount_refunded_cents > 0 AS has_refund,
+        charge.payment_intent_id AS payment_intent_id,
+        charge.payment_method_id AS payment_method_id,
+        charge.invoice_id AS invoice_id,
+        coalesce(invoice.subscription_id, tupleElement(checkout.checkout, 2)) AS subscription_id,
+        tupleElement(checkout.checkout, 1) AS checkout_session_id,
+        coalesce(
+            tupleElement(checkout.checkout, 3), catalog.catalog_payment_link_id
+        ) AS payment_link_id,
+        invoice.billing_reason AS invoice_billing_reason,
+        tupleElement(checkout.checkout, 4) AS checkout_mode,
+        catalog.catalog_source AS catalog_source,
+        catalog.catalog_product_id AS catalog_product_id,
+        catalog.catalog_product_name AS catalog_product_name,
+        catalog.catalog_price_id AS catalog_price_id,
+        catalog.catalog_plan_id AS catalog_plan_id,
+        catalog.catalog_line_item_description AS catalog_line_item_description,
+        catalog.catalog_quantity AS catalog_quantity,
+        catalog.catalog_line_amount AS catalog_line_amount,
+        catalog.line_item_signal AS line_item_signal,
+        coalesce(catalog.has_basic_vip_product, toUInt8(0)) AS has_basic_vip_product,
+        coalesce(catalog.has_basic_vip_price, toUInt8(0)) AS has_basic_vip_price,
+        coalesce(catalog.has_basic_vip_payment_link, toUInt8(0)) AS has_basic_vip_payment_link,
+        coalesce(catalog.has_krc_product, toUInt8(0)) AS has_krc_product,
+        coalesce(catalog.has_krc_price, toUInt8(0)) AS has_krc_price,
+        coalesce(catalog.has_full_payment_product, toUInt8(0)) AS has_full_payment_product,
+        coalesce(catalog.has_full_payment_price, toUInt8(0)) AS has_full_payment_price,
+        coalesce(catalog.has_3x1997_product, toUInt8(0)) AS has_3x1997_product,
+        coalesce(catalog.has_3x1997_plan, toUInt8(0)) AS has_3x1997_plan,
+        coalesce(catalog.has_balance_product, toUInt8(0)) AS has_balance_product,
+        coalesce(catalog.has_balance_price, toUInt8(0)) AS has_balance_price,
+        coalesce(discount.has_discount, false) AS has_discount,
+        coalesce(discount.discount_amount_cents, toInt64(0)) AS discount_amount_cents,
+        coalesce(discount.discount_amount, toDecimal128(0, 9)) AS discount_amount,
+        coalesce(discount.discount_ids, CAST([], 'Array(String)')) AS discount_ids,
+        coalesce(discount.coupon_ids, CAST([], 'Array(String)')) AS coupon_ids,
+        coalesce(discount.coupon_names, CAST([], 'Array(String)')) AS coupon_names,
+        coalesce(discount.promotion_code_ids, CAST([], 'Array(String)')) AS promotion_code_ids,
+        coalesce(discount.promotion_codes, CAST([], 'Array(String)')) AS promotion_codes,
+        discount.coupon_amount_off AS coupon_amount_off,
+        discount.coupon_percent_off AS coupon_percent_off,
+        charge.charge_description AS charge_description,
+        charge.calculated_statement_descriptor AS calculated_statement_descriptor,
+        charge.statement_descriptor AS statement_descriptor,
+        intent.description AS payment_intent_description,
+        invoice.description AS invoice_description,
+        lowerUTF8(
+            concat(
+                ifNull(charge.charge_description, ''),
+                ' ',
+                ifNull(charge.calculated_statement_descriptor, ''),
+                ' ',
+                ifNull(charge.statement_descriptor, ''),
+                ' ',
+                ifNull(intent.description, ''),
+                ' ',
+                ifNull(invoice.description, ''),
+                ' ',
+                ifNull(catalog.line_item_signal, '')
+            )
+        ) AS classification_signal,
+        charge.receipt_url AS receipt_url,
+        charge.metadata_products AS metadata_products,
+        charge.livemode AS livemode
+    FROM stripe_primary_successful_charges_adapter AS charge
+    LEFT JOIN
+        latest_primary_customers_for_payments AS customer ON customer.customer_id = charge.customer_id
+    LEFT JOIN
+        latest_primary_intents_for_payments AS intent
+        ON intent.payment_intent_id = charge.payment_intent_id
+    LEFT JOIN latest_primary_invoices_for_payments AS invoice ON invoice.invoice_id = charge.invoice_id
+    LEFT JOIN primary_checkout_summaries AS checkout ON checkout.payment_id = charge.payment_id
+    LEFT JOIN stripe_primary_catalog_adapter AS catalog ON catalog.payment_id = charge.payment_id
+    LEFT JOIN stripe_primary_discount_adapter AS discount ON discount.payment_id = charge.payment_id
+
+NODE primary_stripe_classification_signals
+SQL >
+    SELECT
+        *,
+        nullIf(
+            extract(ifNull(charge_description, ''), '(?i)products?:[[:space:]]*(.*)'), ''
+        ) AS book_product_text,
+        toUInt8(
+            match(
+                lowerUTF8(
+                    concat(
+                        ifNull(calculated_statement_descriptor, ''),
+                        ' ',
+                        ifNull(statement_descriptor, '')
+                    )
+                ),
+                'keyboard rich book'
+            )
+        ) AS is_keyboard_rich_book,
+        toUInt8(
+            lowerUTF8(
+                replaceRegexpAll(ifNull(metadata_products, ''), '^[[:space:]]+|[[:space:]]+$', '')
+            )
+            = 'top tax loopholes for bookkeeping business owners'
+        ) AS is_top_tax_loopholes,
+        toUInt8(
+            lowerUTF8(
+                replaceRegexpAll(ifNull(metadata_products, ''), '^[[:space:]]+|[[:space:]]+$', '')
+            )
+            = 'booming bookkeeping mentorship program (one-time payment - save $994)'
+        ) AS is_mentorship_full_payment_metadata,
+        toUInt8(
+            amount_cents = 4700
+            AND match(classification_signal, '(keyboard rich|keyboardrich|krc)')
+            AND match(classification_signal, '(vip|backstage|basic package|platinum)')
+        ) AS is_47_vip,
+        toUInt8(
+            amount_cents IN (99700, 49700)
+            AND match(lowerUTF8(ifNull(charge_description, '')), 'mentorship program \\(deposit\\)')
+        ) AS is_mentorship_deposit,
+        toUInt8(
+            coalesce(
+                catalog_product_id IN (
+                    'prod_RtWTQcXFL5PCoP',
+                    'prod_P5jeaXOTRDRYb3',
+                    'prod_P8O68hxEgWfW2G',
+                    'prod_OtknE7wwsCWpIQ'
+                )
+                OR catalog_price_id IN (
+                    'price_1QzjQSBf6i84vTZEHPfW7AFx',
+                    'price_1OHYB4Bf6i84vTZEHRHagkb2',
+                    'price_1OK7KMBf6i84vTZEHgHrnSGj',
+                    'price_1O5xI0Bf6i84vTZEoFWnW066'
+                )
+                OR payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+                OR lowerUTF8(
+                    replaceRegexpAll(ifNull(charge_description, ''), '^[[:space:]]+|[[:space:]]+$', '')
+                )
+                = 'bbb installment',
+                false
+            )
+        ) AS is_bbb_mentorship_installment
+    FROM enriched_primary_stripe_payments
+
+NODE classified_primary_stripe_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            is_keyboard_rich_book = 1,
+            'keyboard_rich_book',
+            is_top_tax_loopholes = 1,
+            'top_tax_loopholes',
+            has_basic_vip_product = 1 OR has_basic_vip_price = 1 OR has_basic_vip_payment_link = 1,
+            'structured_basic_vip',
+            has_krc_product = 1 OR has_krc_price = 1,
+            'structured_keyboard_rich_challenge',
+            is_47_vip = 1,
+            'keyboard_rich_challenge_vip',
+            is_mentorship_deposit = 1,
+            'mentorship_deposit',
+            is_mentorship_full_payment_metadata = 1,
+            'mentorship_full_payment',
+            has_full_payment_product = 1 OR has_full_payment_price = 1,
+            'mentorship_full_payment',
+            has_3x1997_product = 1 OR has_3x1997_plan = 1,
+            'mentorship_3x1997',
+            has_balance_product = 1 OR has_balance_price = 1,
+            'mentorship_balance',
+            catalog_product_name IS NOT NULL,
+            'catalog_product',
+            'unclassified'
+        ) AS product_rule
+    FROM primary_stripe_classification_signals
+
+NODE named_primary_stripe_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            is_mentorship_full_payment_metadata = 1,
+            coalesce(catalog_product_id, 'mentorship_full_payment'),
+            product_rule = 'structured_basic_vip',
+            'prod_RtWRamfeN5cGXG',
+            product_rule = 'structured_keyboard_rich_challenge',
+            'prod_RL2UJfDpmvCvRx',
+            product_rule = 'mentorship_full_payment',
+            'prod_RlhQH6wdxzjZeZ',
+            product_rule = 'mentorship_3x1997',
+            'prod_PtzEmmHhC1K9Xi',
+            product_rule = 'mentorship_balance',
+            'prod_RtWNqT9xux5CI7',
+            catalog_product_id
+        ) AS product_id,
+        multiIf(
+            product_rule = 'keyboard_rich_book',
+            'Keyboard Rich book',
+            product_rule = 'top_tax_loopholes',
+            'Top Tax Loopholes for Bookkeeping Business Owners',
+            product_rule = 'structured_basic_vip',
+            'KRC - Basic VIP',
+            product_rule = 'structured_keyboard_rich_challenge',
+            'Keyboard Rich Challenge',
+            product_rule = 'keyboard_rich_challenge_vip',
+            '$47 Keyboard Rich Challenge VIP',
+            product_rule = 'mentorship_deposit',
+            'Booming Bookkeeping Mentorship Program deposit',
+            product_rule = 'mentorship_full_payment',
+            'Booming Bookkeeping Mentorship Program',
+            product_rule = 'mentorship_3x1997',
+            'Booming Bookkeeping Mentorship Program (3 payments of $1,997)',
+            product_rule = 'mentorship_balance',
+            'Booming Bookkeeping Balance payment',
+            product_rule = 'catalog_product',
+            catalog_product_name,
+            'unclassified'
+        ) AS product_name,
+        multiIf(
+            product_rule != 'keyboard_rich_book',
+            CAST(NULL AS Nullable(String)),
+            match(lowerUTF8(ifNull(book_product_text, '')), 'international shipping')
+            AND match(lowerUTF8(ifNull(book_product_text, '')), 'audiobook'),
+            'Book + international shipping + audiobook',
+            match(lowerUTF8(ifNull(book_product_text, '')), 'domestic shipping')
+            AND match(lowerUTF8(ifNull(book_product_text, '')), 'audiobook'),
+            'Book + domestic shipping + audiobook',
+            match(lowerUTF8(ifNull(book_product_text, '')), 'international shipping'),
+            'Book + international shipping',
+            match(lowerUTF8(ifNull(book_product_text, '')), 'domestic shipping'),
+            'Book + domestic shipping',
+            match(lowerUTF8(ifNull(book_product_text, '')), 'audiobook'),
+            'Book + audiobook/no shipping label',
+            'Book/no shipping label'
+        ) AS product_variant,
+        multiIf(
+            is_mentorship_full_payment_metadata = 1,
+            'charge_metadata_products',
+            product_rule = 'keyboard_rich_book',
+            'charge_statement_descriptor',
+            product_rule = 'top_tax_loopholes',
+            'charge_metadata_products',
+            product_rule = 'keyboard_rich_challenge_vip',
+            'charge_amount_and_text',
+            product_rule = 'mentorship_deposit',
+            'charge_description_and_amount',
+            product_rule = 'structured_basic_vip',
+            'stripe_catalog_or_payment_link',
+            product_rule = 'structured_keyboard_rich_challenge',
+            'stripe_catalog',
+            product_rule = 'mentorship_full_payment',
+            'stripe_catalog',
+            product_rule = 'mentorship_3x1997',
+            'stripe_plan_or_catalog',
+            product_rule = 'mentorship_balance',
+            'stripe_catalog',
+            product_rule = 'catalog_product',
+            catalog_source,
+            'unclassified'
+        ) AS product_classification_method,
+        product_rule != 'unclassified' AS is_product_classified
+    FROM classified_primary_stripe_payments
+
+NODE resolved_primary_stripe_products
+SQL >
+    SELECT
+        * EXCEPT (
+            is_keyboard_rich_book,
+            is_top_tax_loopholes,
+            is_mentorship_full_payment_metadata,
+            is_47_vip,
+            is_mentorship_deposit,
+            has_basic_vip_product,
+            has_basic_vip_price,
+            has_basic_vip_payment_link,
+            has_krc_product,
+            has_krc_price,
+            has_full_payment_product,
+            has_full_payment_price,
+            has_3x1997_product,
+            has_3x1997_plan,
+            has_balance_product,
+            has_balance_price
+        )
+    FROM named_primary_stripe_payments
+
+NODE sequenced_primary_stripe_payments
+SQL >
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY subscription_id ORDER BY payment_time, payment_id
+        ) AS subscription_sequence_number,
+        row_number() OVER (
+            PARTITION BY
+                coalesce(
+                    if(
+                        customer_id IS NULL,
+                        CAST(NULL AS Nullable(String)),
+                        concat('customer:', customer_id)
+                    ),
+                    if(
+                        payment_email IS NULL,
+                        CAST(NULL AS Nullable(String)),
+                        concat('email:', lowerUTF8(payment_email))
+                    ),
+                    concat('payment:', payment_id)
+                ),
+                payment_link_id
+            ORDER BY payment_time, payment_id
+        ) AS customer_payment_link_sequence_number
+    FROM resolved_primary_stripe_products
+
+NODE current_primary_stripe_payment_rows
+SQL >
+    SELECT
+        'stripe' AS payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        billing_address_line_1,
+        billing_address_city,
+        billing_address_region,
+        billing_address_zip,
+        billing_address_country,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        product_variant,
+        catalog_price_id AS price_id,
+        catalog_plan_id AS plan_id,
+        product_rule,
+        product_classification_method,
+        is_product_classified,
+        is_bbb_mentorship_installment,
+        if(
+            subscription_id IS NOT NULL,
+            toInt64(subscription_sequence_number),
+            if(
+                is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P',
+                toInt64(customer_payment_link_sequence_number),
+                CAST(NULL AS Nullable(Int64))
+            )
+        ) AS payment_sequence_number,
+        multiIf(
+            product_rule = 'mentorship_balance',
+            'balance',
+            is_bbb_mentorship_installment = 1
+            AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+            AND customer_payment_link_sequence_number = 1,
+            'initial',
+            is_bbb_mentorship_installment = 1 AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P',
+            'installment',
+            subscription_id IS NULL,
+            'one_time',
+            invoice_billing_reason = 'subscription_create',
+            'initial',
+            product_rule = 'mentorship_3x1997' OR is_bbb_mentorship_installment = 1,
+            'installment',
+            'renewal'
+        ) AS payment_occurrence_type,
+        toUInt8(
+            product_rule = 'mentorship_balance'
+            OR coalesce(
+                is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+                AND customer_payment_link_sequence_number > 1,
+                false
+            )
+            OR (
+                subscription_id IS NOT NULL
+                AND coalesce(invoice_billing_reason != 'subscription_create', true)
+            )
+        ) AS is_repeat_payment,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        checkout_session_id,
+        payment_link_id,
+        invoice_billing_reason,
+        checkout_mode,
+        has_discount,
+        discount_amount,
+        discount_ids,
+        coupon_ids,
+        coupon_names,
+        promotion_code_ids,
+        promotion_codes,
+        coupon_amount_off,
+        coupon_percent_off,
+        charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        payment_intent_description,
+        invoice_description,
+        book_product_text,
+        receipt_url,
+        livemode,
+        coalesce(
+            nullIf(replaceRegexpAll(metadata_products, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(replaceRegexpAll(book_product_text, '^[[:space:]]+|[[:space:]]+$', ''), ''),
+            nullIf(replaceRegexpAll(product_name, '^[[:space:]]+|[[:space:]]+$', ''), '')
+        ) AS product_complete_name
+    FROM sequenced_primary_stripe_payments

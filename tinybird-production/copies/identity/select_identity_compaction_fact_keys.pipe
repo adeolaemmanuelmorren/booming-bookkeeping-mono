@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Select and append retained fact keys for one identity compaction batch.
+
+NODE append_selected_identity_compaction_fact_keys
+SQL >
+    SELECT * FROM identity_compaction_fact_keys_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_fact_keys_stage
+COPY_MODE append

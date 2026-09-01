@@ -1,0 +1,61 @@
+DESCRIPTION >
+    Typed low-latency Jitsu Events API landing contract. It shares message_id with GCS
+    backfills so adapter precedence can collapse live and historical copies deterministically.
+    ingested_at records each Tinybird delivery attempt so incremental identity scans cannot
+    miss a message delayed in Cloudflare Queue. source_fact_version remains the UInt64 UTC
+    epoch-microsecond value of Jitsu's received/sent/event timestamp, preserving deterministic
+    retry and correction ordering independently from operational delivery time.
+
+TOKEN "jitsu_events_append" APPEND
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`,
+    `producer_sequence` UInt64 `json:$.producer_sequence`,
+    `delivery_event_id` String `json:$.delivery_event_id`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`,
+    `message_id` String `json:$.message_id`,
+    `event_kind` LowCardinality(String) `json:$.event_kind`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `ingested_at` DateTime64(6) `json:$.ingested_at`,
+    `event_timestamp` Nullable(DateTime64(6)) `json:$.event_timestamp`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `first_name` Nullable(String) `json:$.first_name`,
+    `last_name` Nullable(String) `json:$.last_name`,
+    `customer_name` Nullable(String) `json:$.customer_name`,
+    `page_url` Nullable(String) `json:$.page_url`,
+    `page_path` Nullable(String) `json:$.page_path`,
+    `page_referrer` Nullable(String) `json:$.page_referrer`,
+    `form_id` Nullable(String) `json:$.form_id`,
+    `form_name` Nullable(String) `json:$.form_name`,
+    `form_action` Nullable(String) `json:$.form_action`,
+    `submitted_at` Nullable(DateTime64(6)) `json:$.submitted_at`,
+    `is_checkout_form` Nullable(Bool) `json:$.is_checkout_form`,
+    `is_payment_confirmed` Nullable(Bool) `json:$.is_payment_confirmed`,
+    `payment_status` Nullable(String) `json:$.payment_status`,
+    `amount` Nullable(Decimal(38,9)) `json:$.amount`,
+    `value` Nullable(Decimal(38,9)) `json:$.value`,
+    `currency` Nullable(String) `json:$.currency`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `product_name` Nullable(String) `json:$.product_name`,
+    `products` Nullable(String) `json:$.products`,
+    `utm_source` Nullable(String) `json:$.utm_source`,
+    `utm_medium` Nullable(String) `json:$.utm_medium`,
+    `utm_campaign` Nullable(String) `json:$.utm_campaign`,
+    `utm_content` Nullable(String) `json:$.utm_content`,
+    `utm_term` Nullable(String) `json:$.utm_term`,
+    `utm_id` Nullable(String) `json:$.utm_id`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `fbclid` Nullable(String) `json:$.fbclid`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `source_deleted` UInt8 `json:$.source_deleted`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, producer_id, producer_sequence, delivery_event_id

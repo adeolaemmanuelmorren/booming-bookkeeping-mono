@@ -1,0 +1,45 @@
+DESCRIPTION >
+    Complete fact replacements, fact tombstones, and the marker for one shadow generation.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `state_kind` LowCardinality(String) `json:$.state_kind`,
+    `state_key` String `json:$.state_key`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `is_deleted` UInt8 `json:$.is_deleted`,
+    `row_hash` FixedString(64) `json:$.row_hash`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `profile_id` String `json:$.profile_id`,
+    `profile_key` String `json:$.profile_key`,
+    `winner_identifier_key` String `json:$.winner_identifier_key`,
+    `member_identifier_keys` Array(String) `json:$.member_identifier_keys[:]`,
+    `anonymous_ids` Array(String) `json:$.anonymous_ids[:]`,
+    `user_ids` Array(String) `json:$.user_ids[:]`,
+    `emails` Array(String) `json:$.emails[:]`,
+    `phones` Array(String) `json:$.phones[:]`,
+    `historical_profile_ids` Array(String) `json:$.historical_profile_ids[:]`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_deleted` UInt8 `json:$.fact_deleted`,
+    `fact_observed_at` DateTime64(6) `json:$.fact_observed_at`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`,
+    `evidence_keys` Array(String) `json:$.evidence_keys[:]`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`,
+    `checkpoint_sequence` UInt64 `json:$.checkpoint_sequence`,
+    `prior_profile_ids` Array(String) `json:$.prior_profile_ids[:]`,
+    `dirty_profile_ids` Array(String) `json:$.dirty_profile_ids[:]`,
+    `input_event_count` UInt64 `json:$.input_event_count`,
+    `input_hash` FixedString(64) `json:$.input_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, state_kind, state_key

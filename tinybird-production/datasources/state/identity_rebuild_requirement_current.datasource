@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Frozen safety decision for the current identity batch. Normal compaction only
+    runs when this snapshot says no evidence removal can split a profile.
+
+SCHEMA >
+    `unsafe_fact_count` UInt64 `json:$.unsafe_fact_count`,
+    `rebuild_reasons` Array(String) `json:$.rebuild_reasons[:]`,
+    `rebuild_required` UInt8 `json:$.rebuild_required`,
+    `checked_at` DateTime64(6) `json:$.checked_at`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY checked_at

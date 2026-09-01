@@ -1,0 +1,21 @@
+DESCRIPTION >
+    Verify one literal-key slice of an unactivated Worker batch before its manifest
+    is published.
+
+NODE verified_identity_worker_written_rows
+SQL >
+    %
+    SELECT DISTINCT state_kind, lookup_key, sub_key, row_hash
+    FROM identity_state_delta_versions
+    WHERE
+        tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND state_kind = {{ String(p_state_kind, '') }}
+        {% if defined(p_lookup_key) %}
+            AND lookup_key = {{ String(p_lookup_key) }}
+        {% else %}
+            AND lookup_key IN {{ Array(p_lookup_keys, 'String') }}
+        {% end %}
+        AND batch_version = {{ UInt64(p_batch_version, 0) }}
+        AND batch_id = {{ String(p_batch_id, '') }}
+
+TYPE ENDPOINT

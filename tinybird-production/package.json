@@ -1,0 +1,20 @@
+{
+  "name": "boom-tinybird-production",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check-project.mjs && node --test scripts/tests/identity-compaction.test.mjs scripts/tests/identity-enqueue-batching.test.mjs scripts/tests/identity-source-cdc.test.mjs scripts/tests/identity-state-layer.test.mjs scripts/tests/incremental-journey.test.mjs",
+    "deploy": "tb --max-depth 4 deploy",
+    "deploy:check": "tb --max-depth 4 deploy --check",
+    "identity-seed:plan": "node scripts/export-identity-state-seed-to-gcs.mjs --plan",
+    "identity-seed:dry-run": "node scripts/export-identity-state-seed-to-gcs.mjs --dry-run",
+    "parity:check": "node --test scripts/tests/parity-contract.test.mjs scripts/tests/identity-parity.test.mjs",
+    "parity:identity": "node scripts/compare-identity-state.mjs",
+    "parity:identity:plan": "node scripts/compare-identity-state.mjs",
+    "parity:plan": "node scripts/compare-dataform-outputs.mjs --plan --target=cloud",
+    "parity:production": "node scripts/compare-dataform-outputs.mjs --target=cloud",
+    "parity:activecampaign": "node scripts/compare-activecampaign-registration.mjs",
+    "parity:meta": "node scripts/compare-meta-marts.mjs",
+    "parity:payments": "node scripts/compare-all-stripe-payments.mjs"
+  }
+}

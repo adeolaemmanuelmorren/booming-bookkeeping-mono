@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Current payment-plan timing computed after read-time identity resolution.
+
+NODE current_payment_plan_timing_rows
+SQL >
+    SELECT * FROM int_payment_plan_timing_build

@@ -1,0 +1,74 @@
+DESCRIPTION >
+    Current attribution-param contract over physical version state.
+
+NODE recently_ingested_attribution_param_keys
+SQL >
+    %
+    SELECT tenant_id, __tb_state_key
+    FROM jitsu_attribution_param_versions
+    WHERE
+        {{ String(p_identity_producer, 'all') }} = 'source_identity:segment_attribution'
+        AND __tb_state_key != ''
+        AND source_ingested_at
+        >= toDateTime64({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    GROUP BY tenant_id, __tb_state_key
+
+NODE ranked_attribution_param_versions
+SQL >
+    %
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.attribution_event_id
+            ORDER BY
+                source.source_priority DESC,
+                source.source_fact_version DESC,
+                source.source_ingested_at DESC,
+                source.payload_hash DESC
+        ) AS current_version_rank
+    FROM jitsu_attribution_param_versions AS source
+    WHERE
+        {{ String(p_identity_producer, 'all') }} = 'all'
+        OR (
+            {{ String(p_identity_producer, 'all') }} = 'source_identity:segment_attribution'
+            AND (source.tenant_id, source.__tb_state_key)
+            IN (SELECT tenant_id, __tb_state_key FROM recently_ingested_attribution_param_keys)
+        )
+
+NODE current_attribution_param_rows
+SQL >
+    SELECT
+        tenant_id,
+        attribution_event_id,
+        source_system,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        utm_source,
+        source_version
+    FROM ranked_attribution_param_versions
+    WHERE current_version_rank = 1 AND source_deleted = 0

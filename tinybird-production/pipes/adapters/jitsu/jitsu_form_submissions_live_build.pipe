@@ -1,0 +1,505 @@
+DESCRIPTION >
+    Canonical form-submission versions derived from the single
+    Jitsu Events API origin. Tombstones remain in the version contract.
+
+NODE form_live_ranked_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY source.source_fact_version DESC, source.ingested_at DESC, source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    WHERE source.tenant_id = 'boom'
+
+NODE form_live_current_versions
+SQL >
+    SELECT * FROM form_live_ranked_versions WHERE logical_version_rank = 1
+
+NODE form_live_rows
+SQL >
+    SELECT
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.source_deleted,
+        nullIf(trim(source.message_id), '') AS form_submission_id,
+        coalesce(
+            nullIf(JSONExtractString(source.fact_payload, 'event_id'), ''),
+            nullIf(JSONExtractString(source.fact_payload, 'properties', 'event_id'), '')
+        ) AS event_id,
+        coalesce(source.submitted_at, source.observed_at) AS submitted_at,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(JSONExtractString(source.fact_payload, 'email'))), ''),
+            nullIf(lowerUTF8(trim(JSONExtractString(source.fact_payload, 'properties', 'email'))), ''),
+            nullIf(
+                lowerUTF8(
+                    trim(
+                        JSONExtractString(
+                            source.fact_payload, 'extra_submitted_fields_checkout_offer_member_email'
+                        )
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                lowerUTF8(
+                    trim(
+                        JSONExtractString(
+                            source.fact_payload,
+                            'properties',
+                            'extra_submitted_fields_checkout_offer_member_email'
+                        )
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                lowerUTF8(trim(JSONExtractString(source.fact_payload, 'context', 'traits', 'email'))),
+                ''
+            ),
+            nullIf(lowerUTF8(trim(JSONExtractString(source.fact_payload, 'context_traits_email'))), ''),
+            nullIf(lowerUTF8(trim(source.user_id)), '')
+        ) AS email,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'phone')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'phone')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'traits', 'phone')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_traits_phone')), '')
+        ) AS phone,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'first_name')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'first_name')), '')
+        ) AS first_name,
+        coalesce(
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'extra_submitted_fields_checkout_offer_member_name'
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload,
+                        'properties',
+                        'extra_submitted_fields_checkout_offer_member_name'
+                    )
+                ),
+                ''
+            )
+        ) AS checkout_member_name,
+        nullIf(trim(source.form_id), '') AS form_id,
+        nullIf(trim(source.form_name), '') AS form_name,
+        nullIf(trim(source.form_action), '') AS form_action,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'form_method')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'form_method')), '')
+        ) AS form_method,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'page_url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'page_url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_url')), '')
+        ) AS page_url,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'page_path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'page_path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_path')), '')
+        ) AS page_path,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'referrer')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_referrer')), '')
+        ) AS page_referrer,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'ip')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_ip')), '')
+        ) AS ip_address,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'userAgent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent')), '')
+        ) AS user_agent,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'cityName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_city_name')), '')
+        ) AS geo_city,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'regionName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_region_name')), '')
+        ) AS geo_region,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'countryCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_country_code')), '')
+        ) AS geo_country,
+        coalesce(
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'extra_submitted_fields_checkout_offer_payment_method_id'
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload,
+                        'properties',
+                        'extra_submitted_fields_checkout_offer_payment_method_id'
+                    )
+                ),
+                ''
+            )
+        ) AS stripe_payment_method_id,
+        coalesce(
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'extra_submitted_fields_checkout_offer_payment_method_type'
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload,
+                        'properties',
+                        'extra_submitted_fields_checkout_offer_payment_method_type'
+                    )
+                ),
+                ''
+            )
+        ) AS payment_method_type,
+        coalesce(
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'extra_submitted_fields_checkout_offer_payment_provider'
+                    )
+                ),
+                ''
+            ),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload,
+                        'properties',
+                        'extra_submitted_fields_checkout_offer_payment_provider'
+                    )
+                ),
+                ''
+            )
+        ) AS payment_provider,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'extra_submitted_fields_payment_type')), ''
+            ),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'properties', 'extra_submitted_fields_payment_type'
+                    )
+                ),
+                ''
+            )
+        ) AS payment_type,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'extra_submitted_fields_coupon')), ''),
+            nullIf(
+                trim(
+                    JSONExtractString(
+                        source.fact_payload, 'properties', 'extra_submitted_fields_coupon'
+                    )
+                ),
+                ''
+            )
+        ) AS coupon,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gclid')), '')
+        ) AS gclid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gbraid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gbraid')), '')
+        ) AS gbraid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbclid')), '')
+        ) AS fbclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbc')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbc')), '')
+        ) AS fbc,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbp')), '')
+        ) AS fbp,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'ttp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_ttp')), '')
+        ) AS ttp,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetsid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_uetsid')), '')
+        ) AS uetsid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetvid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_uetvid')), '')
+        ) AS uetvid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_source')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_source')), '')
+        ) AS utm_source,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_medium')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_medium')), '')
+        ) AS utm_medium,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_campaign')),
+                ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_campaign')), '')
+        ) AS utm_campaign,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_content')),
+                ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_content')), '')
+        ) AS utm_content,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_term')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_term')), '')
+        ) AS utm_term,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'active_campaign_form_id')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'properties', 'active_campaign_form_id')),
+                ''
+            )
+        ) AS payload_active_campaign_form_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(JSONExtractString(source.fact_payload, 'registration_type'))), ''),
+            nullIf(
+                lowerUTF8(
+                    trim(JSONExtractString(source.fact_payload, 'properties', 'registration_type'))
+                ),
+                ''
+            )
+        ) AS payload_registration_type,
+        source.ingested_at AS source_version,
+        source.source_fact_version,
+        source.ingested_at AS source_ingested_at,
+        source.payload_hash
+    FROM form_live_current_versions AS source
+    WHERE source.event_kind = 'client_form'
+
+NODE form_classified_rows
+SQL >
+    SELECT
+        source.*,
+        coalesce(
+            source.payload_active_campaign_form_id,
+            nullIf(extract(ifNull(source.form_id, ''), '(?i)^_form_(\\d+)_$'), '')
+        ) AS active_campaign_form_id
+    FROM form_live_rows AS source
+
+NODE form_registration_labeled_rows
+SQL >
+    SELECT
+        source.*,
+        multiIf(
+            source.payload_registration_type IN ('krc', 'webinar'),
+            source.payload_registration_type,
+            source.active_campaign_form_id = '20',
+            'krc',
+            source.active_campaign_form_id = '15',
+            'webinar',
+            CAST(NULL AS Nullable(String))
+        ) AS registration_type
+    FROM form_classified_rows AS source
+
+NODE current_form_submission_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        form_submission_id,
+        source_system,
+        event_id,
+        submitted_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        checkout_member_name,
+        form_id,
+        form_name,
+        form_action,
+        form_method,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        payment_type,
+        coupon,
+        gclid,
+        gbraid,
+        fbclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        active_campaign_form_id,
+        registration_type,
+        multiIf(
+            registration_type = 'krc',
+            'Keyboard Rich Challenge Registration',
+            registration_type = 'webinar',
+            'Booming Bookkeeping Webinar Registration',
+            CAST(NULL AS Nullable(String))
+        ) AS content_name,
+        if(
+            email IS NOT NULL AND registration_type IS NOT NULL AND submitted_at IS NOT NULL,
+            concat(
+                'form_submission_',
+                lowerUTF8(
+                    hex(
+                        SHA256(
+                            concat(
+                                lowerUTF8(trim(email)),
+                                '|',
+                                registration_type,
+                                '|',
+                                toString(toDate(submitted_at, 'America/Los_Angeles'))
+                            )
+                        )
+                    )
+                )
+            ),
+            CAST(NULL AS Nullable(String))
+        ) AS canonical_event_id,
+        lowerUTF8(ifNull(form_id, '')) = 'new_checkout_offer'
+        OR lowerUTF8(ifNull(form_name, '')) = 'new_checkout_offer'
+        OR match(lowerUTF8(ifNull(form_action, '')), '/offers/[^/]+/checkout')
+        OR match(lowerUTF8(ifNull(page_path, '')), '/offers/[^/]+/checkout')
+        OR payment_method_type IS NOT NULL AS is_checkout_form,
+        if(
+            lowerUTF8(ifNull(form_id, '')) = 'new_checkout_offer'
+            OR match(lowerUTF8(ifNull(form_action, '')), '/offers/[^/]+/checkout')
+            OR match(lowerUTF8(ifNull(page_path, '')), '/offers/[^/]+/checkout')
+            OR payment_method_type IS NOT NULL,
+            'checkout',
+            'lead'
+        ) AS form_type,
+        nullIf(
+            extract(coalesce(form_action, page_path, ''), '(?i)/offers/([^/]+)/checkout'), ''
+        ) AS offer_id,
+        source_version
+    FROM form_registration_labeled_rows
+
+NODE current_form_submission_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        form_submission_id,
+        event_id,
+        submitted_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        checkout_member_name,
+        form_id,
+        form_name,
+        form_action,
+        form_method,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        payment_type,
+        coupon,
+        gclid,
+        gbraid,
+        fbclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        active_campaign_form_id,
+        registration_type,
+        content_name,
+        canonical_event_id,
+        is_checkout_form,
+        form_type,
+        offer_id,
+        source_version,
+        ifNull(form_submission_id, '') AS __tb_state_key
+    FROM current_form_submission_rows

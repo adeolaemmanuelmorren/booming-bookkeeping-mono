@@ -1,0 +1,26 @@
+DESCRIPTION >
+    Preserve every arriving ActiveCampaign tag semantic version. Repeated overlap
+    imports collapse by tag and source version in the target datasource.
+
+NODE project_activecampaign_tag_semantic_versions
+SQL >
+    SELECT
+        ifNull(id, '') AS tag_id,
+        tags AS tag_name,
+        ifNull(_fivetran_synced, toDateTime64(0, 6)) AS source_version,
+        toUInt8(coalesce(_fivetran_deleted, false)) AS is_deleted,
+        lower(
+            hex(
+                SHA256(
+                    concat(
+                        ifNull(tags, ''),
+                        '\n',
+                        toString(toUInt8(coalesce(_fivetran_deleted, false)))
+                    )
+                )
+            )
+        ) AS semantic_hash
+    FROM raw_activecampaign_tags
+
+TYPE MATERIALIZED
+DATASOURCE activecampaign_tag_semantic_versions

@@ -1,0 +1,785 @@
+{
+  "snapshot": "2026-08-28T12:04:51Z",
+  "max_batch_version": 1787915640067,
+  "compared_buckets": [
+    2,
+    3,
+    5,
+    7,
+    8,
+    9,
+    12,
+    13,
+    20,
+    21,
+    23,
+    26,
+    30,
+    34,
+    35,
+    40,
+    43,
+    48,
+    49,
+    50,
+    51,
+    54,
+    56,
+    62,
+    64,
+    65,
+    68,
+    79,
+    80,
+    87,
+    88,
+    90,
+    92,
+    104,
+    105,
+    110,
+    111,
+    117,
+    118,
+    121,
+    127,
+    128,
+    129,
+    133,
+    134,
+    137,
+    142,
+    146,
+    149,
+    152,
+    164,
+    169,
+    170,
+    185,
+    192,
+    197,
+    198,
+    202,
+    206,
+    215,
+    220,
+    223,
+    224,
+    226,
+    227,
+    232,
+    238,
+    242,
+    246,
+    254
+  ],
+  "bigquery_rows": 628497,
+  "tinybird_rows": 628497,
+  "mismatch_count": 88,
+  "mismatches": [
+    {
+      "profile_id": "009efa8769d3cf67bd666d359c5371ce",
+      "kind": "trait",
+      "bigquery_first_name": "Beverly",
+      "bigquery_last_name": "Wilson",
+      "tinybird_first_name": "Beverly Wilson",
+      "tinybird_last_name": "Wilson"
+    },
+    {
+      "profile_id": "0299fc0d872c5c0452b96accd91bd952",
+      "kind": "trait",
+      "bigquery_first_name": "Sean",
+      "bigquery_last_name": "Pearce",
+      "tinybird_first_name": "Sean",
+      "tinybird_last_name": "e"
+    },
+    {
+      "profile_id": "03a74c8e29b89211255689e89cea5619",
+      "kind": "trait",
+      "bigquery_first_name": "Nechelle",
+      "bigquery_last_name": "Bixby",
+      "tinybird_first_name": "Nechelle Bixby",
+      "tinybird_last_name": "Bixby"
+    },
+    {
+      "profile_id": "044f3d4ff9aed3ea2689d647b6d896b7",
+      "kind": "trait",
+      "bigquery_first_name": "Roseann",
+      "bigquery_last_name": "Lopez",
+      "tinybird_first_name": "Roseann Lopez",
+      "tinybird_last_name": "Lopez"
+    },
+    {
+      "profile_id": "0b931612d45a63d1f9ca9d4a8ed06d87",
+      "kind": "trait",
+      "bigquery_first_name": "Meredith",
+      "bigquery_last_name": "Dwyer",
+      "tinybird_first_name": "Meredith Dwyer",
+      "tinybird_last_name": "Dwyer"
+    },
+    {
+      "profile_id": "0d370f8a2be2f681db2eba39953056ed",
+      "kind": "trait",
+      "bigquery_first_name": "Devanee",
+      "bigquery_last_name": "Maass",
+      "tinybird_first_name": "Devabee",
+      "tinybird_last_name": "Maass"
+    },
+    {
+      "profile_id": "1208ac7c458193b5d311cb63cd274cfb",
+      "kind": "trait",
+      "bigquery_first_name": "Nathan",
+      "bigquery_last_name": "Gay",
+      "tinybird_first_name": "Nathan Gay",
+      "tinybird_last_name": "Gay"
+    },
+    {
+      "profile_id": "14bfa9e0ea8e23d391c1feb89d7d6afc",
+      "kind": "trait",
+      "bigquery_first_name": "Tracy",
+      "bigquery_last_name": "Rabey",
+      "tinybird_first_name": "Tracy",
+      "tinybird_last_name": "Haaland"
+    },
+    {
+      "profile_id": "14f62fb3092f1a42ab70f1950bede3d1",
+      "kind": "trait",
+      "bigquery_first_name": "Delila",
+      "bigquery_last_name": "Gordon",
+      "tinybird_first_name": "Delila",
+      "tinybird_last_name": "gordon"
+    },
+    {
+      "profile_id": "14f750539f5c9db468ea97fd85b1d2f4",
+      "kind": "trait",
+      "bigquery_first_name": "Sherri",
+      "bigquery_last_name": "Green",
+      "tinybird_first_name": "Sherri Green",
+      "tinybird_last_name": "Green"
+    },
+    {
+      "profile_id": "15cda7f7a1797f74b96de67261b2c8b2",
+      "kind": "trait",
+      "bigquery_first_name": "Adriana",
+      "bigquery_last_name": "Echeverri",
+      "tinybird_first_name": "Adri",
+      "tinybird_last_name": "Echeverri"
+    },
+    {
+      "profile_id": "18f1479dda219d86cd1f7f1325cce4a3",
+      "kind": "trait",
+      "bigquery_first_name": "craig",
+      "bigquery_last_name": "johnson",
+      "tinybird_first_name": "CJ Johnson",
+      "tinybird_last_name": "johnson"
+    },
+    {
+      "profile_id": "194a2eaac074470aacf2b5420b90d516",
+      "kind": "trait",
+      "bigquery_first_name": "Lorraine",
+      "bigquery_last_name": "Megdanis",
+      "tinybird_first_name": "Lorraine Megdanis",
+      "tinybird_last_name": "Megdanis"
+    },
+    {
+      "profile_id": "1c4b58ee6b5a54394f207c9f31185cbc",
+      "kind": "trait",
+      "bigquery_first_name": "Eileen",
+      "bigquery_last_name": "Ryan-Williams",
+      "tinybird_first_name": "Eileen Ryan",
+      "tinybird_last_name": "Ryan-Williams"
+    },
+    {
+      "profile_id": "206ade814813d4bc67adf7b5916ba0ae",
+      "kind": "trait",
+      "bigquery_first_name": "Andre",
+      "bigquery_last_name": "Howell",
+      "tinybird_first_name": "Andre Howell",
+      "tinybird_last_name": "Howell"
+    },
+    {
+      "profile_id": "22ebeca632e08e238356bfb33a484fbd",
+      "kind": "trait",
+      "bigquery_first_name": "Jimmie",
+      "bigquery_last_name": "Horton",
+      "tinybird_first_name": "Jimmie Horton",
+      "tinybird_last_name": "Horton"
+    },
+    {
+      "profile_id": "24100ee2cbcb4cfadd76185057bab93d",
+      "kind": "trait",
+      "bigquery_first_name": "Kathleen",
+      "bigquery_last_name": "Chin",
+      "tinybird_first_name": "Pua",
+      "tinybird_last_name": "Chin"
+    },
+    {
+      "profile_id": "263a87db363d7b0b9b828d05a4e94fbb",
+      "kind": "trait",
+      "bigquery_first_name": "kathy",
+      "bigquery_last_name": "blair",
+      "tinybird_first_name": "Kathy",
+      "tinybird_last_name": "blair"
+    },
+    {
+      "profile_id": "26eb280b038c16cb2687fee2153909c1",
+      "kind": "trait",
+      "bigquery_first_name": "Okello",
+      "bigquery_last_name": "Obang",
+      "tinybird_first_name": "Okello Obang",
+      "tinybird_last_name": "Obang"
+    },
+    {
+      "profile_id": "27919ae45728f64cb57a5703bca9aad8",
+      "kind": "trait",
+      "bigquery_first_name": "William",
+      "bigquery_last_name": "Sherman",
+      "tinybird_first_name": "Bill",
+      "tinybird_last_name": "Sherman"
+    },
+    {
+      "profile_id": "2bd5d76ffccb82fb8c49b662fe27f71e",
+      "kind": "trait",
+      "bigquery_first_name": "Debbie",
+      "bigquery_last_name": "Greve",
+      "tinybird_first_name": "Debbie Greve",
+      "tinybird_last_name": "Greve"
+    },
+    {
+      "profile_id": "2ea3353122c720751ea46eb79681cf00",
+      "kind": "trait",
+      "bigquery_first_name": "Sara",
+      "bigquery_last_name": "Zink",
+      "tinybird_first_name": "Sara zink",
+      "tinybird_last_name": "Zink"
+    },
+    {
+      "profile_id": "35a913052e1938d43e09af9df68523d0",
+      "kind": "trait",
+      "bigquery_first_name": "Stephen",
+      "bigquery_last_name": "Stephen",
+      "tinybird_first_name": "Stephen L",
+      "tinybird_last_name": "Stephen"
+    },
+    {
+      "profile_id": "37a1e61ea2f6ded0fdcb8935f231adb7",
+      "kind": "trait",
+      "bigquery_first_name": "LeAnn",
+      "bigquery_last_name": "Pryor",
+      "tinybird_first_name": "LeAnn Pryor",
+      "tinybird_last_name": "Pryor"
+    },
+    {
+      "profile_id": "3ad23d1c83baf5af833b4f64b2c805c5",
+      "kind": "trait",
+      "bigquery_first_name": "Diane",
+      "bigquery_last_name": "",
+      "tinybird_first_name": "diane",
+      "tinybird_last_name": ""
+    },
+    {
+      "profile_id": "4138a3622f003e87ccad6ef357d39e8b",
+      "kind": "trait",
+      "bigquery_first_name": "Kathleen",
+      "bigquery_last_name": "Joyce",
+      "tinybird_first_name": "Katy Joyce",
+      "tinybird_last_name": "Joyce"
+    },
+    {
+      "profile_id": "567c3b289f96037e93f145853fc83946",
+      "kind": "trait",
+      "bigquery_first_name": "Arif",
+      "bigquery_last_name": "A",
+      "tinybird_first_name": "Arif A",
+      "tinybird_last_name": "A"
+    },
+    {
+      "profile_id": "5887fd2f5f70fd7775d700c40400995c",
+      "kind": "trait",
+      "bigquery_first_name": "Nicole Del Pino",
+      "bigquery_last_name": "",
+      "tinybird_first_name": "Nicole",
+      "tinybird_last_name": ""
+    },
+    {
+      "profile_id": "594a3772d3f20e284f758f1cc3b80d09",
+      "kind": "trait",
+      "bigquery_first_name": "Mirna",
+      "bigquery_last_name": "Ceron",
+      "tinybird_first_name": "Mirna",
+      "tinybird_last_name": "Lopez"
+    },
+    {
+      "profile_id": "5971edb102068c9011215487273e44d1",
+      "kind": "trait",
+      "bigquery_first_name": "Joel",
+      "bigquery_last_name": "Kaden",
+      "tinybird_first_name": "Joel Kaden",
+      "tinybird_last_name": "Kaden"
+    },
+    {
+      "profile_id": "5afa8842b9192da88ee8ea60be65bdaf",
+      "kind": "trait",
+      "bigquery_first_name": "Diane",
+      "bigquery_last_name": "Fair",
+      "tinybird_first_name": "Diane Fair",
+      "tinybird_last_name": "Fair"
+    },
+    {
+      "profile_id": "5d51441f5e52195dabf8f7de37f096cf",
+      "kind": "trait",
+      "bigquery_first_name": "Nancy",
+      "bigquery_last_name": "Roper",
+      "tinybird_first_name": "Mitchlyn",
+      "tinybird_last_name": "Gentry"
+    },
+    {
+      "profile_id": "5de30d7b58b78a7e5de41a48f8a5deed",
+      "kind": "trait",
+      "bigquery_first_name": "Brian",
+      "bigquery_last_name": "Roberson",
+      "tinybird_first_name": "Brian Roberson",
+      "tinybird_last_name": "Roberson"
+    },
+    {
+      "profile_id": "5e8b8befa4fc78d7e42afb37f61f564e",
+      "kind": "trait",
+      "bigquery_first_name": "Kimberly",
+      "bigquery_last_name": "Goldman",
+      "tinybird_first_name": "Kimberly Goldman",
+      "tinybird_last_name": "Goldman"
+    },
+    {
+      "profile_id": "60ae44172097b1a999602a1c2da00683",
+      "kind": "trait",
+      "bigquery_first_name": "Barbara",
+      "bigquery_last_name": "STRATTON",
+      "tinybird_first_name": "Barbara Stratton",
+      "tinybird_last_name": "STRATTON"
+    },
+    {
+      "profile_id": "6219bd6aee05fcda3a5840f66ab4502c",
+      "kind": "trait",
+      "bigquery_first_name": "McKenzie",
+      "bigquery_last_name": "Bernhart",
+      "tinybird_first_name": "McKenzie Bernhart",
+      "tinybird_last_name": "Bernhart"
+    },
+    {
+      "profile_id": "6a82adca91551f169846d740ec9dfd26",
+      "kind": "trait",
+      "bigquery_first_name": "Micheal",
+      "bigquery_last_name": "Green",
+      "tinybird_first_name": "Micheal Green",
+      "tinybird_last_name": "Green"
+    },
+    {
+      "profile_id": "6e72be2fe7839276aafc607c1be7e67d",
+      "kind": "trait",
+      "bigquery_first_name": "Patricia",
+      "bigquery_last_name": "McCown",
+      "tinybird_first_name": "Patricia McCown",
+      "tinybird_last_name": "McCown"
+    },
+    {
+      "profile_id": "713a161375b0063c93d17134ca3e9aae",
+      "kind": "trait",
+      "bigquery_first_name": "Ernesto",
+      "bigquery_last_name": "Alvarenga",
+      "tinybird_first_name": "ERNESTO",
+      "tinybird_last_name": "Alvarenga"
+    },
+    {
+      "profile_id": "733311ac4d1aa528ae8adcb38521fbf1",
+      "kind": "trait",
+      "bigquery_first_name": "Isabelle",
+      "bigquery_last_name": "Haddocks",
+      "tinybird_first_name": "Golden_Rose8",
+      "tinybird_last_name": "Haddocks"
+    },
+    {
+      "profile_id": "77045479568707422d24dd95f5606053",
+      "kind": "trait",
+      "bigquery_first_name": "Callie",
+      "bigquery_last_name": "Ohlde",
+      "tinybird_first_name": "Callie Ohlde",
+      "tinybird_last_name": "Ohlde"
+    },
+    {
+      "profile_id": "7731284bc04a970cb7f4b01a343fa18b",
+      "kind": "trait",
+      "bigquery_first_name": "K",
+      "bigquery_last_name": "B",
+      "tinybird_first_name": "KB",
+      "tinybird_last_name": "B"
+    },
+    {
+      "profile_id": "77708178f8a9b68f71aa01e22d279804",
+      "kind": "trait",
+      "bigquery_first_name": "Monica",
+      "bigquery_last_name": "Brown",
+      "tinybird_first_name": "Monica Brown",
+      "tinybird_last_name": "Brown"
+    },
+    {
+      "profile_id": "79d9cbb21eb48934b5a77df76003d97c",
+      "kind": "trait",
+      "bigquery_first_name": "Edwin",
+      "bigquery_last_name": "Madera",
+      "tinybird_first_name": "Sue",
+      "tinybird_last_name": "Madera"
+    },
+    {
+      "profile_id": "7b02262eaccafd0d57a21d10598516ea",
+      "kind": "trait",
+      "bigquery_first_name": "Dawn",
+      "bigquery_last_name": "Mount",
+      "tinybird_first_name": "dawnie66@ymail.com",
+      "tinybird_last_name": "Mount"
+    },
+    {
+      "profile_id": "7cce6fda050084942c22a131167def1a",
+      "kind": "trait",
+      "bigquery_first_name": "Sandra",
+      "bigquery_last_name": "Baker",
+      "tinybird_first_name": "Sandra Baker",
+      "tinybird_last_name": "Baker"
+    },
+    {
+      "profile_id": "7f264ad6553d77f667874dc892bd37b0",
+      "kind": "trait",
+      "bigquery_first_name": "Jill",
+      "bigquery_last_name": "Cooper",
+      "tinybird_first_name": "Jill",
+      "tinybird_last_name": "Victoria Cooper"
+    },
+    {
+      "profile_id": "7f9ebb5f3fbb7dee5088c1591a3afa37",
+      "kind": "trait",
+      "bigquery_first_name": "Alma Delia",
+      "bigquery_last_name": "Morris",
+      "tinybird_first_name": "Alma Delia Morris",
+      "tinybird_last_name": "Morris"
+    },
+    {
+      "profile_id": "7fc88c93b2c9862ee1450fc2f0594c71",
+      "kind": "trait",
+      "bigquery_first_name": "Gerald",
+      "bigquery_last_name": "Brooks",
+      "tinybird_first_name": "Gerald Brooks",
+      "tinybird_last_name": "Brooks"
+    },
+    {
+      "profile_id": "82f4bd2f9240c5b7485fc147a91921d3",
+      "kind": "trait",
+      "bigquery_first_name": "Steven",
+      "bigquery_last_name": "Gomez",
+      "tinybird_first_name": "Steven Gomez",
+      "tinybird_last_name": "Gomez"
+    },
+    {
+      "profile_id": "8303efca96abf7007e6eb04a61ffd2e9",
+      "kind": "trait",
+      "bigquery_first_name": "Karen",
+      "bigquery_last_name": "Chapman",
+      "tinybird_first_name": "Karen Chapman",
+      "tinybird_last_name": "Chapman"
+    },
+    {
+      "profile_id": "8c1fde4a424da13e33ec779d14ec7a94",
+      "kind": "trait",
+      "bigquery_first_name": "Alexandria",
+      "bigquery_last_name": "Ray",
+      "tinybird_first_name": "Alexandria Ray",
+      "tinybird_last_name": "Ray"
+    },
+    {
+      "profile_id": "8d054b999ac7f9c20d1ae044df054543",
+      "kind": "trait",
+      "bigquery_first_name": "Marcia",
+      "bigquery_last_name": "Baker",
+      "tinybird_first_name": "Marcia Baker",
+      "tinybird_last_name": "Baker"
+    },
+    {
+      "profile_id": "8d083143ec7cef37783602a6ad16ef2f",
+      "kind": "trait",
+      "bigquery_first_name": "Edward",
+      "bigquery_last_name": "BRAGG",
+      "tinybird_first_name": "Edward F Bragg",
+      "tinybird_last_name": "BRAGG"
+    },
+    {
+      "profile_id": "8d950656c07ca5104c228eca12b231d8",
+      "kind": "trait",
+      "bigquery_first_name": "Emerencia",
+      "bigquery_last_name": "Nah",
+      "tinybird_first_name": "EMERENCIA NAH",
+      "tinybird_last_name": "Nah"
+    },
+    {
+      "profile_id": "8e7f878f469812e7046574e6b0c2b3d8",
+      "kind": "trait",
+      "bigquery_first_name": "Louade",
+      "bigquery_last_name": "Johnson",
+      "tinybird_first_name": "Lourdes Johnson",
+      "tinybird_last_name": "Johnson"
+    },
+    {
+      "profile_id": "92b1d1b32e06a8f15f926b5481c42ab1",
+      "kind": "trait",
+      "bigquery_first_name": "Jennifer",
+      "bigquery_last_name": "ntia",
+      "tinybird_first_name": "Japhet Ntia",
+      "tinybird_last_name": "ntia"
+    },
+    {
+      "profile_id": "94af11d98320731be43e242d7a914536",
+      "kind": "trait",
+      "bigquery_first_name": "Cristine vaccaro",
+      "bigquery_last_name": "VACCARO",
+      "tinybird_first_name": "Cristine",
+      "tinybird_last_name": "VACCARO"
+    },
+    {
+      "profile_id": "9827826d260cce14611b2e7b3cd4ca0d",
+      "kind": "trait",
+      "bigquery_first_name": "francine",
+      "bigquery_last_name": "walker",
+      "tinybird_first_name": "Francine walker",
+      "tinybird_last_name": "walker"
+    },
+    {
+      "profile_id": "99571fb919460755a35144e059b55a2c",
+      "kind": "trait",
+      "bigquery_first_name": "Sgt",
+      "bigquery_last_name": "",
+      "tinybird_first_name": "Sgtyves",
+      "tinybird_last_name": ""
+    },
+    {
+      "profile_id": "a47135076658aa19c3266c73d105d989",
+      "kind": "trait",
+      "bigquery_first_name": "christina",
+      "bigquery_last_name": "mudi",
+      "tinybird_first_name": "Christina",
+      "tinybird_last_name": "mudi"
+    },
+    {
+      "profile_id": "a570a32a4e5c0a092bd0ef0aa6119d0f",
+      "kind": "trait",
+      "bigquery_first_name": "Rita",
+      "bigquery_last_name": "Herrington",
+      "tinybird_first_name": "Rita Herrington",
+      "tinybird_last_name": "Herrington"
+    },
+    {
+      "profile_id": "a60af806a1e94c5c7b97f77bb469e9a3",
+      "kind": "trait",
+      "bigquery_first_name": "Theresa",
+      "bigquery_last_name": "DeWitt",
+      "tinybird_first_name": "Theresa DeWitt",
+      "tinybird_last_name": "DeWitt"
+    },
+    {
+      "profile_id": "a62871fc7e63d66828b689a3caf81e54",
+      "kind": "trait",
+      "bigquery_first_name": "Sara",
+      "bigquery_last_name": "Duarte",
+      "tinybird_first_name": "Sara duarte",
+      "tinybird_last_name": "Duarte"
+    },
+    {
+      "profile_id": "a65904a998bb00e62e401e643970d7e0",
+      "kind": "trait",
+      "bigquery_first_name": "Sam",
+      "bigquery_last_name": "Edwards",
+      "tinybird_first_name": "Sam Edwards",
+      "tinybird_last_name": "Edwards"
+    },
+    {
+      "profile_id": "a67e1cbfe47e50c962e76db8d0fd60e0",
+      "kind": "trait",
+      "bigquery_first_name": "Mackie Sue",
+      "bigquery_last_name": "Gilchrist",
+      "tinybird_first_name": "Mackie Sue Gilchrist",
+      "tinybird_last_name": "Gilchrist"
+    },
+    {
+      "profile_id": "afc68b440ff9153c73e2addaee088155",
+      "kind": "trait",
+      "bigquery_first_name": "Jeffrey",
+      "bigquery_last_name": "Pulliam",
+      "tinybird_first_name": "Jeff",
+      "tinybird_last_name": "Pulliam"
+    },
+    {
+      "profile_id": "b5924a7090d4ed450d2f84b51547318d",
+      "kind": "trait",
+      "bigquery_first_name": "Jennifer",
+      "bigquery_last_name": "Holderness",
+      "tinybird_first_name": "Jennifer Holderness",
+      "tinybird_last_name": "Holderness"
+    },
+    {
+      "profile_id": "b5c349dc938dce875eb488376b77105f",
+      "kind": "trait",
+      "bigquery_first_name": "Steve",
+      "bigquery_last_name": "Lefebvre",
+      "tinybird_first_name": "Stephen",
+      "tinybird_last_name": "Lefebvre"
+    },
+    {
+      "profile_id": "b69a47e8b31ad5162c7e04968d74e7ca",
+      "kind": "trait",
+      "bigquery_first_name": "Matthew",
+      "bigquery_last_name": "Lindhiem",
+      "tinybird_first_name": "Matthew Lindhiem",
+      "tinybird_last_name": "Lindhiem"
+    },
+    {
+      "profile_id": "be067f6b1c01ad5d67ed69144d70af94",
+      "kind": "trait",
+      "bigquery_first_name": "James",
+      "bigquery_last_name": "Tucker",
+      "tinybird_first_name": "James Tucker",
+      "tinybird_last_name": "Tucker"
+    },
+    {
+      "profile_id": "c619bdee1c273a1042163e50c1e5deaa",
+      "kind": "trait",
+      "bigquery_first_name": "Cindy",
+      "bigquery_last_name": "",
+      "tinybird_first_name": "Cynthia",
+      "tinybird_last_name": ""
+    },
+    {
+      "profile_id": "cb65a2a2cecc4ab718100cdf3b873954",
+      "kind": "trait",
+      "bigquery_first_name": "ako",
+      "bigquery_last_name": "aisoe",
+      "tinybird_first_name": "Ako",
+      "tinybird_last_name": "aisoe"
+    },
+    {
+      "profile_id": "cb68fdf5e40260f431534287c74dcea0",
+      "kind": "trait",
+      "bigquery_first_name": "Jessica",
+      "bigquery_last_name": "Perez",
+      "tinybird_first_name": "Jessica Perez",
+      "tinybird_last_name": "Perez"
+    },
+    {
+      "profile_id": "cefd0ab9583732577849851ccd294979",
+      "kind": "trait",
+      "bigquery_first_name": "ELIZABETH",
+      "bigquery_last_name": "GUTIERREZ",
+      "tinybird_first_name": "Elizabeth Gutierrez",
+      "tinybird_last_name": "GUTIERREZ"
+    },
+    {
+      "profile_id": "cf02f542718e53c3c1c935582f15cfa2",
+      "kind": "trait",
+      "bigquery_first_name": "Adrienne",
+      "bigquery_last_name": "Confron",
+      "tinybird_first_name": "Adrienne Confron",
+      "tinybird_last_name": "Confron"
+    },
+    {
+      "profile_id": "d583d9dd166dcf0303da63977509fa77",
+      "kind": "trait",
+      "bigquery_first_name": "INDRANEEL",
+      "bigquery_last_name": "DUTT",
+      "tinybird_first_name": "Indraneel Dutt",
+      "tinybird_last_name": "DUTT"
+    },
+    {
+      "profile_id": "d9d2a4e5534684013191bb38d2b65d7d",
+      "kind": "trait",
+      "bigquery_first_name": "Sha'Ronda",
+      "bigquery_last_name": "Dugger",
+      "tinybird_first_name": "Sharonda",
+      "tinybird_last_name": "Dugger"
+    },
+    {
+      "profile_id": "dd0278581e7021ca4c0d7a3c2388c69a",
+      "kind": "trait",
+      "bigquery_first_name": "Erica",
+      "bigquery_last_name": "Strait",
+      "tinybird_first_name": "E",
+      "tinybird_last_name": "Strait"
+    },
+    {
+      "profile_id": "dd9dde6454d389f1a3c7a69c1016a6a2",
+      "kind": "trait",
+      "bigquery_first_name": "Gabrielle",
+      "bigquery_last_name": "Wordlaw",
+      "tinybird_first_name": "Gabrielle Wordlaw",
+      "tinybird_last_name": "Wordlaw"
+    },
+    {
+      "profile_id": "de0f4daa1d419ed0eb9351ca0c0439e2",
+      "kind": "trait",
+      "bigquery_first_name": "MICHELLE",
+      "bigquery_last_name": "mccormick",
+      "tinybird_first_name": "MICHELLE",
+      "tinybird_last_name": "McCORMICK"
+    },
+    {
+      "profile_id": "e2c4c95e16357a61280efcbcf61f04ec",
+      "kind": "trait",
+      "bigquery_first_name": "Samantha",
+      "bigquery_last_name": "McBay",
+      "tinybird_first_name": "Samantha McBay",
+      "tinybird_last_name": "McBay"
+    },
+    {
+      "profile_id": "e3696039d8cd3fa9514ef5640e8ac3be",
+      "kind": "trait",
+      "bigquery_first_name": "Gale",
+      "bigquery_last_name": "Ramos",
+      "tinybird_first_name": "Gale Ramos",
+      "tinybird_last_name": "Ramos"
+    },
+    {
+      "profile_id": "e416cda75c7e91e4e8c2d803caa7b791",
+      "kind": "trait",
+      "bigquery_first_name": "Sherry",
+      "bigquery_last_name": "Carter",
+      "tinybird_first_name": "SHERRY",
+      "tinybird_last_name": "Carter"
+    },
+    {
+      "profile_id": "f24d4b5756abc7e155df5bdf56bb1641",
+      "kind": "trait",
+      "bigquery_first_name": "Paul",
+      "bigquery_last_name": "Savery",
+      "tinybird_first_name": "Paul Savery",
+      "tinybird_last_name": "Savery"
+    },
+    {
+      "profile_id": "f56dfa8e1d5ca4b77e8959f6f3779000",
+      "kind": "trait",
+      "bigquery_first_name": "Kamala",
+      "bigquery_last_name": "Small",
+      "tinybird_first_name": "Kamala Small",
+      "tinybird_last_name": "Small"
+    },
+    {
+      "profile_id": "f63a7ed88ed945368ccba4fa3ec2d40b",
+      "kind": "trait",
+      "bigquery_first_name": "Kathy",
+      "bigquery_last_name": "Verdi",
+      "tinybird_first_name": "Kathleen",
+      "tinybird_last_name": "Verdi"
+    },
+    {
+      "profile_id": "ff5c3081618deec063318a429cf1bb3f",
+      "kind": "trait",
+      "bigquery_first_name": "VLADIMIR",
+      "bigquery_last_name": "VLADIMIR",
+      "tinybird_first_name": "VLADIMIR",
+      "tinybird_last_name": "SULLA"
+    }
+  ]
+}

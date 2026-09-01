@@ -1,0 +1,24 @@
+DESCRIPTION >
+    Replace-mode physical boundary for resolved ActiveCampaign form submissions.
+
+SCHEMA >
+    `form_submission_id` String `json:$.form_submission_id`,
+    `submitted_at` Nullable(DateTime64(6)) `json:$.submitted_at`,
+    `contact_id` Nullable(String) `json:$.contact_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `first_name` Nullable(String) `json:$.first_name`,
+    `last_name` Nullable(String) `json:$.last_name`,
+    `full_name` Nullable(String) `json:$.full_name`,
+    `tag_id` Nullable(String) `json:$.tag_id`,
+    `tag_name` Nullable(String) `json:$.tag_name`,
+    `registration_type` String `json:$.registration_type`,
+    `content_name` String `json:$.content_name`,
+    `canonical_event_id` Nullable(String) `json:$.canonical_event_id`,
+    `form_type` String `json:$.form_type`,
+    `event_source` String `json:$.event_source`,
+    `registration_tag_type` String `json:$.registration_tag_type`,
+    `profile_id` Nullable(String) `json:$.profile_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY form_submission_id

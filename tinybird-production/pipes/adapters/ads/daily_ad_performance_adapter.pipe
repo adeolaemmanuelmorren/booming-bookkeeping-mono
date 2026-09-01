@@ -1,0 +1,268 @@
+DESCRIPTION >
+    Reusable Google and Meta daily ad-performance contract at the Dataform mart grain.
+
+NODE latest_google_accounts
+SQL >
+    SELECT
+        toString(id) AS account_id,
+        nullIf(trimBoth(ifNull(descriptive_name, '')), '') AS account_name,
+        coalesce(nullIf(trimBoth(ifNull(currency_code, '')), ''), 'USD') AS currency
+    FROM raw_google_ads_account_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY id ORDER BY updated_at DESC NULLS LAST, _fivetran_synced DESC NULLS LAST
+        )
+        = 1
+
+NODE latest_google_campaigns
+SQL >
+    SELECT
+        toString(customer_id) AS account_id,
+        toString(id) AS campaign_id,
+        nullIf(trimBoth(ifNull(name, '')), '') AS campaign_name
+    FROM raw_google_ads_campaign_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY customer_id, id
+            ORDER BY updated_at DESC NULLS LAST, _fivetran_synced DESC NULLS LAST
+        )
+        = 1
+
+NODE latest_google_adsets
+SQL >
+    SELECT
+        toString(campaign_id) AS campaign_id,
+        toString(id) AS adset_id,
+        nullIf(trimBoth(ifNull(name, '')), '') AS adset_name
+    FROM raw_google_ads_ad_group_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY campaign_id, id
+            ORDER BY updated_at DESC NULLS LAST, _fivetran_synced DESC NULLS LAST
+        )
+        = 1
+
+NODE latest_google_ads
+SQL >
+    SELECT
+        toString(ad_group_id) AS adset_id,
+        toString(id) AS ad_id,
+        nullIf(trimBoth(ifNull(name, '')), '') AS ad_name,
+        coalesce(
+            nullIf(
+                trimBoth(
+                    extract(replaceAll(replaceAll(ifNull(final_urls, ''), '[', ''), ']', ''), '^[^,]+')
+                ),
+                ''
+            ),
+            nullIf(
+                trimBoth(
+                    extract(
+                        replaceAll(replaceAll(ifNull(final_mobile_urls, ''), '[', ''), ']', ''),
+                        '^[^,]+'
+                    )
+                ),
+                ''
+            )
+        ) AS landing_page_url
+    FROM raw_google_ads_ad_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY ad_group_id, id
+            ORDER BY updated_at DESC NULLS LAST, _fivetran_synced DESC NULLS LAST
+        )
+        = 1
+
+NODE current_google_ad_stats_versions
+SQL >
+    SELECT *
+    FROM raw_google_ads_ad_stats
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (PARTITION BY _fivetran_id ORDER BY _fivetran_synced DESC NULLS LAST) = 1
+
+NODE google_daily_performance
+SQL >
+    SELECT
+        toDateTime64(toString(date), 6, 'America/Los_Angeles') AS time,
+        toString(customer_id) AS account_id,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_group_id) AS adset_id,
+        toString(ad_id) AS ad_id,
+        sum(ifNull(impressions, 0)) AS impressions,
+        sum(ifNull(clicks, 0)) AS clicks,
+        sum(toDecimal128(ifNull(cost_micros, 0), 9)) / toDecimal128(1000000, 9) AS spend,
+        sum(toDecimal128(toString(ifNull(conversions, 0)), 9)) AS platform_conversions,
+        sum(toDecimal128(toString(ifNull(conversions_value, 0)), 9)) AS platform_conversion_value
+    FROM current_google_ad_stats_versions
+    GROUP BY time, account_id, campaign_id, adset_id, ad_id
+
+NODE google_daily_ad_rows
+SQL >
+    SELECT
+        performance.time AS time,
+        performance.account_id AS account_id,
+        accounts.account_name AS account_name,
+        'google' AS source,
+        'Google Ads' AS formatted_source,
+        performance.campaign_id AS campaign_id,
+        campaigns.campaign_name AS campaign_name,
+        performance.adset_id AS adset_id,
+        adsets.adset_name AS adset_name,
+        performance.ad_id AS ad_id,
+        ads.ad_name AS ad_name,
+        ads.landing_page_url AS landing_page_url,
+        performance.impressions AS impressions,
+        performance.clicks AS clicks,
+        performance.clicks AS unique_clicks,
+        performance.clicks AS unique_inline_link_clicks,
+        performance.spend AS spend,
+        performance.platform_conversions AS platform_conversions,
+        performance.platform_conversion_value AS platform_conversion_value,
+        coalesce(accounts.currency, 'USD') AS currency
+    FROM google_daily_performance AS performance
+    LEFT JOIN latest_google_accounts AS accounts ON performance.account_id = accounts.account_id
+    LEFT JOIN
+        latest_google_campaigns AS campaigns
+        ON performance.account_id = campaigns.account_id
+        AND performance.campaign_id = campaigns.campaign_id
+    LEFT JOIN
+        latest_google_adsets AS adsets
+        ON performance.campaign_id = adsets.campaign_id
+        AND performance.adset_id = adsets.adset_id
+    LEFT JOIN
+        latest_google_ads AS ads
+        ON performance.adset_id = ads.adset_id
+        AND performance.ad_id = ads.ad_id
+
+NODE latest_meta_ads_with_creative
+SQL >
+    SELECT
+        toString(id) AS ad_id,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_set_id) AS adset_id,
+        toString(creative_id) AS creative_id,
+        nullIf(trimBoth(ifNull(name, '')), '') AS ad_name
+    FROM raw_facebook_ads_ad_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY id ORDER BY updated_time DESC NULLS LAST, _fivetran_synced DESC NULLS LAST
+        )
+        = 1
+
+NODE latest_meta_creatives
+SQL >
+    SELECT
+        toString(id) AS creative_id,
+        coalesce(
+            nullIf(trimBoth(ifNull(link_url, '')), ''),
+            nullIf(trimBoth(ifNull(object_url, '')), ''),
+            nullIf(trimBoth(ifNull(object_story_link_data_link, '')), ''),
+            nullIf(trimBoth(ifNull(template_link, '')), ''),
+            nullIf(trimBoth(ifNull(video_call_to_action_value_link, '')), ''),
+            nullIf(trimBoth(ifNull(template_url_spec_web_url, '')), ''),
+            nullIf(trimBoth(ifNull(page_link, '')), ''),
+            nullIf(trimBoth(ifNull(template_page_link, '')), '')
+        ) AS landing_page_url
+    FROM raw_facebook_ads_creative_history
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY id ORDER BY _fivetran_synced DESC NULLS LAST, _fivetran_id DESC NULLS LAST
+        )
+        = 1
+
+NODE current_meta_daily_performance
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY date, account_id, ad_id
+            ORDER BY _fivetran_synced DESC NULLS LAST, _fivetran_id DESC NULLS LAST
+        )
+        = 1
+
+NODE current_meta_action_versions
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad_actions
+    WHERE action_type = 'offsite_conversion.fb_pixel_purchase'
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY ad_id, date, action_type, action_index
+            ORDER BY _fivetran_synced DESC NULLS LAST, _fivetran_id DESC NULLS LAST
+        )
+        = 1
+
+NODE current_meta_action_value_versions
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad_action_values
+    WHERE action_type = 'offsite_conversion.fb_pixel_purchase'
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY ad_id, date, action_type, action_index
+            ORDER BY _fivetran_synced DESC NULLS LAST, _fivetran_id DESC NULLS LAST
+        )
+        = 1
+
+NODE meta_platform_conversions
+SQL >
+    SELECT ad_id, date, sum(toDecimal128(toString(ifNull(value, 0)), 9)) AS platform_conversions
+    FROM current_meta_action_versions
+    GROUP BY ad_id, date
+
+NODE meta_platform_conversion_values
+SQL >
+    SELECT ad_id, date, sum(toDecimal128(toString(ifNull(value, 0)), 9)) AS platform_conversion_value
+    FROM current_meta_action_value_versions
+    GROUP BY ad_id, date
+
+NODE meta_daily_ad_rows
+SQL >
+    SELECT
+        toDateTime64(toString(performance.date), 6, 'America/Los_Angeles') AS time,
+        toString(performance.account_id) AS account_id,
+        CAST(NULL AS Nullable(String)) AS account_name,
+        'meta' AS source,
+        'Meta Ads' AS formatted_source,
+        coalesce(ads.campaign_id, toString(performance.campaign_id)) AS campaign_id,
+        dimensions.campaign_name AS campaign_name,
+        ads.adset_id AS adset_id,
+        coalesce(
+            dimensions.adset_name, nullIf(trimBoth(ifNull(performance.adset_name, '')), '')
+        ) AS adset_name,
+        toString(performance.ad_id) AS ad_id,
+        coalesce(ads.ad_name, nullIf(trimBoth(ifNull(performance.ad_name, '')), '')) AS ad_name,
+        creatives.landing_page_url AS landing_page_url,
+        performance.impressions AS impressions,
+        performance.inline_link_clicks AS clicks,
+        performance.inline_link_clicks AS unique_clicks,
+        performance.inline_link_clicks AS unique_inline_link_clicks,
+        toDecimal128(toString(performance.spend), 9) AS spend,
+        ifNull(conversions.platform_conversions, toDecimal128(0, 9)) AS platform_conversions,
+        ifNull(values.platform_conversion_value, toDecimal128(0, 9)) AS platform_conversion_value,
+        'USD' AS currency
+    FROM current_meta_daily_performance AS performance
+    LEFT JOIN latest_meta_ads_with_creative AS ads ON toString(performance.ad_id) = ads.ad_id
+    LEFT JOIN
+        meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'ad'
+        AND toString(performance.ad_id) = dimensions.ad_id
+    LEFT JOIN latest_meta_creatives AS creatives ON ads.creative_id = creatives.creative_id
+    LEFT JOIN
+        meta_platform_conversions AS conversions
+        ON performance.ad_id = conversions.ad_id
+        AND performance.date = conversions.date
+    LEFT JOIN
+        meta_platform_conversion_values AS values
+        ON performance.ad_id = values.ad_id
+        AND performance.date = values.date
+
+NODE all_daily_ad_rows
+SQL >
+    SELECT *
+    FROM google_daily_ad_rows
+    UNION ALL
+    SELECT *
+    FROM meta_daily_ad_rows

@@ -1,0 +1,93 @@
+DESCRIPTION >
+    Latest Meta campaign, ad-set, and ad names. Every Meta delivery model joins this one
+    reusable hierarchy instead of reimplementing history selection.
+
+NODE latest_campaigns
+SQL >
+    SELECT
+        toString(id) AS campaign_id,
+        nullIf(trim(name), '') AS campaign_name
+    FROM raw_facebook_ads_campaign_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_adsets
+SQL >
+    SELECT
+        toString(id) AS adset_id,
+        toString(campaign_id) AS campaign_id,
+        nullIf(trim(name), '') AS adset_name
+    FROM raw_facebook_ads_ad_set_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_ads
+SQL >
+    SELECT
+        toString(id) AS ad_id,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_set_id) AS adset_id,
+        nullIf(trim(name), '') AS ad_name
+    FROM raw_facebook_ads_ad_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE campaign_dimensions
+SQL >
+    SELECT
+        'campaign' AS level,
+        campaigns.campaign_id,
+        CAST(NULL AS Nullable(String)) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        campaigns.campaign_name,
+        CAST(NULL AS Nullable(String)) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name
+    FROM latest_campaigns AS campaigns
+
+NODE adset_dimensions
+SQL >
+    SELECT
+        'adset' AS level,
+        adsets.campaign_id,
+        adsets.adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        campaigns.campaign_name,
+        adsets.adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name
+    FROM latest_adsets AS adsets
+    LEFT JOIN latest_campaigns AS campaigns
+        ON adsets.campaign_id = campaigns.campaign_id
+
+NODE ad_dimensions
+SQL >
+    SELECT
+        'ad' AS level,
+        coalesce(ads.campaign_id, adsets.campaign_id) AS campaign_id,
+        ads.adset_id,
+        ads.ad_id,
+        campaigns.campaign_name,
+        adsets.adset_name,
+        ads.ad_name
+    FROM latest_ads AS ads
+    LEFT JOIN latest_adsets AS adsets
+        ON ads.adset_id = adsets.adset_id
+    LEFT JOIN latest_campaigns AS campaigns
+        ON coalesce(ads.campaign_id, adsets.campaign_id) = campaigns.campaign_id
+
+NODE meta_ad_dimensions_rows
+SQL >
+    SELECT * FROM campaign_dimensions
+    UNION ALL
+    SELECT * FROM adset_dimensions
+    UNION ALL
+    SELECT * FROM ad_dimensions
+

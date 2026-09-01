@@ -1,0 +1,64 @@
+DESCRIPTION >
+    Meta paid clicks on or after the selected KRC registration. These rows stay separate from
+    the pre-registration acquisition path frozen in mart_krc_acquisition.
+
+NODE krc_post_registration_latest_meta_names
+SQL >
+    SELECT
+        campaign_id,
+        adset_id,
+        ad_id,
+        argMaxIf(campaign_name, time, campaign_name IS NOT NULL) AS campaign_name,
+        argMaxIf(adset_name, time, adset_name IS NOT NULL) AS adset_name,
+        argMaxIf(ad_name, time, ad_name IS NOT NULL) AS ad_name
+    FROM mart_ad_performance
+    WHERE source = 'meta'
+    GROUP BY campaign_id, adset_id, ad_id
+
+NODE krc_post_registration_paid_click_rows
+SQL >
+    SELECT
+        registrations.registration_id,
+        registrations.profile_id,
+        registrations.registration_timestamp,
+        touchpoints.touchpoint_id,
+        assumeNotNull(touchpoints.touchpoint_time) AS click_timestamp,
+        CAST(
+            toStartOfHour(assumeNotNull(touchpoints.touchpoint_time), 'America/Los_Angeles'),
+            'DateTime64(6)'
+        ) AS click_hour,
+        toDate(assumeNotNull(touchpoints.touchpoint_time), 'America/Los_Angeles') AS click_date,
+        'meta' AS source,
+        touchpoints.campaign_id,
+        touchpoints.adset_id,
+        touchpoints.ad_id,
+        coalesce(names.campaign_name, touchpoints.utm_campaign, 'Unknown campaign') AS campaign_name,
+        coalesce(names.adset_name, 'Unknown ad set') AS adset_name,
+        coalesce(names.ad_name, touchpoints.utm_content, 'Unknown ad') AS ad_name
+    FROM mart_krc_acquisition AS registrations
+    INNER JOIN
+        mart_touchpoints_all AS touchpoints
+        ON touchpoints.profile_id = registrations.profile_id
+        AND touchpoints.touchpoint_time >= registrations.registration_timestamp
+    LEFT JOIN
+        krc_post_registration_latest_meta_names AS names
+        ON isNotDistinctFrom(names.campaign_id, touchpoints.campaign_id)
+        AND isNotDistinctFrom(names.adset_id, touchpoints.adset_id)
+        AND isNotDistinctFrom(names.ad_id, touchpoints.ad_id)
+    WHERE
+        lowerUTF8(
+            coalesce(
+                nullIf(trim(touchpoints.utm_source), ''),
+                nullIf(trim(touchpoints.channel_source), ''),
+                ''
+            )
+        )
+        = 'meta'
+        AND lowerUTF8(
+            coalesce(
+                nullIf(trim(touchpoints.utm_medium), ''),
+                nullIf(trim(touchpoints.channel_medium), ''),
+                ''
+            )
+        )
+        = 'paid'

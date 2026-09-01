@@ -1,0 +1,302 @@
+DESCRIPTION >
+    Primary Stripe catalog evidence at payment grain. Checkout, invoice,
+    subscription, and payment-link line items follow the Dataform priority order.
+
+NODE latest_primary_checkout_sessions_for_catalog
+SQL >
+    SELECT
+        id AS checkout_session_id, payment_intent_id, subscription_id, payment_link AS payment_link_id
+    FROM raw_stripe_checkout_session
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_checkout_lines_for_catalog
+SQL >
+    SELECT
+        id AS line_item_id,
+        checkout_session_id,
+        price_id,
+        description AS line_item_description,
+        quantity,
+        toInt64(round(amount_total)) AS line_amount_cents,
+        toDecimal128(toInt64(round(amount_total)), 9) / 100 AS line_amount
+    FROM raw_stripe_checkout_session_line_item
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_invoices_for_catalog
+SQL >
+    SELECT id AS invoice_id, subscription_id
+    FROM raw_stripe_invoice
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_invoice_lines_for_catalog
+SQL >
+    SELECT
+        coalesce(nullIf(unique_id, ''), id) AS line_item_id,
+        invoice_id,
+        subscription_id,
+        price_id,
+        plan_id,
+        description AS line_item_description,
+        quantity,
+        amount AS line_amount_cents,
+        toDecimal128(amount, 9) / 100 AS line_amount
+    FROM raw_stripe_invoice_line_item
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY coalesce(nullIf(unique_id, ''), id) ORDER BY _fivetran_synced DESC
+        )
+        = 1
+
+NODE latest_primary_subscription_items_for_catalog
+SQL >
+    SELECT id AS line_item_id, subscription_id, plan_id, quantity
+    FROM raw_stripe_subscription_item
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_payment_link_lines_for_catalog
+SQL >
+    SELECT
+        id AS line_item_id,
+        payment_link_id,
+        price_id,
+        description AS line_item_description,
+        quantity,
+        amount_total AS line_amount_cents,
+        toDecimal128(amount_total, 9) / 100 AS line_amount
+    FROM raw_stripe_payment_link_line_item
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_prices_for_catalog
+SQL >
+    SELECT
+        id AS price_id,
+        product_id,
+        nickname,
+        unit_amount AS unit_amount_cents,
+        toDecimal128(unit_amount, 9) / 100 AS unit_amount
+    FROM raw_stripe_price
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_plans_for_catalog
+SQL >
+    SELECT
+        id AS plan_id,
+        product_id,
+        nickname,
+        amount AS amount_cents,
+        toDecimal128(amount, 9) / 100 AS amount
+    FROM raw_stripe_plan
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_products_for_catalog
+SQL >
+    SELECT
+        id AS product_id,
+        nullIf(replaceRegexpAll(name, '^[[:space:]]+|[[:space:]]+$', ''), '') AS product_name
+    FROM raw_stripe_product
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE primary_checkout_catalog_candidates
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        'checkout_line_item' AS candidate_source,
+        toUInt8(2) AS candidate_priority,
+        session.checkout_session_id AS checkout_session_id,
+        session.subscription_id AS subscription_id,
+        session.payment_link_id AS payment_link_id,
+        line.line_item_id AS line_item_id,
+        line.price_id AS price_id,
+        CAST(NULL AS Nullable(String)) AS plan_id,
+        price.product_id AS product_id,
+        product.product_name AS product_name,
+        line.line_item_description AS line_item_description,
+        line.quantity AS quantity,
+        line.line_amount_cents AS line_amount_cents,
+        line.line_amount AS line_amount
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN
+        latest_primary_checkout_sessions_for_catalog AS session
+        ON session.payment_intent_id = charge.payment_intent_id
+    INNER JOIN
+        latest_primary_checkout_lines_for_catalog AS line
+        ON line.checkout_session_id = session.checkout_session_id
+    LEFT JOIN latest_primary_prices_for_catalog AS price ON price.price_id = line.price_id
+    LEFT JOIN latest_primary_products_for_catalog AS product ON product.product_id = price.product_id
+
+NODE primary_invoice_catalog_candidates
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        'invoice_line_item' AS candidate_source,
+        toUInt8(3) AS candidate_priority,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        coalesce(line.subscription_id, invoice.subscription_id) AS subscription_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        line.line_item_id AS line_item_id,
+        line.price_id AS price_id,
+        line.plan_id AS plan_id,
+        coalesce(price.product_id, plan.product_id) AS product_id,
+        product.product_name AS product_name,
+        line.line_item_description AS line_item_description,
+        line.quantity AS quantity,
+        line.line_amount_cents AS line_amount_cents,
+        line.line_amount AS line_amount
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN latest_primary_invoices_for_catalog AS invoice ON invoice.invoice_id = charge.invoice_id
+    INNER JOIN latest_primary_invoice_lines_for_catalog AS line ON line.invoice_id = invoice.invoice_id
+    LEFT JOIN latest_primary_prices_for_catalog AS price ON price.price_id = line.price_id
+    LEFT JOIN latest_primary_plans_for_catalog AS plan ON plan.plan_id = line.plan_id
+    LEFT JOIN
+        latest_primary_products_for_catalog AS product
+        ON product.product_id = coalesce(price.product_id, plan.product_id)
+
+NODE primary_subscription_catalog_candidates
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        'subscription_item' AS candidate_source,
+        toUInt8(4) AS candidate_priority,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        invoice.subscription_id AS subscription_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        item.line_item_id AS line_item_id,
+        if(price.price_id IS NULL, CAST(NULL AS Nullable(String)), price.price_id) AS price_id,
+        item.plan_id AS plan_id,
+        coalesce(price.product_id, plan.product_id) AS product_id,
+        product.product_name AS product_name,
+        coalesce(product.product_name, price.nickname, plan.nickname) AS line_item_description,
+        item.quantity AS quantity,
+        coalesce(price.unit_amount_cents, plan.amount_cents) AS line_amount_cents,
+        coalesce(price.unit_amount, plan.amount) AS line_amount
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN latest_primary_invoices_for_catalog AS invoice ON invoice.invoice_id = charge.invoice_id
+    INNER JOIN
+        latest_primary_subscription_items_for_catalog AS item
+        ON item.subscription_id = invoice.subscription_id
+    LEFT JOIN latest_primary_prices_for_catalog AS price ON price.price_id = item.plan_id
+    LEFT JOIN latest_primary_plans_for_catalog AS plan ON plan.plan_id = item.plan_id
+    LEFT JOIN
+        latest_primary_products_for_catalog AS product
+        ON product.product_id = coalesce(price.product_id, plan.product_id)
+
+NODE primary_payment_link_catalog_candidates
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        'payment_link_line_item' AS candidate_source,
+        toUInt8(5) AS candidate_priority,
+        session.checkout_session_id AS checkout_session_id,
+        session.subscription_id AS subscription_id,
+        session.payment_link_id AS payment_link_id,
+        line.line_item_id AS line_item_id,
+        line.price_id AS price_id,
+        CAST(NULL AS Nullable(String)) AS plan_id,
+        price.product_id AS product_id,
+        product.product_name AS product_name,
+        line.line_item_description AS line_item_description,
+        line.quantity AS quantity,
+        line.line_amount_cents AS line_amount_cents,
+        line.line_amount AS line_amount
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN
+        latest_primary_checkout_sessions_for_catalog AS session
+        ON session.payment_intent_id = charge.payment_intent_id
+    INNER JOIN
+        latest_primary_payment_link_lines_for_catalog AS line
+        ON line.payment_link_id = session.payment_link_id
+    LEFT JOIN latest_primary_prices_for_catalog AS price ON price.price_id = line.price_id
+    LEFT JOIN latest_primary_products_for_catalog AS product ON product.product_id = price.product_id
+
+NODE all_primary_catalog_candidates
+SQL >
+    SELECT *
+    FROM primary_checkout_catalog_candidates
+    UNION ALL
+    SELECT *
+    FROM primary_invoice_catalog_candidates
+    UNION ALL
+    SELECT *
+    FROM primary_subscription_catalog_candidates
+    UNION ALL
+    SELECT *
+    FROM primary_payment_link_catalog_candidates
+
+NODE primary_catalog_candidate_rollups
+SQL >
+    SELECT
+        payment_id,
+        argMin(
+            tuple(
+                candidate_source,
+                checkout_session_id,
+                subscription_id,
+                payment_link_id,
+                line_item_id,
+                product_id,
+                product_name,
+                price_id,
+                plan_id,
+                line_item_description,
+                quantity,
+                line_amount_cents,
+                line_amount
+            ),
+            tuple(if(product_id IS NULL, 1, 0), candidate_priority, ifNull(line_item_id, ''))
+        ) AS best_candidate,
+        if(
+            countIf(line_item_description IS NOT NULL) = 0,
+            CAST(NULL AS Nullable(String)),
+            arrayStringConcat(
+                arraySort(
+                    groupUniqArrayIf(
+                        assumeNotNull(line_item_description), line_item_description IS NOT NULL
+                    )
+                ),
+                ' | '
+            )
+        ) AS line_item_signal,
+        max(product_id = 'prod_RtWRamfeN5cGXG') AS has_basic_vip_product,
+        max(price_id = 'price_1QzjOMBf6i84vTZEJziq3pN7') AS has_basic_vip_price,
+        max(payment_link_id = 'plink_1QzjOqBf6i84vTZEkOOwnbNJ') AS has_basic_vip_payment_link,
+        max(product_id = 'prod_RL2UJfDpmvCvRx') AS has_krc_product,
+        max(price_id = 'price_1QSMPLBf6i84vTZEbLsCt1b7') AS has_krc_price,
+        max(product_id = 'prod_RlhQH6wdxzjZeZ') AS has_full_payment_product,
+        max(price_id = 'price_1QsA1wBf6i84vTZEca307VRJ') AS has_full_payment_price,
+        max(product_id = 'prod_PtzEmmHhC1K9Xi') AS has_3x1997_product,
+        max(plan_id = 'BBB3X1997' OR price_id = 'BBB3X1997') AS has_3x1997_plan,
+        max(product_id = 'prod_RtWNqT9xux5CI7') AS has_balance_product,
+        max(price_id = 'price_1QzjKMBf6i84vTZE2WPd5Rh7') AS has_balance_price
+    FROM all_primary_catalog_candidates
+    GROUP BY payment_id
+
+NODE resolved_primary_catalog_evidence
+SQL >
+    SELECT
+        payment_id,
+        tupleElement(best_candidate, 1) AS catalog_source,
+        tupleElement(best_candidate, 2) AS catalog_checkout_session_id,
+        tupleElement(best_candidate, 3) AS catalog_subscription_id,
+        tupleElement(best_candidate, 4) AS catalog_payment_link_id,
+        tupleElement(best_candidate, 5) AS catalog_line_item_id,
+        tupleElement(best_candidate, 6) AS catalog_product_id,
+        tupleElement(best_candidate, 7) AS catalog_product_name,
+        tupleElement(best_candidate, 8) AS catalog_price_id,
+        tupleElement(best_candidate, 9) AS catalog_plan_id,
+        tupleElement(best_candidate, 10) AS catalog_line_item_description,
+        tupleElement(best_candidate, 11) AS catalog_quantity,
+        tupleElement(best_candidate, 12) AS catalog_line_amount_cents,
+        tupleElement(best_candidate, 13) AS catalog_line_amount,
+        line_item_signal,
+        coalesce(has_basic_vip_product, toUInt8(0)) AS has_basic_vip_product,
+        coalesce(has_basic_vip_price, toUInt8(0)) AS has_basic_vip_price,
+        coalesce(has_basic_vip_payment_link, toUInt8(0)) AS has_basic_vip_payment_link,
+        coalesce(has_krc_product, toUInt8(0)) AS has_krc_product,
+        coalesce(has_krc_price, toUInt8(0)) AS has_krc_price,
+        coalesce(has_full_payment_product, toUInt8(0)) AS has_full_payment_product,
+        coalesce(has_full_payment_price, toUInt8(0)) AS has_full_payment_price,
+        coalesce(has_3x1997_product, toUInt8(0)) AS has_3x1997_product,
+        coalesce(has_3x1997_plan, toUInt8(0)) AS has_3x1997_plan,
+        coalesce(has_balance_product, toUInt8(0)) AS has_balance_product,
+        coalesce(has_balance_price, toUInt8(0)) AS has_balance_price
+    FROM primary_catalog_candidate_rollups

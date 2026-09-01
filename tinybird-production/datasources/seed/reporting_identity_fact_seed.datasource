@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Immutable migration-time identity base for reporting facts. Activated mapping
+    deltas override this value at read time, so retroactive identity changes remain live.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `fact_kind` String `json:$.fact_kind`,
+    `fact_id` String `json:$.fact_id`,
+    `profile_id` Nullable(String) `json:$.profile_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, fact_kind, fact_id

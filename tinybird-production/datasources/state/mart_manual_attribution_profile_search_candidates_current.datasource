@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Replace-mode boundary for manual-attribution profile search candidates.
+
+SCHEMA >
+    `candidate_id` Nullable(String) `json:$.candidate_id`,
+    `source_system` String `json:$.source_system`,
+    `source_record_id` Nullable(String) `json:$.source_record_id`,
+    `profile_id` Nullable(String) `json:$.profile_id`,
+    `is_selectable` UInt8 `json:$.is_selectable`,
+    `event_time` Nullable(DateTime64(6)) `json:$.event_time`,
+    `first_name` Nullable(String) `json:$.first_name`,
+    `last_name` Nullable(String) `json:$.last_name`,
+    `full_name` Nullable(String) `json:$.full_name`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `search_text` Nullable(String) `json:$.search_text`,
+    `__tb_sort_candidate_id` String `json:$.__tb_sort_candidate_id` DEFAULT ifNull(candidate_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY source_system, __tb_sort_candidate_id

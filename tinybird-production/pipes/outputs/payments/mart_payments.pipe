@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Current payments with profile identity resolved at read time.
+
+NODE current_payment_mart_rows
+SQL >
+    SELECT * FROM mart_payments_build

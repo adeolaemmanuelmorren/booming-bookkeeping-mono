@@ -1,0 +1,272 @@
+DESCRIPTION >
+    Expand one prepared identity batch from frozen touched profiles to its exact
+    affected mapping scope. The next Copy freezes retained facts.
+
+NODE scoped_identity_compaction_rows
+SQL >
+    %
+    WITH
+        identity_compaction_scope_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        prepared_metadata_candidates AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                identity_compaction_scope_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+        ),
+        selected_prepared_metadata AS (
+            SELECT *
+            FROM prepared_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        selected_prepared_identity_changes AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                selected_prepared_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        prepared_changed_identity_facts AS (
+            SELECT
+                tenant_id,
+                evidence_keys,
+                fact_deleted,
+                stable_is_deleted,
+                stable_fact_deleted,
+                stable_evidence_keys
+            FROM selected_prepared_identity_changes
+            WHERE stage_kind = 'changed_fact'
+        ),
+        selected_frozen_touched_profiles AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                selected_prepared_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            WHERE scoped.stage_kind = 'touched_profile'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY scoped.tenant_id, scoped.stage_kind, scoped.stage_key
+                    ORDER BY scoped.staged_at, scoped.stage_hash
+                )
+                = 1
+        ),
+        affected_identity_identifier_keys AS (
+            SELECT stable.tenant_id AS tenant_id, identifier_key
+            FROM prepared_changed_identity_facts AS stable ARRAY
+            JOIN stable.stable_evidence_keys AS identifier_key
+            WHERE
+                stable.stable_is_deleted = 0
+                AND stable.stable_fact_deleted = 0
+                AND position(identifier_key, ':') > 1
+            UNION
+            DISTINCT
+            SELECT incoming.tenant_id AS tenant_id, identifier_key
+            FROM prepared_changed_identity_facts AS incoming ARRAY
+            JOIN incoming.evidence_keys AS identifier_key
+            WHERE incoming.fact_deleted = 0 AND position(identifier_key, ':') > 1
+            UNION
+            DISTINCT
+            SELECT profiles.tenant_id AS tenant_id, identifier_key
+            FROM selected_frozen_touched_profiles AS profiles ARRAY
+            JOIN profiles.member_identifier_keys AS identifier_key
+        ),
+        affected_identity_mapping_state_keys AS (
+            SELECT
+                tenant_id,
+                concat(
+                    'mapping:', toString(length(identifier_key)), ':', identifier_key
+                ) AS state_key
+            FROM affected_identity_identifier_keys
+        ),
+        scope_activated_identity_batches AS (
+            SELECT tenant_id, batch_version, batch_id
+            FROM
+                (
+                    SELECT
+                        journal.tenant_id AS tenant_id,
+                        journal.batch_version AS batch_version,
+                        journal.batch_id AS batch_id,
+                        journal.committed_at AS committed_at,
+                        journal.row_hash AS row_hash,
+                        metadata.active_batch_version AS active_batch_version,
+                        metadata.active_batch_id AS active_batch_id
+                    FROM identity_state_delta_versions AS journal
+                    INNER JOIN
+                        selected_prepared_metadata AS metadata ON journal.tenant_id = metadata.tenant_id
+                    WHERE journal.state_kind = 'activation_audit' AND journal.is_deleted = 0
+                    QUALIFY
+                        row_number() OVER (
+                            PARTITION BY journal.tenant_id, journal.batch_version
+                            ORDER BY
+                                journal.committed_at DESC, journal.row_hash DESC, journal.batch_id DESC
+                        )
+                        = 1
+                ) AS activated
+            WHERE
+                activated.batch_version < activated.active_batch_version
+                OR (
+                    activated.batch_version = activated.active_batch_version
+                    AND activated.batch_id = activated.active_batch_id
+                )
+        ),
+        candidate_affected_mapping_versions AS (
+            SELECT
+                seed.tenant_id AS tenant_id,
+                seed.identifier_type AS identifier_type,
+                seed.identifier_value AS identifier_value,
+                seed.identifier_key AS identifier_key,
+                seed.profile_id AS profile_id,
+                seed.first_seen_at AS first_seen_at,
+                seed.last_seen_at AS last_seen_at,
+                seed.is_deleted AS is_deleted,
+                seed.batch_version AS batch_version,
+                seed.committed_at AS committed_at,
+                seed.row_hash AS row_hash
+            FROM identity_state_seed_enriched AS seed
+            WHERE
+                seed.state_kind = 'mapping'
+                AND (seed.tenant_id, seed.state_key)
+                IN (SELECT tenant_id, state_key FROM affected_identity_mapping_state_keys)
+            UNION ALL
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.identifier_type AS identifier_type,
+                journal.identifier_value AS identifier_value,
+                journal.identifier_key AS identifier_key,
+                journal.profile_id AS profile_id,
+                journal.first_seen_at AS first_seen_at,
+                journal.last_seen_at AS last_seen_at,
+                journal.is_deleted AS is_deleted,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                scope_activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE
+                journal.state_kind = 'mapping'
+                AND (journal.tenant_id, journal.lookup_key)
+                IN (SELECT tenant_id, identifier_key FROM affected_identity_identifier_keys)
+        ),
+        latest_affected_mapping_versions AS (
+            SELECT *
+            FROM candidate_affected_mapping_versions
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, identifier_key
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+                )
+                = 1
+        ),
+        current_affected_mappings AS (
+            SELECT * FROM latest_affected_mapping_versions WHERE is_deleted = 0
+        ),
+        scoped_metadata_stage_rows AS (
+            SELECT
+                metadata.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'scope_metadata' AS stage_kind,
+                'scope_metadata' AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(
+                    hex(SHA256(concat('scope:', metadata.batch_id, ':', metadata.input_hash)))
+                ) AS stage_hash,
+                metadata.input_hash AS input_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                toDateTime64(0, 6) AS first_seen_at,
+                toDateTime64(0, 6) AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                '' AS producer_id
+            FROM selected_prepared_metadata AS metadata
+        ),
+        scoped_current_mapping_stage_rows AS (
+            SELECT
+                mappings.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'current_mapping' AS stage_kind,
+                mappings.identifier_key AS stage_key,
+                metadata.staged_at AS staged_at,
+                mappings.row_hash AS stage_hash,
+                metadata.input_hash AS input_hash,
+                mappings.identifier_type AS identifier_type,
+                mappings.identifier_value AS identifier_value,
+                mappings.identifier_key AS identifier_key,
+                mappings.profile_id AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                mappings.first_seen_at AS first_seen_at,
+                mappings.last_seen_at AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                '' AS producer_id
+            FROM current_affected_mappings AS mappings
+            INNER JOIN selected_prepared_metadata AS metadata ON mappings.tenant_id = metadata.tenant_id
+        )
+    SELECT
+        * REPLACE(
+            CAST(stage_hash AS FixedString(64)) AS stage_hash,
+            CAST(input_hash AS FixedString(64)) AS input_hash,
+            CAST(fact_payload_hash AS FixedString(64)) AS fact_payload_hash
+        )
+    FROM
+        (
+            SELECT *
+            FROM scoped_metadata_stage_rows
+            UNION ALL
+            SELECT *
+            FROM scoped_current_mapping_stage_rows
+        )

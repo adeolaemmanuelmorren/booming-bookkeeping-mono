@@ -1,0 +1,131 @@
+DESCRIPTION >
+    Discount, coupon, and promotion-code evidence aggregated to successful primary
+    Stripe charge grain.
+
+NODE latest_primary_discounts
+SQL >
+    SELECT
+        id AS discount_id,
+        amount AS discount_amount_cents,
+        toDecimal128(amount, 9) / 100 AS discount_amount,
+        coupon_id,
+        promotion_code AS promotion_code_id,
+        subscription_id,
+        invoice_id,
+        checkout_session_id
+    FROM raw_stripe_discount
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_coupons
+SQL >
+    SELECT
+        id AS coupon_id,
+        name AS coupon_name,
+        toDecimal128(amount_off, 9) / 100 AS coupon_amount_off,
+        percent_off AS coupon_percent_off
+    FROM raw_stripe_coupon
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_promotion_codes
+SQL >
+    SELECT id AS promotion_code_id, code AS promotion_code
+    FROM raw_stripe_promotion_code
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_invoices_for_discounts
+SQL >
+    SELECT id AS invoice_id, subscription_id
+    FROM raw_stripe_invoice
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_checkout_sessions_for_discounts
+SQL >
+    SELECT id AS checkout_session_id, payment_intent_id
+    FROM raw_stripe_checkout_session
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE primary_invoice_discount_links
+SQL >
+    SELECT charge.payment_id AS payment_id, discount.discount_id AS discount_id
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN latest_primary_discounts AS discount ON discount.invoice_id = charge.invoice_id
+
+NODE primary_checkout_discount_links
+SQL >
+    SELECT charge.payment_id AS payment_id, discount.discount_id AS discount_id
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN
+        latest_primary_checkout_sessions_for_discounts AS session
+        ON session.payment_intent_id = charge.payment_intent_id
+    INNER JOIN
+        latest_primary_discounts AS discount
+        ON discount.checkout_session_id = session.checkout_session_id
+
+NODE primary_subscription_discount_links
+SQL >
+    SELECT charge.payment_id AS payment_id, discount.discount_id AS discount_id
+    FROM stripe_primary_successful_charges_adapter AS charge
+    INNER JOIN
+        latest_primary_invoices_for_discounts AS invoice ON invoice.invoice_id = charge.invoice_id
+    INNER JOIN
+        latest_primary_discounts AS discount ON discount.subscription_id = invoice.subscription_id
+
+NODE all_primary_discount_links
+SQL >
+    SELECT *
+    FROM primary_invoice_discount_links
+    UNION ALL
+    SELECT *
+    FROM primary_checkout_discount_links
+    UNION ALL
+    SELECT *
+    FROM primary_subscription_discount_links
+
+NODE distinct_primary_discount_links
+SQL >
+    SELECT payment_id, discount_id FROM all_primary_discount_links GROUP BY payment_id, discount_id
+
+NODE primary_discount_details
+SQL >
+    SELECT
+        link.payment_id AS payment_id,
+        discount.discount_id AS discount_id,
+        discount.discount_amount_cents AS discount_amount_cents,
+        discount.discount_amount AS discount_amount,
+        discount.coupon_id AS coupon_id,
+        coupon.coupon_name AS coupon_name,
+        coupon.coupon_amount_off AS coupon_amount_off,
+        coupon.coupon_percent_off AS coupon_percent_off,
+        discount.promotion_code_id AS promotion_code_id,
+        promotion.promotion_code AS promotion_code
+    FROM distinct_primary_discount_links AS link
+    INNER JOIN latest_primary_discounts AS discount ON discount.discount_id = link.discount_id
+    LEFT JOIN latest_primary_coupons AS coupon ON coupon.coupon_id = discount.coupon_id
+    LEFT JOIN
+        latest_primary_promotion_codes AS promotion
+        ON promotion.promotion_code_id = discount.promotion_code_id
+
+NODE primary_discount_rollups
+SQL >
+    SELECT
+        payment_id,
+        true AS has_discount,
+        sum(coalesce(discount_amount_cents, toInt64(0))) AS discount_amount_cents,
+        sum(coalesce(discount_amount, toDecimal128(0, 9))) AS discount_amount,
+        arraySort(
+            groupUniqArrayIf(assumeNotNull(discount_id), discount_id IS NOT NULL)
+        ) AS discount_ids,
+        arraySort(groupUniqArrayIf(assumeNotNull(coupon_id), coupon_id IS NOT NULL)) AS coupon_ids,
+        arraySort(
+            groupUniqArrayIf(assumeNotNull(coupon_name), coupon_name IS NOT NULL)
+        ) AS coupon_names,
+        arraySort(
+            groupUniqArrayIf(assumeNotNull(promotion_code_id), promotion_code_id IS NOT NULL)
+        ) AS promotion_code_ids,
+        arraySort(
+            groupUniqArrayIf(assumeNotNull(promotion_code), promotion_code IS NOT NULL)
+        ) AS promotion_codes,
+        max(coupon_amount_off) AS coupon_amount_off,
+        max(coupon_percent_off) AS coupon_percent_off
+    FROM primary_discount_details
+    GROUP BY payment_id

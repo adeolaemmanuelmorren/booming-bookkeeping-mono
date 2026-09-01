@@ -1,0 +1,93 @@
+DESCRIPTION >
+    Compute the complete current ActiveCampaign registration set before publishing
+    it as a replace-mode snapshot.
+
+NODE matched_activecampaign_registration_assignments
+SQL >
+    SELECT
+        contact_tag.contact_tag_id AS form_submission_id,
+        contact_tag.assigned_at AS submitted_at,
+        contact.contact_id AS contact_id,
+        contact.email AS email,
+        contact.phone AS phone,
+        contact.first_name AS first_name,
+        contact.last_name AS last_name,
+        contact.full_name AS full_name,
+        tag.tag_id AS tag_id,
+        tag.tag_name AS tag_name,
+        policy.registration_type AS registration_type,
+        policy.content_name AS content_name,
+        policy.tag_match_type AS tag_match_type
+    FROM activecampaign_contact_tags_adapter AS contact_tag
+    INNER JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = contact_tag.tag_id
+    INNER JOIN activecampaign_contacts_adapter AS contact ON contact.contact_id = contact_tag.contact_id
+    CROSS JOIN activecampaign_registration_tag_policy AS policy
+    WHERE
+        contact_tag.is_deleted = false
+        AND tag.is_deleted = false
+        AND contact.is_deleted = false
+        AND (
+            (policy.tag_match_operator = 'exact' AND tag.tag_name = policy.tag_match_value)
+            OR (
+                policy.tag_match_operator = 'prefix'
+                AND startsWith(tag.tag_name, policy.tag_match_value)
+            )
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY contact_tag.contact_tag_id
+            ORDER BY policy.registration_priority, policy.tag_match_priority
+        )
+        = 1
+
+NODE activecampaign_assignments_with_primary_state
+SQL >
+    SELECT
+        *,
+        max(tag_match_type = 'primary') OVER (
+            PARTITION BY contact_id, registration_type
+        ) AS contact_has_primary_registration
+    FROM matched_activecampaign_registration_assignments
+
+NODE eligible_activecampaign_registration_assignments
+SQL >
+    SELECT
+        form_submission_id,
+        submitted_at,
+        contact_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        full_name,
+        tag_id,
+        tag_name,
+        registration_type,
+        content_name,
+        if(
+            email IS NOT NULL,
+            concat(
+                'form_submission_',
+                lowerUTF8(
+                    hex(
+                        SHA256(
+                            concat(
+                                lowerUTF8(trim(email)),
+                                '|',
+                                registration_type,
+                                '|',
+                                toString(toDate(submitted_at, 'America/Los_Angeles'))
+                            )
+                        )
+                    )
+                )
+            ),
+            CAST(NULL AS Nullable(String))
+        ) AS canonical_event_id,
+        'activecampaign_tag' AS form_type,
+        'activecampaign' AS event_source,
+        tag_match_type AS registration_tag_type
+    FROM activecampaign_assignments_with_primary_state
+    WHERE
+        tag_match_type = 'primary'
+        OR (tag_match_type = 'fallback' AND contact_has_primary_registration = 0)

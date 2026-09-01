@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Atomic visibility markers for versioned conversion journeys. The latest
+    committed version replaces every older row for the same conversion.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `conversion_id` String `json:$.conversion_id`,
+    `profile_id` Nullable(String) `json:$.profile_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `journey_row_count` UInt64 `json:$.journey_row_count`,
+    `is_deleted` UInt8 `json:$.is_deleted`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY tenant_id, conversion_id
+ENGINE_VER batch_version

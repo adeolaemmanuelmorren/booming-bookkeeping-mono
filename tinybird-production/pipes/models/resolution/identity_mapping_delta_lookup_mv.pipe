@@ -1,0 +1,23 @@
+DESCRIPTION >
+    Materializes only mapping rows from the identity journal into the narrow
+    reporting lookup. Activation markers remain the visibility gate at read time.
+
+NODE materialize_identity_mapping_delta
+SQL >
+    SELECT
+        tenant_id,
+        state_key,
+        lookup_key,
+        sub_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        is_deleted,
+        row_hash,
+        identifier_key,
+        profile_id
+    FROM identity_state_delta_versions
+    WHERE state_kind = 'mapping'
+
+TYPE materialized
+DATASOURCE identity_mapping_delta_lookup

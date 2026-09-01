@@ -1,0 +1,31 @@
+DESCRIPTION >
+    Materializes new Jitsu Events API identify versions
+    into their append-only canonical state.
+
+NODE materialized_identify_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        identify_id,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        identified_at,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        source_version,
+        __tb_state_key
+    FROM jitsu_identifies_live_build
+
+TYPE MATERIALIZED
+DATASOURCE jitsu_identify_versions

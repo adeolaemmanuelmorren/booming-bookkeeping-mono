@@ -1,0 +1,82 @@
+DESCRIPTION >
+    Current active fact heads for literal fact keys. Payloads stay in Tinybird;
+    the Worker receives only graph fields and extracted names.
+
+NODE requested_identity_worker_fact_heads
+SQL >
+    %
+    WITH candidates AS (
+        SELECT
+            fact_kind,
+            fact_key,
+            source_fact_version,
+            fact_deleted,
+            fact_observed_at,
+            fact_payload_hash,
+            evidence_keys,
+            producer_id,
+            is_deleted,
+            batch_version,
+            committed_at,
+            row_hash,
+            JSONExtractString(fact_payload, 'first_name') AS first_name,
+            JSONExtractString(fact_payload, 'last_name') AS last_name
+        FROM identity_state_seed_enriched
+        WHERE
+            tenant_id = {{ String(p_tenant_id, 'boom') }}
+            AND state_kind = 'fact'
+            {% if defined(p_state_key) %}
+                AND state_key = {{ String(p_state_key) }}
+            {% else %}
+                AND state_key IN {{ Array(p_state_keys, 'String') }}
+            {% end %}
+        UNION ALL
+        SELECT
+            journal.fact_kind,
+            journal.fact_key,
+            journal.source_fact_version,
+            journal.fact_deleted,
+            journal.fact_observed_at,
+            journal.fact_payload_hash,
+            journal.evidence_keys,
+            journal.producer_id,
+            journal.is_deleted,
+            journal.batch_version,
+            journal.committed_at,
+            journal.row_hash,
+            JSONExtractString(journal.fact_payload, 'first_name') AS first_name,
+            JSONExtractString(journal.fact_payload, 'last_name') AS last_name
+        FROM identity_state_delta_versions AS journal
+        INNER JOIN activated_identity_batches AS activated
+            ON journal.tenant_id = activated.tenant_id
+            AND journal.batch_version = activated.batch_version
+            AND journal.batch_id = activated.batch_id
+        WHERE
+            journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+            AND journal.state_kind = 'fact'
+            {% if defined(p_fact_key) %}
+                AND journal.lookup_key = {{ String(p_fact_key) }}
+            {% else %}
+                AND journal.lookup_key IN {{ Array(p_fact_keys, 'String') }}
+            {% end %}
+    )
+    SELECT
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_deleted,
+        fact_observed_at,
+        fact_payload_hash,
+        evidence_keys,
+        producer_id,
+        is_deleted,
+        first_name,
+        last_name
+    FROM candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY fact_kind, fact_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        ) = 1
+
+TYPE ENDPOINT

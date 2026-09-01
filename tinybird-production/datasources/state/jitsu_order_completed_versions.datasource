@@ -1,0 +1,53 @@
+DESCRIPTION >
+    Append-only canonical order-completed versions. The reader
+    resolves source precedence, revisions, and deletion tombstones at query time.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_system` LowCardinality(String) `json:$.source_system`,
+    `source_priority` UInt8 `json:$.source_priority`,
+    `source_deleted` UInt8 `json:$.source_deleted`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `source_ingested_at` DateTime64(6) `json:$.source_ingested_at`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`,
+    `event_row_id` Nullable(String) `json:$.event_row_id`,
+    `event_id` Nullable(String) `json:$.event_id`,
+    `completed_at` Nullable(DateTime64(6)) `json:$.completed_at`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `customer_name` Nullable(String) `json:$.customer_name`,
+    `order_id` Nullable(String) `json:$.order_id`,
+    `checkout_id` Nullable(String) `json:$.checkout_id`,
+    `checkout_submission_id` Nullable(String) `json:$.checkout_submission_id`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `product_name` Nullable(String) `json:$.product_name`,
+    `products` Nullable(String) `json:$.products`,
+    `value` Nullable(Decimal(38, 9)) `json:$.value`,
+    `currency` Nullable(String) `json:$.currency`,
+    `completion_basis` Nullable(String) `json:$.completion_basis`,
+    `is_payment_confirmed` Nullable(Bool) `json:$.is_payment_confirmed`,
+    `payment_status` Nullable(String) `json:$.payment_status`,
+    `stripe_payment_method_id` Nullable(String) `json:$.stripe_payment_method_id`,
+    `payment_method_type` Nullable(String) `json:$.payment_method_type`,
+    `payment_provider` Nullable(String) `json:$.payment_provider`,
+    `form_id` Nullable(String) `json:$.form_id`,
+    `form_action` Nullable(String) `json:$.form_action`,
+    `page_url` Nullable(String) `json:$.page_url`,
+    `page_path` Nullable(String) `json:$.page_path`,
+    `page_referrer` Nullable(String) `json:$.page_referrer`,
+    `ip_address` Nullable(String) `json:$.ip_address`,
+    `user_agent` Nullable(String) `json:$.user_agent`,
+    `geo_city` Nullable(String) `json:$.geo_city`,
+    `geo_region` Nullable(String) `json:$.geo_region`,
+    `geo_country` Nullable(String) `json:$.geo_country`,
+    `fbp` Nullable(String) `json:$.fbp`,
+    `ttp` Nullable(String) `json:$.ttp`,
+    `uetsid` Nullable(String) `json:$.uetsid`,
+    `uetvid` Nullable(String) `json:$.uetvid`,
+    `source_version` Nullable(DateTime64(6)) `json:$.source_version`,
+    `__tb_state_key` String `json:$.__tb_state_key` DEFAULT ifNull(event_row_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, __tb_state_key, source_priority, source_fact_version, source_ingested_at, payload_hash

@@ -1,0 +1,46 @@
+DESCRIPTION >
+    Immutable flat identity snapshot with mapping evidence timestamps stored on
+    each mapping row.
+
+NODE flat_identity_state_base
+SQL >
+    SELECT
+        seed.tenant_id AS tenant_id,
+        seed.state_kind AS state_kind,
+        seed.state_key AS state_key,
+        seed.batch_version AS batch_version,
+        seed.batch_id AS batch_id,
+        seed.committed_at AS committed_at,
+        seed.is_deleted AS is_deleted,
+        seed.row_hash AS row_hash,
+        seed.identifier_type AS identifier_type,
+        seed.identifier_value AS identifier_value,
+        seed.identifier_key AS identifier_key,
+        seed.profile_id AS profile_id,
+        seed.profile_key AS profile_key,
+        seed.winner_identifier_key AS winner_identifier_key,
+        seed.member_identifier_keys AS member_identifier_keys,
+        seed.anonymous_ids AS anonymous_ids,
+        seed.user_ids AS user_ids,
+        seed.emails AS emails,
+        seed.phones AS phones,
+        seed.historical_profile_ids AS historical_profile_ids,
+        seed.first_name AS first_name,
+        seed.last_name AS last_name,
+        seed.first_seen_at AS first_seen_at,
+        seed.last_seen_at AS last_seen_at,
+        seed.fact_kind AS fact_kind,
+        seed.fact_key AS fact_key,
+        seed.source_fact_version AS source_fact_version,
+        seed.fact_deleted AS fact_deleted,
+        seed.fact_observed_at AS fact_observed_at,
+        seed.fact_payload_hash AS fact_payload_hash,
+        seed.fact_payload AS fact_payload,
+        seed.evidence_keys AS evidence_keys,
+        seed.producer_id AS producer_id,
+        seed.checkpoint_sequence AS checkpoint_sequence,
+        seed.prior_profile_ids AS prior_profile_ids,
+        seed.dirty_profile_ids AS dirty_profile_ids,
+        seed.input_event_count AS input_event_count,
+        seed.input_hash AS input_hash
+    FROM identity_state_seed_enriched AS seed

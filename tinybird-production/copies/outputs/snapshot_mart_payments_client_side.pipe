@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Atomically replace the client-side payment mart after its form and identity inputs refresh.
+
+NODE build_client_payment_mart_snapshot
+SQL >
+    SELECT source.*, source.client_payment_id AS __tb_sort_client_payment_id
+    FROM mart_payments_client_side_build AS source
+
+TYPE COPY
+TARGET_DATASOURCE mart_payments_client_side_current
+COPY_MODE replace

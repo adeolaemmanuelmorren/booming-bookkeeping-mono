@@ -1,0 +1,92 @@
+DESCRIPTION >
+    Website touchpoints resolved to the active profile by anonymous ID first, then
+    lowercased user ID across user-id and email mappings.
+
+NODE anonymous_identity_mappings
+SQL >
+    SELECT profile_id, identifier_value AS anonymous_id
+    FROM reporting_current_identity_mappings_direct
+    WHERE identifier_type = 'anonymous_id'
+
+NODE user_identity_mappings
+SQL >
+    SELECT min(profile_id) AS profile_id, identifier_value AS user_id
+    FROM reporting_current_identity_mappings_direct
+    WHERE identifier_type IN ('user_id', 'email')
+    GROUP BY identifier_value
+
+NODE resolved_session_touchpoint_candidates
+SQL >
+    SELECT
+        touchpoints.tenant_id AS tenant_id,
+        touchpoints.touchpoint_id AS touchpoint_id,
+        touchpoints.session_id AS session_id,
+        touchpoints.visitor_key AS visitor_key,
+        touchpoints.anonymous_id AS anonymous_id,
+        touchpoints.user_id AS user_id,
+        touchpoints.session_start_timestamp AS session_start_timestamp,
+        touchpoints.touchpoint_time AS touchpoint_time,
+        touchpoints.session_end_timestamp AS session_end_timestamp,
+        touchpoints.session_duration_seconds AS session_duration_seconds,
+        touchpoints.page_view_count AS page_view_count,
+        touchpoints.first_page_view_id AS first_page_view_id,
+        touchpoints.first_page_url AS first_page_url,
+        touchpoints.first_page_host AS first_page_host,
+        touchpoints.first_page_path AS first_page_path,
+        touchpoints.first_page_path_host AS first_page_path_host,
+        touchpoints.ip_address AS ip_address,
+        touchpoints.user_agent AS user_agent,
+        touchpoints.device_platform AS device_platform,
+        touchpoints.device_is_mobile AS device_is_mobile,
+        touchpoints.geo_city AS geo_city,
+        touchpoints.geo_region AS geo_region,
+        touchpoints.geo_region_code AS geo_region_code,
+        touchpoints.geo_country AS geo_country,
+        touchpoints.geo_timezone AS geo_timezone,
+        touchpoints.last_page_view_id AS last_page_view_id,
+        touchpoints.last_page_url AS last_page_url,
+        touchpoints.last_page_path AS last_page_path,
+        touchpoints.utm_source AS utm_source,
+        touchpoints.utm_medium AS utm_medium,
+        touchpoints.utm_campaign AS utm_campaign,
+        touchpoints.utm_content AS utm_content,
+        touchpoints.utm_term AS utm_term,
+        touchpoints.utm_id AS utm_id,
+        touchpoints.campaign_id AS campaign_id,
+        touchpoints.adset_id AS adset_id,
+        touchpoints.ad_id AS ad_id,
+        touchpoints.google_keyword_id AS google_keyword_id,
+        touchpoints.google_keyword AS google_keyword,
+        touchpoints.click_id AS click_id,
+        touchpoints.click_id_type AS click_id_type,
+        touchpoints.gclid AS gclid,
+        touchpoints.gbraid AS gbraid,
+        touchpoints.wbraid AS wbraid,
+        touchpoints.fbclid AS fbclid,
+        touchpoints.fbc_fbclid AS fbc_fbclid,
+        touchpoints.ttclid AS ttclid,
+        touchpoints.li_fat_id AS li_fat_id,
+        touchpoints.rdt_cid AS rdt_cid,
+        touchpoints.twclid AS twclid,
+        touchpoints.fbc AS fbc,
+        touchpoints.fbp AS fbp,
+        touchpoints.ttp AS ttp,
+        touchpoints.uetsid AS uetsid,
+        touchpoints.uetvid AS uetvid,
+        touchpoints.channel_source AS channel_source,
+        touchpoints.channel_medium AS channel_medium,
+        coalesce(
+            nullIf(anonymous_profiles.profile_id, ''), nullIf(user_profiles.profile_id, '')
+        ) AS profile_id
+    FROM website_session_touchpoints AS touchpoints
+    LEFT JOIN
+        anonymous_identity_mappings AS anonymous_profiles
+        ON touchpoints.anonymous_id = anonymous_profiles.anonymous_id
+    LEFT JOIN
+        user_identity_mappings AS user_profiles
+        ON lowerUTF8(touchpoints.user_id) = user_profiles.user_id
+
+NODE current_resolved_session_touchpoints
+SQL >
+    SELECT candidates.*, toUInt8(candidates.profile_id IS NOT NULL) AS is_identified
+    FROM resolved_session_touchpoint_candidates AS candidates

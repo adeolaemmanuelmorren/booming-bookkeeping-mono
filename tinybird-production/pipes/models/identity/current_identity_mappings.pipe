@@ -1,0 +1,64 @@
+DESCRIPTION >
+    One current profile mapping per normalized first-party identifier, overlaid from
+    the activated delta onto the flat identity snapshot.
+
+NODE current_mapping_rows
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.identifier_type, delta.identifier_type) AS identifier_type,
+        if(delta.state_key = '', base.identifier_value, delta.identifier_value) AS identifier_value,
+        if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
+        if(delta.state_key = '', base.profile_id, delta.profile_id) AS profile_id,
+        if(delta.state_key = '', base.first_seen_at, delta.first_seen_at) AS first_seen_at,
+        if(delta.state_key = '', base.last_seen_at, delta.last_seen_at) AS last_seen_at,
+        if(delta.state_key = '', base.batch_version, delta.batch_version) AS batch_version,
+        if(delta.state_key = '', base.committed_at, delta.committed_at) AS committed_at
+    FROM
+        (
+            SELECT
+                seed.tenant_id AS tenant_id,
+                seed.state_key AS state_key,
+                seed.identifier_type AS identifier_type,
+                seed.identifier_value AS identifier_value,
+                seed.identifier_key AS identifier_key,
+                seed.profile_id AS profile_id,
+                seed.first_seen_at AS first_seen_at,
+                seed.last_seen_at AS last_seen_at,
+                seed.batch_version AS batch_version,
+                seed.committed_at AS committed_at
+            FROM identity_state_seed_enriched AS seed
+            WHERE seed.state_kind = 'mapping'
+        ) AS base
+    FULL OUTER JOIN
+        (
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.state_key AS state_key,
+                journal.is_deleted AS is_deleted,
+                journal.identifier_type AS identifier_type,
+                journal.identifier_value AS identifier_value,
+                journal.identifier_key AS identifier_key,
+                journal.profile_id AS profile_id,
+                journal.first_seen_at AS first_seen_at,
+                journal.last_seen_at AS last_seen_at,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE journal.state_kind = 'mapping'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY journal.tenant_id, journal.lookup_key, journal.sub_key
+                    ORDER BY
+                        journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+                )
+                = 1
+        ) AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.state_key = delta.state_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0

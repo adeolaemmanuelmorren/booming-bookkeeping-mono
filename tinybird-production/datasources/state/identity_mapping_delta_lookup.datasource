@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Narrow activated-journal lookup for reporting identity joins. The materialized
+    view keeps it current as the Durable Object appends new mapping state.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String),
+    `state_key` String,
+    `lookup_key` String,
+    `sub_key` String,
+    `batch_version` UInt64,
+    `batch_id` String,
+    `committed_at` DateTime64(6),
+    `is_deleted` UInt8,
+    `row_hash` FixedString(64),
+    `identifier_key` String,
+    `profile_id` String
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, identifier_key, batch_version, committed_at, row_hash
+ENGINE_SETTINGS "index_granularity=128"

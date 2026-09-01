@@ -1,0 +1,181 @@
+DESCRIPTION >
+    Current primary and Kajabi Stripe identity facts. Charge status transitions emit
+    tombstones, while charge, customer, and payment-intent Fivetran versions make
+    identity-field corrections strictly newer than the prior fact.
+
+NODE all_stripe_identity_charge_versions
+SQL >
+    SELECT
+        'stripe' AS payment_source,
+        id AS payment_id,
+        created AS payment_time,
+        paid,
+        status,
+        customer_id,
+        payment_intent_id,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        receipt_email,
+        metadata,
+        _fivetran_synced AS charge_source_version
+    FROM raw_stripe_charge
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+    UNION ALL
+    SELECT
+        'stripe_kajabi' AS payment_source,
+        id AS payment_id,
+        created AS payment_time,
+        paid,
+        status,
+        customer_id,
+        payment_intent_id,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        receipt_email,
+        metadata,
+        _fivetran_synced AS charge_source_version
+    FROM raw_stripe_kajabi_charge
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+
+NODE latest_stripe_identity_charges
+SQL >
+    SELECT *
+    FROM all_stripe_identity_charge_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payment_source, payment_id
+            ORDER BY ifNull(charge_source_version, toDateTime64(0, 6)) DESC
+        )
+        = 1
+
+NODE all_stripe_identity_customer_versions
+SQL >
+    SELECT
+        'stripe' AS payment_source,
+        id AS customer_id,
+        email,
+        name,
+        phone,
+        is_deleted AS customer_is_deleted,
+        _fivetran_synced AS customer_source_version
+    FROM raw_stripe_customer
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+    UNION ALL
+    SELECT
+        'stripe_kajabi' AS payment_source,
+        id AS customer_id,
+        email,
+        name,
+        phone,
+        is_deleted AS customer_is_deleted,
+        _fivetran_synced AS customer_source_version
+    FROM raw_stripe_kajabi_customer
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+
+NODE latest_stripe_identity_customers
+SQL >
+    SELECT *
+    FROM all_stripe_identity_customer_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payment_source, customer_id
+            ORDER BY ifNull(customer_source_version, toDateTime64(0, 6)) DESC
+        )
+        = 1
+
+NODE all_stripe_identity_intent_versions
+SQL >
+    SELECT
+        'stripe' AS payment_source,
+        id AS payment_intent_id,
+        receipt_email,
+        _fivetran_synced AS intent_source_version
+    FROM raw_stripe_payment_intent
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+    UNION ALL
+    SELECT
+        'stripe_kajabi' AS payment_source,
+        id AS payment_intent_id,
+        receipt_email,
+        _fivetran_synced AS intent_source_version
+    FROM raw_stripe_kajabi_payment_intent
+    WHERE id IS NOT NULL AND trim(assumeNotNull(id)) != ''
+
+NODE latest_stripe_identity_intents
+SQL >
+    SELECT *
+    FROM all_stripe_identity_intent_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payment_source, payment_intent_id
+            ORDER BY ifNull(intent_source_version, toDateTime64(0, 6)) DESC
+        )
+        = 1
+
+NODE evaluated_stripe_identity_facts
+SQL >
+    SELECT
+        charge.payment_source AS payment_source,
+        charge.payment_id AS payment_id,
+        charge.payment_time AS observed_at,
+        greatest(
+            ifNull(charge.charge_source_version, toDateTime64(0, 6)),
+            ifNull(customer.customer_source_version, toDateTime64(0, 6)),
+            ifNull(intent.intent_source_version, toDateTime64(0, 6))
+        ) AS source_version,
+        coalesce(charge.paid, false) AND ifNull(charge.status, '') = 'succeeded' AS is_live,
+        coalesce(
+            nullIf(trim(charge.billing_detail_email), ''),
+            nullIf(trim(charge.receipt_email), ''),
+            if(
+                coalesce(customer.customer_is_deleted, false),
+                CAST(NULL AS Nullable(String)),
+                nullIf(trim(customer.email), '')
+            ),
+            nullIf(trim(intent.receipt_email), '')
+        ) AS payment_email,
+        coalesce(
+            nullIf(trim(charge.billing_detail_name), ''),
+            if(
+                coalesce(customer.customer_is_deleted, false),
+                CAST(NULL AS Nullable(String)),
+                nullIf(trim(customer.name), '')
+            )
+        ) AS payment_name,
+        coalesce(
+            nullIf(trim(charge.billing_detail_phone), ''),
+            if(
+                coalesce(customer.customer_is_deleted, false),
+                CAST(NULL AS Nullable(String)),
+                nullIf(trim(customer.phone), '')
+            ),
+            if(
+                charge.payment_source = 'stripe',
+                nullIf(trim(JSONExtractString(ifNull(charge.metadata, '{}'), 'phone')), ''),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS payment_phone
+    FROM latest_stripe_identity_charges AS charge
+    LEFT JOIN
+        latest_stripe_identity_customers AS customer
+        ON customer.payment_source = charge.payment_source
+        AND customer.customer_id = charge.customer_id
+    LEFT JOIN
+        latest_stripe_identity_intents AS intent
+        ON intent.payment_source = charge.payment_source
+        AND intent.payment_intent_id = charge.payment_intent_id
+
+NODE current_stripe_identity_facts
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        observed_at,
+        source_version,
+        toUInt8(NOT is_live) AS fact_deleted,
+        if(is_live, payment_email, CAST(NULL AS Nullable(String))) AS payment_email,
+        if(is_live, payment_name, CAST(NULL AS Nullable(String))) AS payment_name,
+        if(is_live, payment_phone, CAST(NULL AS Nullable(String))) AS payment_phone
+    FROM evaluated_stripe_identity_facts

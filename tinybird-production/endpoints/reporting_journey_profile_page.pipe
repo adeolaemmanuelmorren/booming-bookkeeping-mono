@@ -1,0 +1,47 @@
+DESCRIPTION >
+    Keyset page of every profile ever written to identity state. Used only by the
+    Durable Object's resumable one-time journey backfill.
+
+NODE journey_backfill_profile_page
+SQL >
+    %
+    SELECT profile_id
+    FROM
+        (
+            SELECT profile_id
+            FROM
+                (
+                    SELECT profile_id
+                    FROM identity_state_seed_enriched
+                    WHERE
+                        tenant_id = {{ String(p_tenant_id, 'boom') }}
+                        AND state_kind = 'profile'
+                        AND state_key
+                            > concat('profile:32:', {{ String(p_after_profile_id, '') }})
+                    ORDER BY state_key
+                    LIMIT least(toUInt64({{ Int64(p_batch_limit, 500) }}), toUInt64(500))
+                )
+            UNION ALL
+            SELECT profile_id
+            FROM
+                (
+                    SELECT journal.profile_id AS profile_id
+                    FROM identity_state_delta_versions AS journal
+                    INNER JOIN activated_identity_batches AS activated
+                        ON journal.tenant_id = activated.tenant_id
+                        AND journal.batch_version = activated.batch_version
+                        AND journal.batch_id = activated.batch_id
+                    WHERE
+                        journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+                        AND journal.state_kind = 'profile'
+                        AND journal.lookup_key > {{ String(p_after_profile_id, '') }}
+                    ORDER BY journal.lookup_key, journal.batch_version
+                    LIMIT least(toUInt64({{ Int64(p_batch_limit, 500) }}), toUInt64(500))
+                )
+        )
+    WHERE profile_id != ''
+    GROUP BY profile_id
+    ORDER BY profile_id
+    LIMIT least(toUInt64({{ Int64(p_batch_limit, 500) }}), toUInt64(500))
+
+TYPE ENDPOINT

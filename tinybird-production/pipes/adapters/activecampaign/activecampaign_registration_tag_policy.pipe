@@ -1,0 +1,47 @@
+DESCRIPTION >
+    ActiveCampaign tag rules that classify KRC and webinar registrations. Priority
+    preserves the first-match order in the Boom business rules.
+
+NODE configured_activecampaign_registration_tag_rules
+SQL >
+    SELECT
+        toUInt8(1) AS registration_priority,
+        toUInt8(1) AS tag_match_priority,
+        'krc' AS registration_type,
+        'Keyboard Rich Challenge Registration' AS content_name,
+        'primary' AS tag_match_type,
+        'prefix' AS tag_match_operator,
+        '[KRC] Registered for Challenge -' AS tag_match_value
+
+    UNION ALL
+
+    SELECT
+        toUInt8(1),
+        toUInt8(2),
+        'krc',
+        'Keyboard Rich Challenge Registration',
+        'primary',
+        'prefix',
+        '[KRC] Registered -'
+
+    UNION ALL
+
+    SELECT
+        toUInt8(1),
+        toUInt8(3),
+        'krc',
+        'Keyboard Rich Challenge Registration',
+        'fallback',
+        'exact',
+        '[KRC] Registered for Challenge'
+
+    UNION ALL
+
+    SELECT
+        toUInt8(2),
+        toUInt8(1),
+        'webinar',
+        'Booming Bookkeeping Webinar Registration',
+        'primary',
+        'exact',
+        '[CW] Registered for Webinar'

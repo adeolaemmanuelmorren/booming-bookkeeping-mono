@@ -1,0 +1,25 @@
+DESCRIPTION >
+    First server-side challenge registration per resolved profile and registration type.
+
+NODE first_contact_conversion_rows
+SQL >
+    SELECT
+        profile_id,
+        email AS profile_email,
+        phone AS profile_phone,
+        first_name AS profile_first_name,
+        last_name AS profile_last_name,
+        form_submission_id,
+        submitted_at AS form_submit_time,
+        tag_name,
+        registration_type,
+        content_name,
+        canonical_event_id
+    FROM mart_form_submissions_server_side
+    WHERE profile_id IS NOT NULL AND email IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY profile_id, registration_type
+            ORDER BY submitted_at ASC NULLS FIRST, form_submission_id ASC NULLS FIRST
+        )
+        = 1

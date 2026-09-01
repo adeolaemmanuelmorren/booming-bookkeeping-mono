@@ -1,0 +1,33 @@
+DESCRIPTION >
+    Returns the next activated identity-to-journey handoff after a durable cursor.
+
+NODE pending_activated_journey_batch
+SQL >
+    %
+    SELECT
+        queue.tenant_id,
+        queue.batch_version,
+        queue.batch_id,
+        queue.committed_at,
+        queue.profile_ids,
+        queue.identifier_keys,
+        queue.conversion_ids
+    FROM reporting_journey_identity_queue AS queue
+    INNER JOIN activated_identity_batches AS activated
+        ON queue.tenant_id = activated.tenant_id
+        AND queue.batch_version = activated.batch_version
+        AND queue.batch_id = activated.batch_id
+    WHERE queue.tenant_id = {{ String(p_tenant_id) }}
+        AND tuple(queue.batch_version, queue.batch_id) > tuple(
+            {{ UInt64(p_after_batch_version, 0) }},
+            {{ String(p_after_batch_id, '') }}
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY queue.tenant_id, queue.batch_version, queue.batch_id
+            ORDER BY queue.committed_at DESC
+        ) = 1
+    ORDER BY queue.batch_version, queue.batch_id
+    LIMIT 1
+
+TYPE ENDPOINT

@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Append the exact affected identity scope for one prepared batch. The coordinator
+    runs this after preparation and before final compaction.
+
+NODE append_scoped_identity_compaction
+SQL >
+    SELECT * FROM identity_compaction_scope_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_scope_stage
+COPY_MODE append

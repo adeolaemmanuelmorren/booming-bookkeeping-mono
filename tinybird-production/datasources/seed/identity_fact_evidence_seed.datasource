@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Flat reverse evidence index from the fixed BigQuery identity snapshot. One row
+    links one normalized identifier to one live logical fact.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `identifier_key` String `json:$.identifier_key`,
+    `fact_key` String `json:$.fact_key`,
+    `base_batch_version` UInt64 `json:$.base_batch_version`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, identifier_key, fact_key
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/migration_seed/identity_fact_evidence/snapshot_at=20260826230500/*.parquet
+IMPORT_SCHEDULE @on-demand
+IMPORT_FORMAT parquet

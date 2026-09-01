@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Atomically replace the conversion journey after all identity-resolved input marts refresh.
+
+NODE build_conversion_touchpoint_snapshot
+SQL >
+    SELECT journey_rows.*
+    FROM mart_conversions_with_touchpoints_build AS journey_rows
+    SETTINGS join_algorithm = 'hash'
+
+TYPE COPY
+TARGET_DATASOURCE mart_conversions_with_touchpoints_current
+COPY_MODE replace

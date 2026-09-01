@@ -1,0 +1,255 @@
+DESCRIPTION >
+    Exact payment-plan start classification for every canonical payment.
+
+NODE subscription_plan_starts
+SQL >
+    SELECT
+        payment_source AS payment_source,
+        subscription_id AS subscription_id,
+        min(
+            coalesce(start_date, subscription_started_at, subscription_created_at)
+        ) AS payment_plan_started_at,
+        toUInt8(1) AS subscription_match
+    FROM raw_stripe_auxiliary
+    WHERE record_type = 'subscription_history'
+    GROUP BY payment_source, subscription_id
+
+NODE payment_plan_base_facts
+SQL >
+    SELECT
+        payment_source AS payment_source,
+        payment_id AS payment_id,
+        payment_time AS payment_time,
+        subscription_id AS subscription_id,
+        payment_link_id AS payment_link_id,
+        product_name AS product_name
+    FROM all_stripe_payments_current
+
+NODE special_payment_facts
+SQL >
+    WITH
+        replaceRegexpAll(trimBoth(ifNull(payment_phone, '')), '[^0-9]', '') AS phone_digits,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    SELECT
+        payment_source,
+        payment_id,
+        payment_time,
+        customer_id,
+        payment_email,
+        subscription_id,
+        payment_link_id,
+        coalesce(
+            if(
+                payment_email IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('email:', payment_email)
+            ),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS identity_anchor_key
+    FROM all_stripe_payments_current
+    WHERE
+        payment_source = 'stripe'
+        AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+        AND product_name = 'Booming Bookkeeping installment'
+
+NODE special_payment_identifier_keys
+SQL >
+    SELECT
+        identity_anchor_key,
+        concat(
+            'mapping:',
+            toString(length(identity_anchor_key)),
+            ':',
+            identity_anchor_key
+        ) AS mapping_state_key
+    FROM special_payment_facts
+    WHERE identity_anchor_key IS NOT NULL
+    GROUP BY identity_anchor_key, mapping_state_key
+
+NODE special_payment_mapping_activations
+SQL >
+    SELECT
+        delta.tenant_id,
+        delta.batch_version,
+        argMax(delta.batch_id, tuple(delta.committed_at, delta.row_hash, delta.batch_id)) AS batch_id
+    FROM identity_state_delta_versions AS delta
+    INNER JOIN
+        (
+            SELECT tenant_id, max(batch_version) AS seed_batch_version
+            FROM identity_state_seed_enriched
+            WHERE state_kind = 'activation_audit' AND is_deleted = 0
+            GROUP BY tenant_id
+        ) AS seed_activation
+        ON delta.tenant_id = seed_activation.tenant_id
+    WHERE
+        delta.tenant_id = 'boom'
+        AND delta.state_kind = 'activation_audit'
+        AND delta.is_deleted = 0
+        AND delta.batch_version > seed_activation.seed_batch_version
+    GROUP BY delta.tenant_id, delta.batch_version
+
+NODE special_payment_mapping_seed_rows
+SQL >
+    SELECT
+        tenant_id,
+        state_key,
+        identifier_key,
+        profile_id
+    FROM identity_state_seed_enriched
+    WHERE
+        tenant_id = 'boom'
+        AND state_kind = 'mapping'
+        AND state_key IN (SELECT mapping_state_key FROM special_payment_identifier_keys)
+
+NODE special_payment_latest_mapping_delta
+SQL >
+    SELECT
+        journal.tenant_id,
+        journal.state_key,
+        journal.is_deleted,
+        journal.identifier_key,
+        journal.profile_id
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN special_payment_mapping_activations AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+    WHERE
+        journal.tenant_id = 'boom'
+        AND journal.state_kind = 'mapping'
+        AND journal.lookup_key IN (
+            SELECT identity_anchor_key FROM special_payment_identifier_keys
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY journal.tenant_id, journal.lookup_key, journal.sub_key
+            ORDER BY journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+        ) = 1
+
+NODE special_payment_current_mappings
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
+        if(delta.state_key = '', base.profile_id, delta.profile_id) AS profile_id
+    FROM special_payment_mapping_seed_rows AS base
+    FULL OUTER JOIN special_payment_latest_mapping_delta AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.state_key = delta.state_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0
+
+NODE special_payment_identity_rows
+SQL >
+    SELECT
+        payment_facts.payment_source AS payment_source,
+        payment_facts.payment_id AS payment_id,
+        payment_facts.payment_time AS payment_time,
+        payment_facts.subscription_id AS subscription_id,
+        payment_facts.payment_link_id AS payment_link_id,
+        coalesce(
+            nullIf(manual_links.manual_profile_id, ''),
+            nullIf(identity_mapping.profile_id, ''),
+            concat(payment_facts.payment_source, ':customer:', payment_facts.customer_id),
+            concat(
+                payment_facts.payment_source,
+                ':email:',
+                lowerUTF8(payment_facts.payment_email)
+            ),
+            concat(payment_facts.payment_source, ':payment:', payment_facts.payment_id)
+        ) AS payment_identity
+    FROM special_payment_facts AS payment_facts
+    LEFT JOIN special_payment_current_mappings AS identity_mapping
+        ON identity_mapping.tenant_id = 'boom'
+        AND identity_mapping.identifier_key = payment_facts.identity_anchor_key
+    LEFT JOIN
+        (
+            SELECT
+                payment_id AS linked_payment_id,
+                manual_profile_id
+            FROM manual_payment_profile_links_latest
+        ) AS manual_links
+        ON payment_facts.payment_id = manual_links.linked_payment_id
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payment_facts.payment_source, payment_facts.payment_id
+            ORDER BY nullIf(identity_mapping.profile_id, '') ASC NULLS FIRST
+        ) = 1
+
+NODE special_payment_plan_rows
+SQL >
+    SELECT
+        payment_facts.payment_source AS payment_source,
+        payment_facts.payment_id AS payment_id,
+        min(payment_facts.payment_time) OVER (
+            PARTITION BY payment_facts.payment_identity, payment_facts.payment_link_id
+        ) AS payment_plan_started_at,
+        toUInt8(1) AS payment_link_match
+    FROM special_payment_identity_rows AS payment_facts
+
+NODE classified_payment_plan_starts
+SQL >
+    SELECT
+        payment_facts.payment_source AS payment_source,
+        payment_facts.payment_id AS payment_id,
+        coalesce(
+            if(
+                ifNull(subscription_rows.subscription_match, 0) = 1,
+                subscription_rows.payment_plan_started_at,
+                CAST(NULL AS Nullable(DateTime64(6)))
+            ),
+            if(
+                ifNull(special_plan_rows.payment_link_match, 0) = 1,
+                special_plan_rows.payment_plan_started_at,
+                CAST(NULL AS Nullable(DateTime64(6)))
+            )
+        ) AS payment_plan_started_at,
+        multiIf(
+            ifNull(subscription_rows.subscription_match, 0) = 1,
+            'stripe_subscription',
+            ifNull(special_plan_rows.payment_link_match, 0) = 1,
+            'first_payment_link_installment',
+            'not_payment_plan'
+        ) AS payment_plan_start_method
+    FROM payment_plan_base_facts AS payment_facts
+    LEFT JOIN subscription_plan_starts AS subscription_rows
+        ON subscription_rows.payment_source = payment_facts.payment_source
+        AND subscription_rows.subscription_id = payment_facts.subscription_id
+    LEFT JOIN special_payment_plan_rows AS special_plan_rows
+        ON special_plan_rows.payment_source = payment_facts.payment_source
+        AND special_plan_rows.payment_id = payment_facts.payment_id
+
+NODE payment_plan_timing_rows
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        payment_plan_started_at,
+        payment_plan_start_method,
+        payment_plan_start_method != 'not_payment_plan' AS is_payment_plan,
+        multiIf(
+            payment_plan_start_method = 'not_payment_plan',
+            'not_payment_plan',
+            payment_plan_started_at < toDateTime64('2026-07-19 02:00:00', 6, 'UTC'),
+            'historical_before_jitsu',
+            'started_during_tracking'
+        ) AS payment_plan_tracking_status
+    FROM classified_payment_plan_starts

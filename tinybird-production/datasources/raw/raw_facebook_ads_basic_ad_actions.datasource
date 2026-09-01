@@ -1,0 +1,31 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.facebook_ads.basic_ad_actions.
+    Source role: meta_platform_conversion_daily.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `date` Nullable(Date) `json:$.date`,
+    `_fivetran_id` Nullable(String) `json:$._fivetran_id`,
+    `action_index` Nullable(Int64) `json:$.index`,
+    `action_type` Nullable(String) `json:$.action_type`,
+    `value` Nullable(Float64) `json:$.value`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `incrementality` Nullable(Float64) `json:$.incrementality`,
+    `_7_d_click` Nullable(Float64) `json:$._7_d_click`,
+    `_1_d_view` Nullable(Float64) `json:$._1_d_view`,
+    `__tb_sort_1` Date `json:$.__tb_sort_1` DEFAULT ifNull(date, toDate(0)),
+    `__tb_sort_2` String `json:$.__tb_sort_2` DEFAULT ifNull(ad_id, ''),
+    `__tb_sort_3` String `json:$.__tb_sort_3` DEFAULT ifNull(action_type, ''),
+    `__tb_sort_4` Int64 `json:$.__tb_sort_4` DEFAULT ifNull(action_index, toInt64(0)),
+    `__tb_sort_5` String `json:$.__tb_sort_5` DEFAULT ifNull(_fivetran_id, '')
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4, __tb_sort_5"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/facebook_ads/basic_ad_actions/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet
+
+TOKEN boom_bigquery_tinybird_sync APPEND

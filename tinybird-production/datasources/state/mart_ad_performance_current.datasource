@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Replace-mode boundary for the exact Google and Meta daily ad-performance mart.
+
+SCHEMA >
+    `time` DateTime64(6) `json:$.time`,
+    `account_id` String `json:$.account_id`,
+    `account_name` Nullable(String) `json:$.account_name`,
+    `source` LowCardinality(String) `json:$.source`,
+    `formatted_source` LowCardinality(String) `json:$.formatted_source`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `campaign_name` Nullable(String) `json:$.campaign_name`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `adset_name` Nullable(String) `json:$.adset_name`,
+    `ad_id` String `json:$.ad_id`,
+    `ad_name` Nullable(String) `json:$.ad_name`,
+    `impressions` Nullable(Int64) `json:$.impressions`,
+    `clicks` Nullable(Int64) `json:$.clicks`,
+    `unique_clicks` Nullable(Int64) `json:$.unique_clicks`,
+    `unique_inline_link_clicks` Nullable(Int64) `json:$.unique_inline_link_clicks`,
+    `spend` Nullable(Decimal(38, 9)) `json:$.spend`,
+    `platform_conversions` Nullable(Decimal(38, 9)) `json:$.platform_conversions`,
+    `platform_conversion_value` Nullable(Decimal(38, 9)) `json:$.platform_conversion_value`,
+    `currency` String `json:$.currency`,
+    `__tb_sort_campaign_id` String `json:$.__tb_sort_campaign_id` DEFAULT ifNull(campaign_id, ''),
+    `__tb_sort_adset_id` String `json:$.__tb_sort_adset_id` DEFAULT ifNull(adset_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY source, time, __tb_sort_campaign_id, __tb_sort_adset_id, ad_id

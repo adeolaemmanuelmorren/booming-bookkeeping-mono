@@ -1,0 +1,56 @@
+DESCRIPTION >
+    Materializes new Jitsu Events API order-completed versions
+    into their append-only canonical state.
+
+NODE materialized_order_completed_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        event_row_id,
+        event_id,
+        completed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        customer_name,
+        order_id,
+        checkout_id,
+        checkout_submission_id,
+        product_id,
+        product_name,
+        products,
+        value,
+        currency,
+        completion_basis,
+        is_payment_confirmed,
+        payment_status,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        form_id,
+        form_action,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_version,
+        __tb_state_key
+    FROM jitsu_order_completed_live_build
+
+TYPE MATERIALIZED
+DATASOURCE jitsu_order_completed_versions

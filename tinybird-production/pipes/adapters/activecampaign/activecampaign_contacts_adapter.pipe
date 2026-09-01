@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Latest ActiveCampaign contact state, normalized to the identity fields used by
+    registration and attribution models.
+
+NODE current_activecampaign_contacts
+SQL >
+    SELECT
+        toString(source.contact_id) AS contact_id,
+        nullIf(lowerUTF8(trim(source.email)), '') AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        nullIf(trim(source.first_name), '') AS first_name,
+        nullIf(trim(source.last_name), '') AS last_name,
+        nullIf(
+            trim(concat(ifNull(source.first_name, ''), ' ', ifNull(source.last_name, ''))), ''
+        ) AS full_name,
+        source.contact_created_at,
+        source.source_version AS contact_updated_at,
+        source.is_deleted = 1 AS is_deleted
+    FROM activecampaign_contacts_current AS source FINAL

@@ -1,0 +1,197 @@
+DESCRIPTION >
+    Current conversion events with one identity join across every source. Payment
+    customer and mentorship ranks run after current profile resolution.
+
+NODE resolved_conversion_candidates
+SQL >
+    SELECT
+        facts.*,
+        nullIf(
+            if(
+                identity_delta.state_key = '',
+                identity_base.profile_id,
+                if(identity_delta.is_deleted = 0, identity_delta.profile_id, '')
+            ),
+            ''
+        ) AS automatic_profile_id,
+        coalesce(
+            nullIf(facts.manual_profile_id, ''),
+            automatic_profile_id
+        ) AS profile_id
+    FROM reporting_conversion_facts AS facts
+    LEFT ANY JOIN
+        (
+            SELECT conversion_id AS base_conversion_id, profile_id
+            FROM reporting_conversion_identity_base
+        ) AS identity_base
+        ON identity_base.base_conversion_id = facts.conversion_id
+    LEFT ANY JOIN reporting_latest_identity_mapping_delta AS identity_delta
+        ON identity_delta.tenant_id = facts.tenant_id
+        AND identity_delta.identifier_key = facts.identity_anchor_key
+
+NODE ranked_resolved_conversion_facts
+SQL >
+    SELECT
+        facts.*,
+        row_number() OVER (
+            PARTITION BY
+                if(
+                    fact_kind = 'server_payment',
+                    coalesce(
+                        profile_id,
+                        concat(payment_source, ':customer:', payment_customer_id),
+                        concat(payment_source, ':payment:', payment_id),
+                        conversion_id
+                    ),
+                    conversion_id
+                )
+            ORDER BY conversion_time ASC NULLS FIRST, payment_id ASC NULLS FIRST
+        ) AS customer_payment_number,
+        countIf(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+        ) OVER (
+            PARTITION BY
+                if(
+                    fact_kind = 'server_payment',
+                    coalesce(
+                        profile_id,
+                        concat(payment_source, ':customer:', payment_customer_id),
+                        concat(payment_source, ':email:', lowerUTF8(payment_email)),
+                        concat(payment_source, ':payment:', payment_id),
+                        conversion_id
+                    ),
+                    conversion_id
+                )
+            ORDER BY conversion_time ASC NULLS FIRST, payment_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS bbb_payment_number
+    FROM resolved_conversion_candidates AS facts
+
+NODE current_resolved_conversion_events
+SQL >
+    SELECT
+        conversion_id,
+        profile_id,
+        conversion_time,
+        conversion_source,
+        conversion_type,
+        if(fact_kind = 'server_form', toFloat64(1), toFloat64(0))
+            AS form_submissions_server_side,
+        if(
+            fact_kind = 'server_form' AND registration_type = 'krc',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS krc_registrations_server_side,
+        if(fact_kind = 'client_form', toFloat64(1), toFloat64(0))
+            AS form_submissions_client_side,
+        if(
+            fact_kind = 'server_payment' AND is_repeat_payment = 0,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS order_completed_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            toFloat64(1),
+            toFloat64(0)
+        ) AS order_completed_client_side,
+        if(fact_kind = 'server_payment', toFloat64(1), toFloat64(0))
+            AS payments_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_client_side,
+        if(fact_kind = 'server_payment', net_amount, toFloat64(0))
+            AS revenue_server_side,
+        if(
+            fact_kind IN ('historical_client_payment', 'client_payment'),
+            client_payment_amount,
+            toFloat64(0)
+        ) AS revenue_client_side,
+        if(
+            fact_kind = 'server_payment' AND customer_payment_number = 1,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS customers_server_side,
+        if(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+            AND bbb_payment_number = 1,
+            toFloat64(1),
+            toFloat64(0)
+        ) AS bbb_buyers_server_side,
+        if(
+            fact_kind = 'server_payment'
+            AND payment_category = 'mentorship'
+            AND is_repeat_payment = 0
+            AND net_amount > 900
+            AND bbb_payment_number = 1,
+            net_amount,
+            toFloat64(0)
+        ) AS bbb_revenue_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'vip',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_vip_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'book',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_book_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'mentorship',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_mentorship_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'kajabi',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_kajabi_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'catalog',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_catalog_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'unknown',
+            toFloat64(1),
+            toFloat64(0)
+        ) AS payments_unknown_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'vip',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_vip_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'book',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_book_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'mentorship',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_mentorship_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'kajabi',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_kajabi_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'catalog',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_catalog_server_side,
+        if(
+            fact_kind = 'server_payment' AND payment_category = 'unknown',
+            net_amount,
+            toFloat64(0)
+        ) AS revenue_unknown_server_side
+    FROM ranked_resolved_conversion_facts

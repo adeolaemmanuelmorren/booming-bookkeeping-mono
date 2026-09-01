@@ -1,0 +1,19 @@
+DESCRIPTION >
+    One-time seed of all ActiveCampaign contact-tag versions imported before the
+    live materialization was deployed. Replays are safe because the target collapses
+    identical assignment/version rows with ReplacingMergeTree.
+
+NODE backfill_activecampaign_contact_tag_versions
+SQL >
+    SELECT
+        ifNull(id, toInt64(0)) AS contact_tag_id,
+        contact AS contact_id,
+        tags AS tag_id,
+        c_date AS assigned_at,
+        ifNull(_fivetran_synced, toDateTime64(0, 6)) AS source_version,
+        toUInt8(coalesce(_fivetran_deleted, false)) AS is_deleted
+    FROM raw_activecampaign_contact_tag
+
+TYPE COPY
+TARGET_DATASOURCE activecampaign_contact_tags_current
+COPY_MODE append

@@ -1,0 +1,24 @@
+DESCRIPTION >
+    Latest post-snapshot row per logical key, bounded by the active commit marker.
+    The flat seed is never inserted into this journal.
+
+NODE activated_identity_delta_versions
+SQL >
+    SELECT journal.*
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN
+        activated_identity_batches AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+
+NODE current_activated_identity_delta_rows
+SQL >
+    SELECT *
+    FROM activated_identity_delta_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, state_kind, lookup_key, sub_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        )
+        = 1

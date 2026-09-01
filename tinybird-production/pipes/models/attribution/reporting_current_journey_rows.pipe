@@ -1,0 +1,36 @@
+DESCRIPTION >
+    Current atomically committed journey rows with mutable ad names joined only
+    at read time.
+
+NODE latest_current_journey_ad_names
+SQL >
+    SELECT
+        source AS ad_source,
+        campaign_id AS name_campaign_id,
+        adset_id AS name_adset_id,
+        ad_id AS name_ad_id,
+        campaign_name,
+        adset_name,
+        ad_name
+    FROM reporting_latest_ad_names_current
+
+NODE current_journey_rows
+SQL >
+    SELECT
+        journey.* EXCEPT (
+            tenant_id,
+            batch_version,
+            batch_id,
+            committed_at,
+            journey_row_key,
+            ad_source_key
+        ),
+        coalesce(names.campaign_name, journey.utm_campaign, 'unknown') AS campaign_name,
+        coalesce(names.adset_name, 'unknown') AS adset_name,
+        coalesce(names.ad_name, 'unknown') AS ad_name
+    FROM reporting_current_journey_base_rows AS journey
+    LEFT ANY JOIN latest_current_journey_ad_names AS names
+        ON names.ad_source = journey.ad_source_key
+        AND isNotDistinctFrom(names.name_campaign_id, journey.campaign_id)
+        AND isNotDistinctFrom(names.name_adset_id, journey.adset_id)
+        AND isNotDistinctFrom(names.name_ad_id, journey.ad_id)

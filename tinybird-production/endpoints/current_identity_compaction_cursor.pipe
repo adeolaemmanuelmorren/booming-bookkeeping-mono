@@ -1,0 +1,37 @@
+DESCRIPTION >
+    Current activated identity batch and exact raw-event cursor for one tenant.
+    The fixed seed falls back to the epoch and a 64-zero event ID.
+
+NODE requested_identity_compaction_tenant
+SQL >
+    %
+    SELECT {{ String(p_tenant_id, 'boom') }} AS tenant_id
+
+NODE requested_activated_identity_batches
+SQL >
+    SELECT activated.*
+    FROM activated_identity_batches AS activated
+    INNER JOIN
+        requested_identity_compaction_tenant AS request ON activated.tenant_id = request.tenant_id
+
+NODE current_identity_compaction_cursor_rows
+SQL >
+    SELECT
+        activated.tenant_id AS tenant_id,
+        activated.batch_version AS active_batch_version,
+        activated.batch_id AS active_batch_id,
+        activated.checkpoint_ingested_at AS checkpoint_ingested_at,
+        activated.checkpoint_event_id AS checkpoint_event_id
+    FROM requested_activated_identity_batches AS activated
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY activated.tenant_id
+            ORDER BY
+                activated.batch_version DESC,
+                activated.committed_at DESC,
+                activated.row_hash DESC,
+                activated.batch_id DESC
+        )
+        = 1
+
+TYPE ENDPOINT

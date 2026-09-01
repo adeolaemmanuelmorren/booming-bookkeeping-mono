@@ -1,0 +1,36 @@
+DESCRIPTION >
+    Retry-safe affected-scope rows for one identity compaction batch. The final Copy
+    reads only this batch and the matching prepared-change batch.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `stage_kind` LowCardinality(String) `json:$.stage_kind`,
+    `stage_key` String `json:$.stage_key`,
+    `staged_at` DateTime64(6) `json:$.staged_at`,
+    `stage_hash` FixedString(64) `json:$.stage_hash`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `profile_id` String `json:$.profile_id`,
+    `profile_key` String `json:$.profile_key`,
+    `winner_identifier_key` String `json:$.winner_identifier_key`,
+    `member_identifier_keys` Array(String) `json:$.member_identifier_keys[:]`,
+    `historical_profile_ids` Array(String) `json:$.historical_profile_ids[:]`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_observed_at` DateTime64(6) `json:$.fact_observed_at`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`,
+    `evidence_keys` Array(String) `json:$.evidence_keys[:]`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, stage_kind, stage_key, staged_at, stage_hash

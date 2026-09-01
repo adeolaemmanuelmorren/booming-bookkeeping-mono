@@ -1,0 +1,7 @@
+DESCRIPTION >
+    Current client-side payment submissions with profile identity resolved at read time.
+
+NODE current_client_payment_rows
+SQL >
+    SELECT *
+    FROM mart_payments_client_side_build

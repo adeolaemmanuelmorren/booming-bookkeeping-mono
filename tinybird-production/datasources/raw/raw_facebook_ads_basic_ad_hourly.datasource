@@ -1,0 +1,37 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.facebook_ads.basic_ad_hourly.
+    Source role: meta_ad_delivery_hourly.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `date` Nullable(Date) `json:$.date`,
+    `_fivetran_id` Nullable(String) `json:$._fivetran_id`,
+    `hourly_stats_aggregated_by_audience_time_zone` Nullable(String) `json:$.hourly_stats_aggregated_by_audience_time_zone`,
+    `account_id` Nullable(Int64) `json:$.account_id`,
+    `adset_id` Nullable(Int64) `json:$.adset_id`,
+    `campaign_id` Nullable(Int64) `json:$.campaign_id`,
+    `impressions` Nullable(Int64) `json:$.impressions`,
+    `inline_link_clicks` Nullable(Int64) `json:$.inline_link_clicks`,
+    `spend` Nullable(Float64) `json:$.spend`,
+    `account_name` Nullable(String) `json:$.account_name`,
+    `ad_name` Nullable(String) `json:$.ad_name`,
+    `adset_name` Nullable(String) `json:$.adset_name`,
+    `campaign_name` Nullable(String) `json:$.campaign_name`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `hourly_stats_aggregated_by_advertiser_time_zone` Nullable(String) `json:$.hourly_stats_aggregated_by_advertiser_time_zone`,
+    `__tb_sort_1` Date `json:$.__tb_sort_1` DEFAULT ifNull(date, toDate(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(account_id, toInt64(0)),
+    `__tb_sort_3` String `json:$.__tb_sort_3` DEFAULT ifNull(ad_id, ''),
+    `__tb_sort_4` String `json:$.__tb_sort_4` DEFAULT ifNull(hourly_stats_aggregated_by_advertiser_time_zone, ''),
+    `__tb_sort_5` String `json:$.__tb_sort_5` DEFAULT ifNull(_fivetran_id, '')
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4, __tb_sort_5"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/facebook_ads/basic_ad_hourly/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet
+
+TOKEN boom_bigquery_tinybird_sync APPEND

@@ -1,0 +1,30 @@
+DESCRIPTION >
+    Fixed base version and latest exact activated batch triple per tenant.
+
+NODE identity_base_batch_versions
+SQL >
+    SELECT tenant_id, max(batch_version) AS base_batch_version
+    FROM identity_state_seed_enriched
+    WHERE state_kind = 'activation_audit' AND is_deleted = 0
+    GROUP BY tenant_id
+
+NODE latest_activated_identity_batches
+SQL >
+    SELECT *
+    FROM activated_identity_batches
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC, batch_id DESC
+        )
+        = 1
+
+NODE current_identity_batch_version_rows
+SQL >
+    SELECT
+        active.tenant_id AS tenant_id,
+        base.base_batch_version AS base_batch_version,
+        active.batch_version AS active_batch_version,
+        active.batch_id AS active_batch_id
+    FROM latest_activated_identity_batches AS active
+    INNER JOIN identity_base_batch_versions AS base ON active.tenant_id = base.tenant_id

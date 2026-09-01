@@ -1,0 +1,851 @@
+DESCRIPTION >
+    Recompute exact affected components from one prepared and scoped batch. The result
+    contains unactivated delta rows plus one validation manifest.
+
+NODE unactivated_identity_compaction_rows
+SQL >
+    %
+    WITH
+        identity_compaction_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        final_prepared_metadata_candidates AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                identity_compaction_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+        ),
+        final_selected_prepared_metadata AS (
+            SELECT *
+            FROM final_prepared_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        final_selected_prepared_changes AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                final_selected_prepared_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        final_scope_metadata_candidates AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                final_selected_prepared_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            WHERE scoped.stage_kind = 'scope_metadata'
+        ),
+        final_selected_scope_metadata AS (
+            SELECT *
+            FROM final_scope_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        final_selected_scope_rows AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                final_selected_scope_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY scoped.tenant_id, scoped.stage_kind, scoped.stage_key
+                    ORDER BY scoped.staged_at, scoped.stage_hash
+                )
+                = 1
+        ),
+        final_component_metadata_candidates AS (
+            SELECT components.*
+            FROM identity_compaction_components_stage AS components
+            INNER JOIN
+                final_selected_prepared_metadata AS metadata
+                ON components.tenant_id = metadata.tenant_id
+                AND components.batch_version = metadata.batch_version
+                AND components.batch_id = metadata.batch_id
+                AND components.input_hash = metadata.input_hash
+            WHERE components.stage_kind = 'component_metadata'
+        ),
+        final_selected_component_metadata AS (
+            SELECT *
+            FROM final_component_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        final_selected_component_rows AS (
+            SELECT components.*
+            FROM identity_compaction_components_stage AS components
+            INNER JOIN
+                final_selected_component_metadata AS metadata
+                ON components.tenant_id = metadata.tenant_id
+                AND components.batch_version = metadata.batch_version
+                AND components.batch_id = metadata.batch_id
+                AND components.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY components.tenant_id, components.stage_kind, components.stage_key
+                    ORDER BY components.staged_at, components.stage_hash
+                )
+                = 1
+        ),
+        identity_compaction_metadata AS (
+            SELECT
+                tenant_id,
+                batch_version,
+                batch_id,
+                staged_at AS committed_at,
+                input_event_count,
+                input_hash,
+                checkpoint_ingested_at,
+                checkpoint_event_id
+            FROM final_selected_prepared_metadata
+            WHERE
+                (tenant_id, batch_version, batch_id, input_hash) IN (
+                    SELECT tenant_id, batch_version, batch_id, input_hash
+                    FROM final_selected_scope_metadata
+                )
+                AND (tenant_id, batch_version, batch_id, input_hash) IN (
+                    SELECT tenant_id, batch_version, batch_id, input_hash
+                    FROM final_selected_component_metadata
+                )
+        ),
+        changed_identity_facts AS (
+            SELECT
+                tenant_id,
+                producer_id,
+                observed_at,
+                fact_kind,
+                fact_key,
+                source_fact_version,
+                fact_deleted,
+                fact_payload_hash,
+                fact_payload,
+                evidence_keys,
+                stable_is_deleted,
+                stable_fact_deleted,
+                stable_fact_observed_at,
+                stable_evidence_keys
+            FROM final_selected_prepared_changes
+            WHERE stage_kind = 'changed_fact'
+        ),
+        current_touched_profiles AS (
+            SELECT
+                tenant_id,
+                profile_id,
+                profile_key,
+                winner_identifier_key,
+                member_identifier_keys,
+                historical_profile_ids,
+                first_name,
+                last_name,
+                first_seen_at,
+                last_seen_at
+            FROM final_selected_scope_rows
+            WHERE stage_kind = 'touched_profile'
+        ),
+        current_affected_mappings AS (
+            SELECT
+                tenant_id,
+                identifier_type,
+                identifier_value,
+                identifier_key,
+                profile_id,
+                first_seen_at,
+                last_seen_at
+            FROM final_selected_scope_rows
+            WHERE stage_kind = 'current_mapping'
+        ),
+        affected_identity_component_members AS (
+            SELECT
+                tenant_id,
+                component_label,
+                identifier_type,
+                identifier_value,
+                identifier_key,
+                winner_priority,
+                first_seen_at,
+                last_seen_at,
+                first_name,
+                last_name,
+                name_observed_at
+            FROM final_selected_component_rows
+            WHERE stage_kind = 'component_member'
+        ),
+        affected_identity_component_rollups AS (
+            SELECT
+                members.tenant_id AS tenant_id,
+                members.component_label AS component_label,
+                argMin(
+                    members.identifier_key,
+                    tuple(members.winner_priority, members.first_seen_at, members.identifier_value)
+                ) AS winner_identifier_key,
+                argMin(
+                    members.identifier_value,
+                    tuple(members.winner_priority, members.first_seen_at, members.identifier_value)
+                ) AS profile_key,
+                lower(
+                    hex(
+                        MD5(
+                            argMin(
+                                members.identifier_key,
+                                tuple(
+                                    members.winner_priority,
+                                    members.first_seen_at,
+                                    members.identifier_value
+                                )
+                            )
+                        )
+                    )
+                ) AS profile_id,
+                arraySort(groupUniqArray(members.identifier_key)) AS member_identifier_keys,
+                arraySort(
+                    groupUniqArrayIf(members.identifier_value, members.identifier_type = 'anonymous_id')
+                ) AS anonymous_ids,
+                arraySort(
+                    groupUniqArrayIf(members.identifier_value, members.identifier_type = 'user_id')
+                ) AS user_ids,
+                arraySort(
+                    groupUniqArrayIf(members.identifier_value, members.identifier_type = 'email')
+                ) AS emails,
+                arraySort(
+                    groupUniqArrayIf(members.identifier_value, members.identifier_type = 'phone')
+                ) AS phones,
+                argMaxIf(
+                    members.first_name,
+                    tuple(members.name_observed_at, members.identifier_key),
+                    members.first_name != ''
+                ) AS first_name,
+                argMaxIf(
+                    members.last_name,
+                    tuple(members.name_observed_at, members.identifier_key),
+                    members.last_name != ''
+                ) AS last_name,
+                min(members.first_seen_at) AS first_seen_at,
+                max(members.last_seen_at) AS last_seen_at
+            FROM affected_identity_component_members AS members
+            GROUP BY members.tenant_id, members.component_label
+        ),
+        affected_component_history AS (
+            SELECT
+                members.tenant_id AS tenant_id,
+                members.component_label AS component_label,
+                arraySort(
+                    arrayDistinct(
+                        arrayConcat(
+                            groupUniqArrayIf(mappings.profile_id, mappings.profile_id != ''),
+                            arrayFlatten(groupArray(profiles.historical_profile_ids))
+                        )
+                    )
+                ) AS historical_profile_ids
+            FROM affected_identity_component_members AS members
+            LEFT JOIN
+                current_affected_mappings AS mappings
+                ON members.tenant_id = mappings.tenant_id
+                AND members.identifier_key = mappings.identifier_key
+            LEFT JOIN
+                current_touched_profiles AS profiles
+                ON mappings.tenant_id = profiles.tenant_id
+                AND mappings.profile_id = profiles.profile_id
+            GROUP BY members.tenant_id, members.component_label
+        ),
+        recomputed_identity_components AS (
+            SELECT
+                rollups.*,
+                arraySort(
+                    arrayDistinct(arrayConcat(history.historical_profile_ids, [rollups.profile_id]))
+                ) AS historical_profile_ids
+            FROM affected_identity_component_rollups AS rollups
+            INNER JOIN
+                affected_component_history AS history
+                ON rollups.tenant_id = history.tenant_id
+                AND rollups.component_label = history.component_label
+        ),
+        old_changed_evidence_pairs AS (
+            SELECT
+                changed.tenant_id AS tenant_id,
+                identifier_key,
+                changed.fact_kind AS fact_kind,
+                changed.fact_key AS fact_key,
+                changed.stable_fact_observed_at AS fact_observed_at
+            FROM changed_identity_facts AS changed ARRAY
+            JOIN changed.stable_evidence_keys AS identifier_key
+            WHERE
+                changed.stable_is_deleted = 0
+                AND changed.stable_fact_deleted = 0
+                AND position(identifier_key, ':') > 1
+        ),
+        new_changed_evidence_pairs AS (
+            SELECT
+                changed.tenant_id AS tenant_id,
+                identifier_key,
+                changed.fact_kind AS fact_kind,
+                changed.fact_key AS fact_key,
+                changed.observed_at AS fact_observed_at
+            FROM changed_identity_facts AS changed ARRAY
+            JOIN changed.evidence_keys AS identifier_key
+            WHERE changed.fact_deleted = 0 AND position(identifier_key, ':') > 1
+        ),
+        changed_evidence_delta_values AS (
+            SELECT
+                tenant_id,
+                identifier_key,
+                fact_kind,
+                fact_key,
+                fact_observed_at,
+                toUInt8(0) AS is_deleted
+            FROM new_changed_evidence_pairs
+            UNION ALL
+            SELECT
+                old.tenant_id AS tenant_id,
+                old.identifier_key AS identifier_key,
+                old.fact_kind AS fact_kind,
+                old.fact_key AS fact_key,
+                old.fact_observed_at AS fact_observed_at,
+                toUInt8(1) AS is_deleted
+            FROM old_changed_evidence_pairs AS old
+            LEFT JOIN
+                new_changed_evidence_pairs AS new
+                ON old.tenant_id = new.tenant_id
+                AND old.identifier_key = new.identifier_key
+                AND old.fact_kind = new.fact_kind
+                AND old.fact_key = new.fact_key
+            WHERE new.fact_key = ''
+        ),
+        recomputed_mapping_delta_values AS (
+            SELECT
+                members.tenant_id AS tenant_id,
+                members.identifier_type AS identifier_type,
+                members.identifier_value AS identifier_value,
+                members.identifier_key AS identifier_key,
+                components.profile_id AS profile_id,
+                members.first_seen_at AS first_seen_at,
+                members.last_seen_at AS last_seen_at,
+                toUInt8(0) AS is_deleted
+            FROM affected_identity_component_members AS members
+            INNER JOIN
+                recomputed_identity_components AS components
+                ON members.tenant_id = components.tenant_id
+                AND members.component_label = components.component_label
+            UNION ALL
+            SELECT
+                old.tenant_id AS tenant_id,
+                old.identifier_type AS identifier_type,
+                old.identifier_value AS identifier_value,
+                old.identifier_key AS identifier_key,
+                old.profile_id AS profile_id,
+                old.first_seen_at AS first_seen_at,
+                old.last_seen_at AS last_seen_at,
+                toUInt8(1) AS is_deleted
+            FROM current_affected_mappings AS old
+            LEFT JOIN
+                affected_identity_component_members AS current
+                ON old.tenant_id = current.tenant_id
+                AND old.identifier_key = current.identifier_key
+            WHERE current.identifier_key = ''
+        ),
+        displaced_profile_delta_values AS (
+            SELECT profiles.*, toUInt8(1) AS deleted_value
+            FROM current_touched_profiles AS profiles
+            LEFT JOIN
+                recomputed_identity_components AS current
+                ON profiles.tenant_id = current.tenant_id
+                AND profiles.profile_id = current.profile_id
+            WHERE current.profile_id = ''
+        ),
+        compacted_fact_delta_rows AS (
+            SELECT
+                facts.tenant_id AS tenant_id,
+                'fact' AS state_kind,
+                concat('fact:', facts.fact_key) AS state_key,
+                facts.fact_key AS lookup_key,
+                '' AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                facts.fact_deleted AS is_deleted,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'fact:',
+                                facts.fact_kind,
+                                ':',
+                                facts.fact_key,
+                                ':',
+                                toString(facts.source_fact_version),
+                                ':',
+                                facts.fact_payload_hash,
+                                ':',
+                                toString(metadata.batch_version)
+                            )
+                        )
+                    )
+                ) AS row_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS anonymous_ids,
+                CAST([], 'Array(String)') AS user_ids,
+                CAST([], 'Array(String)') AS emails,
+                CAST([], 'Array(String)') AS phones,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                toDateTime64(0, 6) AS first_seen_at,
+                toDateTime64(0, 6) AS last_seen_at,
+                facts.fact_kind AS fact_kind,
+                facts.fact_key AS fact_key,
+                facts.source_fact_version AS source_fact_version,
+                facts.fact_deleted AS fact_deleted,
+                facts.observed_at AS fact_observed_at,
+                facts.fact_payload_hash AS fact_payload_hash,
+                facts.fact_payload AS fact_payload,
+                facts.evidence_keys AS evidence_keys,
+                facts.producer_id AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                CAST([], 'Array(String)') AS prior_profile_ids,
+                CAST([], 'Array(String)') AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM changed_identity_facts AS facts
+            INNER JOIN identity_compaction_metadata AS metadata ON facts.tenant_id = metadata.tenant_id
+        ),
+        compacted_evidence_delta_rows AS (
+            SELECT
+                evidence.tenant_id AS tenant_id,
+                'evidence' AS state_kind,
+                concat(
+                    'evidence:',
+                    toString(length(evidence.identifier_key)),
+                    ':',
+                    evidence.identifier_key,
+                    ':',
+                    evidence.fact_key
+                ) AS state_key,
+                evidence.identifier_key AS lookup_key,
+                evidence.fact_key AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                evidence.is_deleted AS is_deleted,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'evidence:',
+                                evidence.identifier_key,
+                                ':',
+                                evidence.fact_key,
+                                ':',
+                                toString(evidence.is_deleted),
+                                ':',
+                                toString(metadata.batch_version)
+                            )
+                        )
+                    )
+                ) AS row_hash,
+                substring(
+                    evidence.identifier_key, 1, position(evidence.identifier_key, ':') - 1
+                ) AS identifier_type,
+                substring(
+                    evidence.identifier_key, position(evidence.identifier_key, ':') + 1
+                ) AS identifier_value,
+                evidence.identifier_key AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS anonymous_ids,
+                CAST([], 'Array(String)') AS user_ids,
+                CAST([], 'Array(String)') AS emails,
+                CAST([], 'Array(String)') AS phones,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                evidence.fact_observed_at AS first_seen_at,
+                evidence.fact_observed_at AS last_seen_at,
+                evidence.fact_kind AS fact_kind,
+                evidence.fact_key AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                evidence.is_deleted AS fact_deleted,
+                evidence.fact_observed_at AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                [evidence.identifier_key] AS evidence_keys,
+                'identity_compactor' AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                CAST([], 'Array(String)') AS prior_profile_ids,
+                CAST([], 'Array(String)') AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM changed_evidence_delta_values AS evidence
+            INNER JOIN
+                identity_compaction_metadata AS metadata ON evidence.tenant_id = metadata.tenant_id
+        ),
+        compacted_mapping_delta_rows AS (
+            SELECT
+                mappings.tenant_id AS tenant_id,
+                'mapping' AS state_kind,
+                concat(
+                    'mapping:', toString(length(mappings.identifier_key)), ':', mappings.identifier_key
+                ) AS state_key,
+                mappings.identifier_key AS lookup_key,
+                '' AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                mappings.is_deleted AS is_deleted,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'mapping:',
+                                mappings.identifier_key,
+                                ':',
+                                mappings.profile_id,
+                                ':',
+                                toString(mappings.is_deleted),
+                                ':',
+                                toString(metadata.batch_version)
+                            )
+                        )
+                    )
+                ) AS row_hash,
+                mappings.identifier_type AS identifier_type,
+                mappings.identifier_value AS identifier_value,
+                mappings.identifier_key AS identifier_key,
+                mappings.profile_id AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS anonymous_ids,
+                CAST([], 'Array(String)') AS user_ids,
+                CAST([], 'Array(String)') AS emails,
+                CAST([], 'Array(String)') AS phones,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                mappings.first_seen_at AS first_seen_at,
+                mappings.last_seen_at AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toUInt8(0) AS fact_deleted,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                'identity_compactor' AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                [mappings.profile_id] AS prior_profile_ids,
+                CAST([], 'Array(String)') AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM recomputed_mapping_delta_values AS mappings
+            INNER JOIN
+                identity_compaction_metadata AS metadata ON mappings.tenant_id = metadata.tenant_id
+        ),
+        compacted_profile_upsert_rows AS (
+            SELECT
+                profiles.tenant_id AS tenant_id,
+                'profile' AS state_kind,
+                concat(
+                    'profile:', toString(length(profiles.profile_id)), ':', profiles.profile_id
+                ) AS state_key,
+                profiles.profile_id AS lookup_key,
+                '' AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                toUInt8(0) AS is_deleted,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'profile:',
+                                profiles.profile_id,
+                                ':',
+                                arrayStringConcat(profiles.member_identifier_keys, '|'),
+                                ':',
+                                toString(metadata.batch_version)
+                            )
+                        )
+                    )
+                ) AS row_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                profiles.profile_id AS profile_id,
+                profiles.profile_key AS profile_key,
+                profiles.winner_identifier_key AS winner_identifier_key,
+                profiles.member_identifier_keys AS member_identifier_keys,
+                profiles.anonymous_ids AS anonymous_ids,
+                profiles.user_ids AS user_ids,
+                profiles.emails AS emails,
+                profiles.phones AS phones,
+                profiles.historical_profile_ids AS historical_profile_ids,
+                profiles.first_name AS first_name,
+                profiles.last_name AS last_name,
+                profiles.first_seen_at AS first_seen_at,
+                profiles.last_seen_at AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toUInt8(0) AS fact_deleted,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                'identity_compactor' AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                profiles.historical_profile_ids AS prior_profile_ids,
+                [profiles.profile_id] AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM recomputed_identity_components AS profiles
+            INNER JOIN
+                identity_compaction_metadata AS metadata ON profiles.tenant_id = metadata.tenant_id
+        ),
+        compacted_profile_tombstone_rows AS (
+            SELECT
+                profiles.tenant_id AS tenant_id,
+                'profile' AS state_kind,
+                concat(
+                    'profile:', toString(length(profiles.profile_id)), ':', profiles.profile_id
+                ) AS state_key,
+                profiles.profile_id AS lookup_key,
+                '' AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                toUInt8(1) AS is_deleted,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'delete:profile:',
+                                profiles.profile_id,
+                                ':',
+                                toString(metadata.batch_version)
+                            )
+                        )
+                    )
+                ) AS row_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                profiles.profile_id AS profile_id,
+                profiles.profile_key AS profile_key,
+                profiles.winner_identifier_key AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS anonymous_ids,
+                CAST([], 'Array(String)') AS user_ids,
+                CAST([], 'Array(String)') AS emails,
+                CAST([], 'Array(String)') AS phones,
+                profiles.historical_profile_ids AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                profiles.first_seen_at AS first_seen_at,
+                profiles.last_seen_at AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toUInt8(0) AS fact_deleted,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                'identity_compactor' AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                [profiles.profile_id] AS prior_profile_ids,
+                CAST([], 'Array(String)') AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM displaced_profile_delta_values AS profiles
+            INNER JOIN
+                identity_compaction_metadata AS metadata ON profiles.tenant_id = metadata.tenant_id
+        ),
+        identity_compaction_delta_rows AS (
+            SELECT *
+            FROM compacted_fact_delta_rows
+            UNION ALL
+            SELECT *
+            FROM compacted_evidence_delta_rows
+            UNION ALL
+            SELECT *
+            FROM compacted_mapping_delta_rows
+            UNION ALL
+            SELECT *
+            FROM compacted_profile_upsert_rows
+            UNION ALL
+            SELECT *
+            FROM compacted_profile_tombstone_rows
+        ),
+        identity_compaction_manifest_placeholder AS (
+            SELECT
+                metadata.tenant_id AS tenant_id,
+                '__manifest_placeholder' AS state_kind,
+                '' AS state_key,
+                '' AS lookup_key,
+                '' AS sub_key,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                metadata.committed_at AS committed_at,
+                toUInt8(0) AS is_deleted,
+                repeat('0', 64) AS row_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS anonymous_ids,
+                CAST([], 'Array(String)') AS user_ids,
+                CAST([], 'Array(String)') AS emails,
+                CAST([], 'Array(String)') AS phones,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                toDateTime64(0, 6) AS first_seen_at,
+                toDateTime64(0, 6) AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toUInt8(0) AS fact_deleted,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                'identity_compactor' AS producer_id,
+                toUInt64(0) AS checkpoint_sequence,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                CAST([], 'Array(String)') AS prior_profile_ids,
+                CAST([], 'Array(String)') AS dirty_profile_ids,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                toUInt64(0) AS output_row_count,
+                repeat('0', 64) AS output_hash
+            FROM identity_compaction_metadata AS metadata
+        ),
+        identity_compaction_rows_with_placeholder AS (
+            SELECT *
+            FROM identity_compaction_delta_rows
+            UNION ALL
+            SELECT *
+            FROM identity_compaction_manifest_placeholder
+        ),
+        identity_compaction_rows_with_summary AS (
+            SELECT
+                rows.*,
+                rows.state_kind = '__manifest_placeholder' AS is_manifest_placeholder,
+                countIf(rows.state_kind != '__manifest_placeholder') OVER (
+                ) AS computed_output_row_count,
+                lower(
+                    hex(
+                        SHA256(
+                            arrayStringConcat(
+                                arraySort(
+                                    groupArrayIf(
+                                        concat(
+                                            rows.state_kind,
+                                            ':',
+                                            rows.lookup_key,
+                                            ':',
+                                            rows.sub_key,
+                                            ':',
+                                            rows.row_hash
+                                        ),
+                                        rows.state_kind != '__manifest_placeholder'
+                                    ) OVER ()
+                                ),
+                                '|'
+                            )
+                        )
+                    )
+                ) AS computed_output_hash
+            FROM identity_compaction_rows_with_placeholder AS rows
+        )
+    SELECT
+        * EXCEPT (
+            is_manifest_placeholder,
+            computed_output_row_count,
+            computed_output_hash
+        ) REPLACE(
+            if(is_manifest_placeholder, 'batch_manifest', state_kind) AS state_kind,
+            if(is_manifest_placeholder, concat('batch_manifest:', batch_id), state_key) AS state_key,
+            if(is_manifest_placeholder, batch_id, lookup_key) AS lookup_key,
+            CAST(
+                if(
+                    is_manifest_placeholder,
+                    lower(hex(SHA256(concat(batch_id, ':', input_hash, ':', computed_output_hash)))),
+                    row_hash
+                ) AS FixedString(64)
+            ) AS row_hash,
+            CAST(fact_payload_hash AS FixedString(64)) AS fact_payload_hash,
+            CAST(checkpoint_event_id AS FixedString(64)) AS checkpoint_event_id,
+            CAST(input_hash AS FixedString(64)) AS input_hash,
+            if(
+                is_manifest_placeholder, toUInt64(computed_output_row_count), output_row_count
+            ) AS output_row_count,
+            CAST(
+                if(is_manifest_placeholder, computed_output_hash, output_hash) AS FixedString(64)
+            ) AS output_hash
+        )
+    FROM identity_compaction_rows_with_summary

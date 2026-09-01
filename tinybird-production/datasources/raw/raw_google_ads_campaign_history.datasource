@@ -1,0 +1,49 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.google_ads.campaign_history.
+    Source role: google_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_at` Nullable(DateTime64(6)) `json:$.updated_at`,
+    `customer_id` Nullable(Int64) `json:$.customer_id`,
+    `base_campaign_id` Nullable(Int64) `json:$.base_campaign_id`,
+    `ad_serving_optimization_status` Nullable(String) `json:$.ad_serving_optimization_status`,
+    `advertising_channel_subtype` Nullable(String) `json:$.advertising_channel_subtype`,
+    `advertising_channel_type` Nullable(String) `json:$.advertising_channel_type`,
+    `experiment_type` Nullable(String) `json:$.experiment_type`,
+    `end_date` Nullable(String) `json:$.end_date`,
+    `end_date_time` Nullable(String) `json:$.end_date_time`,
+    `final_url_suffix` Nullable(String) `json:$.final_url_suffix`,
+    `frequency_caps` Nullable(String) `json:$.frequency_caps`,
+    `name` Nullable(String) `json:$.name`,
+    `optimization_score` Nullable(Float64) `json:$.optimization_score`,
+    `payment_mode` Nullable(String) `json:$.payment_mode`,
+    `serving_status` Nullable(String) `json:$.serving_status`,
+    `start_date` Nullable(String) `json:$.start_date`,
+    `start_date_time` Nullable(String) `json:$.start_date_time`,
+    `status` Nullable(String) `json:$.status`,
+    `tracking_url_template` Nullable(String) `json:$.tracking_url_template`,
+    `vanity_pharma_display_url_mode` Nullable(String) `json:$.vanity_pharma_display_url_mode`,
+    `vanity_pharma_text` Nullable(String) `json:$.vanity_pharma_text`,
+    `video_brand_safety_suitability` Nullable(String) `json:$.video_brand_safety_suitability`,
+    `ai_max_setting_enable_ai_max` Nullable(Bool) `json:$.ai_max_setting_enable_ai_max`,
+    `ai_max_setting_bundling_required` Nullable(String) `json:$.ai_max_setting_bundling_required`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `_fivetran_start` Nullable(DateTime64(6)) `json:$._fivetran_start`,
+    `_fivetran_end` Nullable(DateTime64(6)) `json:$._fivetran_end`,
+    `_fivetran_active` Nullable(Bool) `json:$._fivetran_active`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(customer_id, toInt64(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(updated_at, toDateTime64(0, 6)),
+    `__tb_sort_4` DateTime64(6) `json:$.__tb_sort_4` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/google_ads/campaign_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet
+
+TOKEN boom_bigquery_tinybird_sync APPEND

@@ -1,0 +1,38 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.google_ads.ad_group_history.
+    Source role: google_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_at` Nullable(DateTime64(6)) `json:$.updated_at`,
+    `campaign_id` Nullable(Int64) `json:$.campaign_id`,
+    `base_ad_group_id` Nullable(Int64) `json:$.base_ad_group_id`,
+    `ad_rotation_mode` Nullable(String) `json:$.ad_rotation_mode`,
+    `campaign_name` Nullable(String) `json:$.campaign_name`,
+    `display_custom_bid_dimension` Nullable(String) `json:$.display_custom_bid_dimension`,
+    `explorer_auto_optimizer_setting_opt_in` Nullable(Bool) `json:$.explorer_auto_optimizer_setting_opt_in`,
+    `final_url_suffix` Nullable(String) `json:$.final_url_suffix`,
+    `name` Nullable(String) `json:$.name`,
+    `status` Nullable(String) `json:$.status`,
+    `target_restrictions` Nullable(String) `json:$.target_restrictions`,
+    `tracking_url_template` Nullable(String) `json:$.tracking_url_template`,
+    `type` Nullable(String) `json:$.type`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `_fivetran_start` Nullable(DateTime64(6)) `json:$._fivetran_start`,
+    `_fivetran_end` Nullable(DateTime64(6)) `json:$._fivetran_end`,
+    `_fivetran_active` Nullable(Bool) `json:$._fivetran_active`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(campaign_id, toInt64(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(updated_at, toDateTime64(0, 6)),
+    `__tb_sort_4` DateTime64(6) `json:$.__tb_sort_4` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/google_ads/ad_group_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet
+
+TOKEN boom_bigquery_tinybird_sync APPEND

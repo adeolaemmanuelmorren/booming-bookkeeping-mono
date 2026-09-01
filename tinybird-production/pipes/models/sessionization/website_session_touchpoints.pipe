@@ -1,0 +1,88 @@
+DESCRIPTION >
+    Identity-independent website touchpoints at one row per session. Identity resolution can
+    join this stable contract without rebuilding page ordering or first-seen fbclid logic.
+
+NODE website_session_fbclid_first_seen
+SQL >
+    SELECT
+        tenant_id AS tenant_id, fbclid AS fbclid, min(session_start_timestamp) AS fbclid_first_seen_at
+    FROM website_sessions
+    WHERE fbclid IS NOT NULL
+    GROUP BY tenant_id, fbclid
+
+NODE website_session_touchpoint_rows
+SQL >
+    SELECT
+        sessions.tenant_id AS tenant_id,
+        lower(
+            hex(MD5(concat(assumeNotNull(sessions.session_id), '|website_session')))
+        ) AS touchpoint_id,
+        sessions.session_id AS session_id,
+        sessions.visitor_key AS visitor_key,
+        sessions.anonymous_id AS anonymous_id,
+        sessions.user_id AS user_id,
+        sessions.session_start_timestamp AS session_start_timestamp,
+        sessions.session_start_timestamp AS touchpoint_time,
+        sessions.session_end_timestamp AS session_end_timestamp,
+        sessions.session_duration_seconds AS session_duration_seconds,
+        sessions.page_view_count AS page_view_count,
+        sessions.first_page_view_id AS first_page_view_id,
+        sessions.first_page_url AS first_page_url,
+        sessions.first_page_host AS first_page_host,
+        sessions.first_page_path AS first_page_path,
+        sessions.first_page_path_host AS first_page_path_host,
+        sessions.ip_address AS ip_address,
+        sessions.user_agent AS user_agent,
+        sessions.device_platform AS device_platform,
+        sessions.device_is_mobile AS device_is_mobile,
+        sessions.geo_city AS geo_city,
+        sessions.geo_region AS geo_region,
+        sessions.geo_region_code AS geo_region_code,
+        sessions.geo_country AS geo_country,
+        sessions.geo_timezone AS geo_timezone,
+        sessions.last_page_view_id AS last_page_view_id,
+        sessions.last_page_url AS last_page_url,
+        sessions.last_page_path AS last_page_path,
+        sessions.utm_source AS utm_source,
+        sessions.utm_medium AS utm_medium,
+        sessions.utm_campaign AS utm_campaign,
+        sessions.utm_content AS utm_content,
+        sessions.utm_term AS utm_term,
+        sessions.utm_id AS utm_id,
+        sessions.campaign_id AS campaign_id,
+        sessions.adset_id AS adset_id,
+        sessions.ad_id AS ad_id,
+        sessions.google_keyword_id AS google_keyword_id,
+        sessions.google_keyword AS google_keyword,
+        sessions.click_id AS click_id,
+        sessions.click_id_type AS click_id_type,
+        sessions.gclid AS gclid,
+        sessions.gbraid AS gbraid,
+        sessions.wbraid AS wbraid,
+        sessions.fbclid AS fbclid,
+        if(
+            sessions.fbclid IS NOT NULL AND first_seen.fbclid_first_seen_at IS NOT NULL,
+            concat(
+                'fb.1.',
+                toString(toUnixTimestamp64Milli(assumeNotNull(first_seen.fbclid_first_seen_at))),
+                '.',
+                assumeNotNull(sessions.fbclid)
+            ),
+            CAST(NULL AS Nullable(String))
+        ) AS fbc_fbclid,
+        sessions.ttclid AS ttclid,
+        sessions.li_fat_id AS li_fat_id,
+        sessions.rdt_cid AS rdt_cid,
+        sessions.twclid AS twclid,
+        sessions.fbc AS fbc,
+        sessions.fbp AS fbp,
+        sessions.ttp AS ttp,
+        sessions.uetsid AS uetsid,
+        sessions.uetvid AS uetvid,
+        sessions.channel_source AS channel_source,
+        sessions.channel_medium AS channel_medium
+    FROM website_sessions AS sessions
+    LEFT JOIN
+        website_session_fbclid_first_seen AS first_seen
+        ON sessions.tenant_id = first_seen.tenant_id
+        AND sessions.fbclid = first_seen.fbclid

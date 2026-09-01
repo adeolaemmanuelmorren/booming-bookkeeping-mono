@@ -1,0 +1,181 @@
+DESCRIPTION >
+    Resolve and freeze the profile rows selected by the prior-profile Copy.
+
+NODE frozen_identity_compaction_touched_profiles
+SQL >
+    %
+    WITH
+        touched_profiles_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        selected_profiles_metadata AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                touched_profiles_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.batch_version, prepared.batch_id
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        selected_prior_profile_ids AS (
+            SELECT prepared.tenant_id AS tenant_id, prepared.prior_profile_id AS profile_id
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                selected_profiles_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            WHERE
+                prepared.stage_kind = 'prior_profile'
+                AND prepared.prior_profile_id != ''
+                AND cityHash64(prepared.prior_profile_id)
+                    % {{ UInt64(p_touched_profile_shard_count, 1) }}
+                    = {{ UInt64(p_touched_profile_shard, 0) }}
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        selected_prior_profile_state_keys AS (
+            SELECT
+                tenant_id,
+                concat('profile:', toString(length(profile_id)), ':', profile_id) AS state_key
+            FROM selected_prior_profile_ids
+        ),
+        touched_profiles_activated_batches AS (
+            SELECT tenant_id, batch_version, batch_id
+            FROM
+                (
+                    SELECT
+                        journal.tenant_id AS tenant_id,
+                        journal.batch_version AS batch_version,
+                        journal.batch_id AS batch_id,
+                        journal.committed_at AS committed_at,
+                        journal.row_hash AS row_hash,
+                        metadata.active_batch_version AS active_batch_version,
+                        metadata.active_batch_id AS active_batch_id
+                    FROM identity_state_delta_versions AS journal
+                    INNER JOIN
+                        selected_profiles_metadata AS metadata
+                        ON journal.tenant_id = metadata.tenant_id
+                    WHERE journal.state_kind = 'activation_audit' AND journal.is_deleted = 0
+                    QUALIFY
+                        row_number() OVER (
+                            PARTITION BY journal.tenant_id, journal.batch_version
+                            ORDER BY
+                                journal.committed_at DESC, journal.row_hash DESC, journal.batch_id DESC
+                        )
+                        = 1
+                ) AS activated
+            WHERE
+                activated.batch_version < activated.active_batch_version
+                OR (
+                    activated.batch_version = activated.active_batch_version
+                    AND activated.batch_id = activated.active_batch_id
+                )
+        ),
+        candidate_touched_profile_versions AS (
+            SELECT
+                seed.tenant_id AS tenant_id,
+                seed.profile_id AS profile_id,
+                seed.profile_key AS profile_key,
+                seed.winner_identifier_key AS winner_identifier_key,
+                seed.member_identifier_keys AS member_identifier_keys,
+                seed.historical_profile_ids AS historical_profile_ids,
+                seed.first_name AS first_name,
+                seed.last_name AS last_name,
+                seed.first_seen_at AS first_seen_at,
+                seed.last_seen_at AS last_seen_at,
+                seed.is_deleted AS is_deleted,
+                seed.batch_version AS batch_version,
+                seed.committed_at AS committed_at,
+                seed.row_hash AS row_hash
+            FROM identity_state_seed_enriched AS seed
+            WHERE
+                seed.state_kind = 'profile'
+                AND (seed.tenant_id, seed.state_key)
+                IN (SELECT tenant_id, state_key FROM selected_prior_profile_state_keys)
+            UNION ALL
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.profile_id AS profile_id,
+                journal.profile_key AS profile_key,
+                journal.winner_identifier_key AS winner_identifier_key,
+                journal.member_identifier_keys AS member_identifier_keys,
+                journal.historical_profile_ids AS historical_profile_ids,
+                journal.first_name AS first_name,
+                journal.last_name AS last_name,
+                journal.first_seen_at AS first_seen_at,
+                journal.last_seen_at AS last_seen_at,
+                journal.is_deleted AS is_deleted,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                touched_profiles_activated_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE
+                journal.state_kind = 'profile'
+                AND (journal.tenant_id, journal.lookup_key)
+                IN (SELECT tenant_id, profile_id FROM selected_prior_profile_ids)
+        ),
+        latest_touched_profile_versions AS (
+            SELECT *
+            FROM candidate_touched_profile_versions
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, profile_id
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+                )
+                = 1
+        ),
+        current_touched_profiles AS (
+            SELECT * FROM latest_touched_profile_versions WHERE is_deleted = 0
+        )
+    SELECT
+        profiles.tenant_id AS tenant_id,
+        metadata.batch_version AS batch_version,
+        metadata.batch_id AS batch_id,
+        'touched_profile' AS stage_kind,
+        profiles.profile_id AS stage_key,
+        metadata.staged_at AS staged_at,
+        profiles.row_hash AS stage_hash,
+        metadata.input_hash AS input_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        profiles.profile_id AS profile_id,
+        profiles.profile_key AS profile_key,
+        profiles.winner_identifier_key AS winner_identifier_key,
+        profiles.member_identifier_keys AS member_identifier_keys,
+        profiles.historical_profile_ids AS historical_profile_ids,
+        profiles.first_name AS first_name,
+        profiles.last_name AS last_name,
+        profiles.first_seen_at AS first_seen_at,
+        profiles.last_seen_at AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toDateTime64(0, 6) AS fact_observed_at,
+        CAST(repeat('0', 64) AS FixedString(64)) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id
+    FROM current_touched_profiles AS profiles
+    INNER JOIN selected_profiles_metadata AS metadata ON profiles.tenant_id = metadata.tenant_id

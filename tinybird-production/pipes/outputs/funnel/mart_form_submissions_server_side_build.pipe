@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Server-side form submissions from configured ActiveCampaign tag assignments.
+
+NODE mart_server_form_submission_rows
+SQL >
+    SELECT * FROM resolved_activecampaign_registrations

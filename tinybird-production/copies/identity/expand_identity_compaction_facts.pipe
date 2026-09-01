@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Append retained facts for one frozen identity scope. The coordinator runs this
+    after scope expansion and before component rebuilding.
+
+NODE append_expanded_identity_compaction_facts
+SQL >
+    SELECT * FROM identity_compaction_facts_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_scope_stage
+COPY_MODE append

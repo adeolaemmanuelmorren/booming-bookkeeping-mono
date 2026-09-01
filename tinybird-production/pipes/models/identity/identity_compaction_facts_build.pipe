@@ -1,0 +1,386 @@
+DESCRIPTION >
+    Expand one frozen identity scope to the retained facts needed by component
+    rebuilding. This stage appends to the existing scope staging Data Source.
+
+NODE expanded_identity_compaction_fact_rows
+SQL >
+    %
+    WITH
+        identity_compaction_facts_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        facts_prepared_metadata_candidates AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                identity_compaction_facts_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+        ),
+        selected_facts_prepared_metadata AS (
+            SELECT *
+            FROM facts_prepared_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        selected_facts_prepared_changes AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                selected_facts_prepared_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                )
+                = 1
+        ),
+        facts_scope_metadata_candidates AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                selected_facts_prepared_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            WHERE scoped.stage_kind = 'scope_metadata'
+        ),
+        selected_facts_scope_metadata AS (
+            SELECT *
+            FROM facts_scope_metadata_candidates
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, batch_version, batch_id ORDER BY staged_at, stage_hash
+                )
+                = 1
+        ),
+        selected_facts_scope_rows AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                selected_facts_scope_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY scoped.tenant_id, scoped.stage_kind, scoped.stage_key
+                    ORDER BY scoped.staged_at, scoped.stage_hash
+                )
+                = 1
+        ),
+        identity_compaction_facts_metadata AS (
+            SELECT
+                prepared.tenant_id AS tenant_id,
+                prepared.batch_version AS batch_version,
+                prepared.batch_id AS batch_id,
+                prepared.staged_at AS staged_at,
+                prepared.input_hash AS input_hash
+            FROM selected_facts_prepared_metadata AS prepared
+            INNER JOIN
+                selected_facts_scope_metadata AS scoped
+                ON prepared.tenant_id = scoped.tenant_id
+                AND prepared.batch_version = scoped.batch_version
+                AND prepared.batch_id = scoped.batch_id
+                AND prepared.input_hash = scoped.input_hash
+            INNER JOIN
+                (
+                    SELECT staged.*
+                    FROM identity_compaction_fact_keys_stage AS staged
+                    INNER JOIN
+                        selected_facts_prepared_metadata AS selected
+                        ON staged.tenant_id = selected.tenant_id
+                        AND staged.batch_version = selected.batch_version
+                        AND staged.batch_id = selected.batch_id
+                        AND staged.input_hash = selected.input_hash
+                    WHERE staged.stage_kind = 'metadata'
+                    QUALIFY
+                        row_number() OVER (
+                            PARTITION BY staged.tenant_id, staged.batch_version, staged.batch_id
+                            ORDER BY staged.staged_at, staged.row_hash
+                        ) = 1
+                ) AS fact_keys
+                ON prepared.tenant_id = fact_keys.tenant_id
+                AND prepared.batch_version = fact_keys.batch_version
+                AND prepared.batch_id = fact_keys.batch_id
+                AND prepared.input_hash = fact_keys.input_hash
+        ),
+        prepared_changed_identity_facts AS (
+            SELECT
+                tenant_id,
+                producer_id,
+                observed_at,
+                fact_kind,
+                fact_key,
+                source_fact_version,
+                fact_deleted,
+                fact_payload_hash,
+                fact_payload,
+                evidence_keys,
+                stable_is_deleted,
+                stable_fact_deleted,
+                stable_fact_observed_at,
+                stable_evidence_keys
+            FROM selected_facts_prepared_changes
+            WHERE stage_kind = 'changed_fact'
+        ),
+        facts_activated_identity_batches AS (
+            SELECT tenant_id, batch_version, batch_id
+            FROM
+                (
+                    SELECT
+                        journal.tenant_id AS tenant_id,
+                        journal.batch_version AS batch_version,
+                        journal.batch_id AS batch_id,
+                        journal.committed_at AS committed_at,
+                        journal.row_hash AS row_hash,
+                        metadata.active_batch_version AS active_batch_version,
+                        metadata.active_batch_id AS active_batch_id
+                    FROM identity_state_delta_versions AS journal
+                    INNER JOIN
+                        selected_facts_prepared_metadata AS metadata
+                        ON journal.tenant_id = metadata.tenant_id
+                    WHERE journal.state_kind = 'activation_audit' AND journal.is_deleted = 0
+                    QUALIFY
+                        row_number() OVER (
+                            PARTITION BY journal.tenant_id, journal.batch_version
+                            ORDER BY
+                                journal.committed_at DESC, journal.row_hash DESC, journal.batch_id DESC
+                        )
+                        = 1
+                ) AS activated
+            WHERE
+                activated.batch_version < activated.active_batch_version
+                OR (
+                    activated.batch_version = activated.active_batch_version
+                    AND activated.batch_id = activated.active_batch_id
+                )
+        ),
+        retained_identity_fact_keys AS (
+            SELECT staged.tenant_id AS tenant_id, staged.fact_key AS fact_key
+            FROM identity_compaction_fact_keys_stage AS staged
+            INNER JOIN
+                selected_facts_prepared_metadata AS metadata
+                ON staged.tenant_id = metadata.tenant_id
+                AND staged.batch_version = metadata.batch_version
+                AND staged.batch_id = metadata.batch_id
+                AND staged.input_hash = metadata.input_hash
+            WHERE
+                staged.stage_kind = 'fact_key'
+                AND staged.fact_key != ''
+                AND cityHash64(staged.fact_key) % {{ UInt64(p_fact_shard_count, 1) }}
+                    = {{ UInt64(p_fact_shard, 0) }}
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY staged.tenant_id, staged.stage_kind, staged.stage_key
+                    ORDER BY staged.staged_at, staged.row_hash
+                ) = 1
+        ),
+        retained_identity_fact_state_keys AS (
+            SELECT tenant_id, concat('fact:', fact_key) AS state_key
+            FROM retained_identity_fact_keys
+        ),
+        candidate_retained_fact_versions AS (
+            SELECT
+                seed.tenant_id AS tenant_id,
+                seed.fact_kind AS fact_kind,
+                seed.fact_key AS fact_key,
+                seed.source_fact_version AS source_fact_version,
+                seed.fact_deleted AS fact_deleted,
+                seed.fact_observed_at AS fact_observed_at,
+                seed.fact_payload_hash AS fact_payload_hash,
+                seed.fact_payload AS fact_payload,
+                seed.evidence_keys AS evidence_keys,
+                seed.producer_id AS producer_id,
+                seed.is_deleted AS is_deleted,
+                seed.batch_version AS batch_version,
+                seed.committed_at AS committed_at,
+                seed.row_hash AS row_hash
+            FROM identity_state_seed_enriched AS seed
+            WHERE
+                seed.state_kind = 'fact'
+                AND (seed.tenant_id, seed.state_key)
+                IN (SELECT tenant_id, state_key FROM retained_identity_fact_state_keys)
+            UNION ALL
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.fact_kind AS fact_kind,
+                journal.fact_key AS fact_key,
+                journal.source_fact_version AS source_fact_version,
+                journal.fact_deleted AS fact_deleted,
+                journal.fact_observed_at AS fact_observed_at,
+                journal.fact_payload_hash AS fact_payload_hash,
+                journal.fact_payload AS fact_payload,
+                journal.evidence_keys AS evidence_keys,
+                journal.producer_id AS producer_id,
+                journal.is_deleted AS is_deleted,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                facts_activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE
+                journal.state_kind = 'fact'
+                AND (journal.tenant_id, journal.lookup_key)
+                IN (SELECT tenant_id, fact_key FROM retained_identity_fact_keys)
+        ),
+        current_retained_fact_heads AS (
+            SELECT *
+            FROM candidate_retained_fact_versions
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, fact_kind, fact_key
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+                )
+                = 1
+        ),
+        retained_identity_facts_after_overlay AS (
+            SELECT
+                stable.tenant_id AS tenant_id,
+                stable.fact_kind AS fact_kind,
+                stable.fact_key AS fact_key,
+                stable.source_fact_version AS source_fact_version,
+                stable.fact_observed_at AS fact_observed_at,
+                stable.fact_payload_hash AS fact_payload_hash,
+                stable.fact_payload AS fact_payload,
+                stable.evidence_keys AS evidence_keys,
+                stable.producer_id AS producer_id
+            FROM current_retained_fact_heads AS stable
+            WHERE
+                stable.is_deleted = 0
+                AND stable.fact_deleted = 0
+                AND (stable.tenant_id, stable.fact_kind, stable.fact_key)
+                NOT IN (SELECT tenant_id, fact_kind, fact_key FROM prepared_changed_identity_facts)
+            UNION ALL
+            SELECT
+                incoming.tenant_id AS tenant_id,
+                incoming.fact_kind AS fact_kind,
+                incoming.fact_key AS fact_key,
+                incoming.source_fact_version AS source_fact_version,
+                incoming.observed_at AS fact_observed_at,
+                incoming.fact_payload_hash AS fact_payload_hash,
+                incoming.fact_payload AS fact_payload,
+                incoming.evidence_keys AS evidence_keys,
+                incoming.producer_id AS producer_id
+            FROM prepared_changed_identity_facts AS incoming
+            WHERE incoming.fact_deleted = 0
+        ),
+        expanded_facts_metadata_stage_row AS (
+            SELECT
+                metadata.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'facts_metadata' AS stage_kind,
+                'facts_metadata' AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(
+                    hex(SHA256(concat('facts:', metadata.batch_id, ':', metadata.input_hash)))
+                ) AS stage_hash,
+                metadata.input_hash AS input_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                toDateTime64(0, 6) AS first_seen_at,
+                toDateTime64(0, 6) AS last_seen_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toDateTime64(0, 6) AS fact_observed_at,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                '' AS producer_id
+            FROM identity_compaction_facts_metadata AS metadata
+        ),
+        expanded_retained_fact_stage_rows AS (
+            SELECT
+                facts.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'retained_fact' AS stage_kind,
+                concat(
+                    facts.fact_kind, ':', toString(length(facts.fact_key)), ':', facts.fact_key
+                ) AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(
+                    hex(
+                        SHA256(
+                            concat(
+                                'retained_fact:',
+                                facts.fact_kind,
+                                ':',
+                                facts.fact_key,
+                                ':',
+                                toString(facts.source_fact_version),
+                                ':',
+                                facts.fact_payload_hash,
+                                ':',
+                                metadata.input_hash
+                            )
+                        )
+                    )
+                ) AS stage_hash,
+                metadata.input_hash AS input_hash,
+                '' AS identifier_type,
+                '' AS identifier_value,
+                '' AS identifier_key,
+                '' AS profile_id,
+                '' AS profile_key,
+                '' AS winner_identifier_key,
+                CAST([], 'Array(String)') AS member_identifier_keys,
+                CAST([], 'Array(String)') AS historical_profile_ids,
+                '' AS first_name,
+                '' AS last_name,
+                toDateTime64(0, 6) AS first_seen_at,
+                toDateTime64(0, 6) AS last_seen_at,
+                facts.fact_kind AS fact_kind,
+                facts.fact_key AS fact_key,
+                facts.source_fact_version AS source_fact_version,
+                facts.fact_observed_at AS fact_observed_at,
+                facts.fact_payload_hash AS fact_payload_hash,
+                facts.fact_payload AS fact_payload,
+                facts.evidence_keys AS evidence_keys,
+                facts.producer_id AS producer_id
+            FROM retained_identity_facts_after_overlay AS facts
+            INNER JOIN
+                identity_compaction_facts_metadata AS metadata ON facts.tenant_id = metadata.tenant_id
+        )
+    SELECT
+        * REPLACE(
+            CAST(stage_hash AS FixedString(64)) AS stage_hash,
+            CAST(input_hash AS FixedString(64)) AS input_hash,
+            CAST(fact_payload_hash AS FixedString(64)) AS fact_payload_hash
+        )
+    FROM
+        (
+            SELECT *
+            FROM expanded_facts_metadata_stage_row
+            UNION ALL
+            SELECT *
+            FROM expanded_retained_fact_stage_rows
+        )

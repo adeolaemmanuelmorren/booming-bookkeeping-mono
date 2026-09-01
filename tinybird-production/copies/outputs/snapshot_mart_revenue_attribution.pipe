@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Atomically replace revenue attribution after payment timing and conversion journeys refresh.
+
+NODE build_revenue_attribution_snapshot
+SQL >
+    SELECT revenue_rows.*, ifNull(revenue_rows.payment_id, '') AS __tb_sort_payment_id
+    FROM mart_revenue_attribution_build AS revenue_rows
+
+TYPE COPY
+TARGET_DATASOURCE mart_revenue_attribution_current
+COPY_MODE replace

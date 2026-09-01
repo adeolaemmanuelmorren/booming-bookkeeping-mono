@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Immutable migration-time profile base keyed only by conversion ID.
+    Activated identifier-mapping deltas override this value at read time.
+
+SCHEMA >
+    `conversion_id` String `json:$.conversion_id`,
+    `profile_id` Nullable(String) `json:$.profile_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY conversion_id

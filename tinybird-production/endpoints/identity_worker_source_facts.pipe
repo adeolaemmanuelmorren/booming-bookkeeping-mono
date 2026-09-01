@@ -1,0 +1,28 @@
+DESCRIPTION >
+    One bounded page of normalized source facts for Worker-side identity enqueue.
+    The producer and overlap cutoff keep the read small; fact-key pagination makes
+    retries deterministic without a Tinybird Copy job.
+
+NODE identity_worker_source_fact_page
+SQL >
+    %
+    SELECT
+        event_id,
+        producer_id,
+        observed_at,
+        ingested_at,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_deleted,
+        fact_payload_hash,
+        fact_payload,
+        evidence_keys
+    FROM source_identity_facts
+    WHERE
+        producer_id = {{ String(p_identity_producer, '') }}
+        AND fact_key > {{ String(p_after_fact_key, '') }}
+    ORDER BY fact_key
+    LIMIT {{ UInt64(p_batch_limit, 500) }}
+
+TYPE ENDPOINT

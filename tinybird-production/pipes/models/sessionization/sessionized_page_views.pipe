@@ -1,0 +1,61 @@
+DESCRIPTION >
+    Canonical page views ordered into tenant-scoped browser sessions. The visitor key keeps
+    the page-view adapter's user-id casing and uses the Dataform timestamp-plus-page-id order.
+
+NODE ordered_session_page_views
+SQL >
+    SELECT
+        source.*,
+        coalesce(source.anonymous_id, source.user_id, source.page_view_id) AS visitor_key,
+        lagInFrame(source.page_view_timestamp) OVER (
+            PARTITION BY
+                source.tenant_id, coalesce(source.anonymous_id, source.user_id, source.page_view_id)
+            ORDER BY source.page_view_timestamp ASC, source.page_view_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS previous_page_view_timestamp
+    FROM jitsu_page_views AS source
+    WHERE source.page_view_timestamp IS NOT NULL
+
+NODE flagged_session_page_views
+SQL >
+    SELECT
+        source.*,
+        toUInt8(
+            source.previous_page_view_timestamp IS NULL
+            OR toUnixTimestamp64Micro(assumeNotNull(source.page_view_timestamp))
+            - toUnixTimestamp64Micro(assumeNotNull(source.previous_page_view_timestamp))
+            >= 1860000000
+        ) AS starts_new_session
+    FROM ordered_session_page_views AS source
+
+NODE numbered_session_page_views
+SQL >
+    SELECT
+        source.*,
+        sum(source.starts_new_session) OVER (
+            PARTITION BY source.tenant_id, source.visitor_key
+            ORDER BY source.page_view_timestamp ASC, source.page_view_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS visitor_session_number
+    FROM flagged_session_page_views AS source
+
+NODE sessionized_page_view_rows
+SQL >
+    SELECT
+        source.*,
+        if(
+            source.visitor_key IS NULL,
+            CAST(NULL AS Nullable(String)),
+            lower(
+                hex(
+                    MD5(
+                        concat(
+                            assumeNotNull(source.visitor_key),
+                            '|',
+                            toString(source.visitor_session_number)
+                        )
+                    )
+                )
+            )
+        ) AS session_id
+    FROM numbered_session_page_views AS source

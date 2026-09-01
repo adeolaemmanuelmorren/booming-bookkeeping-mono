@@ -1,0 +1,7 @@
+DESCRIPTION >
+    Live conversion-to-touchpoint journeys from the immutable seed plus
+    atomically committed identity-driven updates.
+
+NODE current_conversion_touchpoint_rows
+SQL >
+    SELECT * FROM mart_conversions_with_touchpoints_build

@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Resolve and append the prior profile IDs touched by one classified identity batch.
+
+NODE append_seeded_identity_compaction_profiles
+SQL >
+    SELECT * FROM identity_compaction_profiles_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_changes_stage
+COPY_MODE append

@@ -1,0 +1,297 @@
+{
+  "version": 1,
+  "bigquery": {
+    "project": "able-folio-499722",
+    "dataset": "booming_data_analytics",
+    "location": "US"
+  },
+  "dataform_root": "../dataform",
+  "bucket_count": 256,
+  "float_scale": 9,
+  "outputs": [
+    {
+      "name": "mart_ad_cost_by_landing_page_daily",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/ads/mart_ad_cost_by_landing_page_daily.sqlx",
+      "diagnostic_key": ["date", "source", "account_id", "campaign_id", "adset_id", "landing_page_normalized"]
+    },
+    {
+      "name": "mart_ad_performance",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/ads/mart_ad_performance.sqlx",
+      "diagnostic_key": ["time", "source", "account_id", "ad_id"]
+    },
+    {
+      "name": "mart_ad_performance_hourly",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/ads/mart_ad_performance_hourly.sqlx"
+    },
+    {
+      "name": "mart_form_submissions_client_side",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/funnel/mart_form_submissions_client_side.sqlx"
+    },
+    {
+      "name": "mart_form_submissions_server_side",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/funnel/mart_form_submissions_server_side.sqlx"
+    },
+    {
+      "name": "mart_manual_attribution_profile_search_candidates",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/manual_attribution/mart_manual_attribution_profile_search_candidates.sqlx",
+      "diagnostic_key": ["candidate_id"]
+    },
+    {
+      "name": "mart_meta_delivery_daily",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/ads/mart_meta_delivery_daily.sqlx"
+    },
+    {
+      "name": "mart_payments",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/payments/mart_payments.sqlx",
+      "array_policies": {
+        "discount_ids": "set",
+        "coupon_ids": "set",
+        "coupon_names": "set",
+        "promotion_code_ids": "set",
+        "promotion_codes": "set"
+      }
+    },
+    {
+      "name": "mart_touchpoints_all",
+      "layer": 1,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/touchpoints/mart_touchpoints_all.sqlx",
+      "diagnostic_key": ["touchpoint_id"],
+      "digest_shards": 8,
+      "digest_shard_key": "touchpoint_id",
+      "digest_shard_strategy": "hex_range"
+    },
+    {
+      "name": "mart_checkout_started_client_side",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/funnel/mart_checkout_started_client_side.sqlx",
+      "diagnostic_key": ["checkout_started_id"]
+    },
+    {
+      "name": "mart_contact_first_conversions",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_contact_first_conversions.sqlx",
+      "diagnostic_key": ["profile_id"]
+    },
+    {
+      "name": "mart_customers",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/customers/mart_customers.sqlx",
+      "diagnostic_key": ["profile_id"],
+      "array_policies": {
+        "anonymous_ids": "set",
+        "user_ids": "set",
+        "emails": "set",
+        "phones": "set"
+      }
+    },
+    {
+      "name": "mart_krc_acquisition",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_krc_acquisition.sqlx"
+    },
+    {
+      "name": "mart_manual_attribution_payment_status",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/manual_attribution/mart_manual_attribution_payment_status.sqlx",
+      "diagnostic_key": ["payment_source", "payment_id"]
+    },
+    {
+      "name": "mart_payment_info_submitted_client_side",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/funnel/mart_payment_info_submitted_client_side.sqlx",
+      "diagnostic_key": ["form_submission_id"]
+    },
+    {
+      "name": "mart_payments_client_side",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/payments/mart_payments_client_side.sqlx"
+    },
+    {
+      "name": "mart_product_sales",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/products/mart_product_sales.sqlx",
+      "diagnostic_key": ["payment_date", "payment_source", "product_rule", "product_id", "payment_occurrence_type"]
+    },
+    {
+      "name": "mart_touchpoints_first",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/touchpoints/mart_touchpoints_first.sqlx",
+      "diagnostic_key": ["profile_id", "touchpoint_id"]
+    },
+    {
+      "name": "mart_touchpoints_last",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/touchpoints/mart_touchpoints_last.sqlx",
+      "diagnostic_key": ["profile_id", "touchpoint_id"]
+    },
+    {
+      "name": "mart_unattributed_payments",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/manual_attribution/mart_unattributed_payments.sqlx",
+      "diagnostic_key": ["payment_source", "payment_id"],
+      "array_policies": {
+        "discount_ids": "set",
+        "coupon_ids": "set",
+        "coupon_names": "set",
+        "promotion_code_ids": "set",
+        "promotion_codes": "set"
+      }
+    },
+    {
+      "name": "segretl_form_submitted",
+      "layer": 2,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_form_submitted.sqlx"
+    },
+    {
+      "name": "mart_booming_mentorship_vip_customers",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/customers/mart_booming_mentorship_vip_customers.sqlx",
+      "diagnostic_key": ["payment_email", "payment_phone"]
+    },
+    {
+      "name": "mart_conversions_with_touchpoints",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_with_touchpoints.sqlx",
+      "diagnostic_key": ["conversion_id", "touchpoint_id"]
+    },
+    {
+      "name": "mart_krc_post_registration_paid_clicks",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_krc_post_registration_paid_clicks.sqlx"
+    },
+    {
+      "name": "segretl_first_conversions",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_first_conversions.sqlx"
+    },
+    {
+      "name": "segretl_form_submitted_flattened",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_form_submitted_flattened.sqlx"
+    },
+    {
+      "name": "segretl_repeatable_conversions",
+      "layer": 3,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_repeatable_conversions.sqlx"
+    },
+    {
+      "name": "mart_conversions_ad_performance_hourly",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_ad_performance_hourly.sqlx"
+    },
+    {
+      "name": "mart_conversions_multi_touch",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_multi_touch.sqlx",
+      "diagnostic_key": ["click_date", "source", "campaign_id", "adset_id", "ad_id", "landing_page_host", "landing_page_path"]
+    },
+    {
+      "name": "mart_revenue_attribution",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_revenue_attribution.sqlx"
+    },
+    {
+      "name": "segretl_first_conversions_flattened",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_first_conversions_flattened.sqlx"
+    },
+    {
+      "name": "segretl_order_completed",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_order_completed.sqlx"
+    },
+    {
+      "name": "segretl_repeatable_conversions_flattened",
+      "layer": 4,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_repeatable_conversions_flattened.sqlx"
+    },
+    {
+      "name": "mart_conversions_ad_performance",
+      "layer": 5,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_ad_performance.sqlx",
+      "diagnostic_key": ["date", "source", "campaign_id", "adset_id", "ad_id", "medium", "secondary_drill_down", "tertiary_drill_down"]
+    },
+    {
+      "name": "mart_conversions_multi_touch_pages",
+      "layer": 5,
+      "bigquery_kind": "view",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_multi_touch_pages.sqlx",
+      "diagnostic_key": ["click_date", "landing_page_host", "landing_page_path"]
+    },
+    {
+      "name": "mart_conversions_organic_performance",
+      "layer": 5,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_organic_performance.sqlx",
+      "diagnostic_key": ["date", "source", "medium", "campaign_name", "adset_name", "ad_name", "secondary_drill_down", "tertiary_drill_down"]
+    },
+    {
+      "name": "mart_meta_krc_reporting_hourly",
+      "layer": 5,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/attribution/mart_meta_krc_reporting_hourly.sqlx"
+    },
+    {
+      "name": "segretl_order_completed_flattened",
+      "layer": 5,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/segment/segretl_order_completed_flattened.sqlx"
+    },
+    {
+      "name": "mart_conversions_all_performance",
+      "layer": 6,
+      "bigquery_kind": "view",
+      "dataform_definition": "definitions/output/attribution/mart_conversions_all_performance.sqlx",
+      "diagnostic_key": ["date", "source", "campaign_id", "adset_id", "ad_id", "medium", "secondary_drill_down", "tertiary_drill_down"]
+    },
+    {
+      "name": "mart_landing_page_performance_daily",
+      "layer": 6,
+      "bigquery_kind": "table",
+      "dataform_definition": "definitions/output/landing_pages/mart_landing_page_performance_daily.sqlx",
+      "diagnostic_key": ["date", "landing_page_host", "landing_page_path"]
+    }
+  ]
+}

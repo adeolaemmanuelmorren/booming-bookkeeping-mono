@@ -1,0 +1,279 @@
+DESCRIPTION >
+    Identity-neutral conversion facts from server forms, client forms, server
+    payments, and client payments. Current profile identity is added downstream.
+
+NODE server_form_conversion_facts
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'server_form' AS fact_kind,
+        concat('server_form:', form_submission_id) AS conversion_id,
+        submitted_at AS conversion_time,
+        'server_side' AS conversion_source,
+        'form_submission' AS conversion_type,
+        identity_anchor_key AS identity_anchor_key,
+        CAST(NULL AS Nullable(String)) AS manual_profile_id,
+        CAST(NULL AS Nullable(String)) AS payment_source,
+        CAST(NULL AS Nullable(String)) AS payment_id,
+        CAST(NULL AS Nullable(String)) AS payment_customer_id,
+        CAST(NULL AS Nullable(String)) AS payment_email,
+        CAST(NULL AS Nullable(String)) AS payment_category,
+        toUInt8(0) AS is_repeat_payment,
+        toFloat64(0) AS net_amount,
+        registration_type AS registration_type,
+        toFloat64(0) AS client_payment_amount
+    FROM mart_form_submissions_server_side_facts_current
+    WHERE submitted_at IS NOT NULL
+
+NODE ranked_client_form_versions_for_conversion
+SQL >
+    SELECT
+        form_versions.*,
+        row_number() OVER (
+            PARTITION BY form_versions.tenant_id, form_versions.form_submission_id
+            ORDER BY
+                form_versions.source_priority DESC,
+                form_versions.source_fact_version DESC,
+                form_versions.source_ingested_at DESC,
+                form_versions.payload_hash DESC
+        ) AS conversion_version_rank
+    FROM jitsu_form_submission_versions AS form_versions
+    WHERE form_versions.tenant_id = 'boom'
+
+NODE current_client_form_facts_for_conversion
+SQL >
+    SELECT *
+    FROM ranked_client_form_versions_for_conversion
+    WHERE conversion_version_rank = 1 AND source_deleted = 0 AND submitted_at IS NOT NULL
+
+NODE normalized_client_form_facts_for_conversion
+SQL >
+    WITH
+        replaceRegexpAll(trimBoth(ifNull(phone, '')), '[^0-9]', '') AS phone_digits,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    SELECT
+        forms.*,
+        coalesce(
+            if(email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', email)),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            ),
+            if(
+                anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', anonymous_id)
+            )
+        ) AS identity_anchor_key
+    FROM current_client_form_facts_for_conversion AS forms
+
+NODE client_form_and_historical_payment_conversion_facts
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        emitted_fact_kind AS fact_kind,
+        if(
+            emitted_fact_kind = 'client_form',
+            concat('client_form:', assumeNotNull(form_submission_id)),
+            concat('client_payment:historical_form_', assumeNotNull(form_submission_id))
+        ) AS conversion_id,
+        submitted_at AS conversion_time,
+        'client_side' AS conversion_source,
+        multiIf(
+            emitted_fact_kind = 'historical_client_payment',
+            'order_completed',
+            is_checkout_form = 1,
+            'checkout_form_submission',
+            'form_submission'
+        ) AS conversion_type,
+        identity_anchor_key AS identity_anchor_key,
+        CAST(NULL AS Nullable(String)) AS manual_profile_id,
+        CAST(NULL AS Nullable(String)) AS payment_source,
+        CAST(NULL AS Nullable(String)) AS payment_id,
+        CAST(NULL AS Nullable(String)) AS payment_customer_id,
+        email AS payment_email,
+        CAST(NULL AS Nullable(String)) AS payment_category,
+        toUInt8(0) AS is_repeat_payment,
+        toFloat64(0) AS net_amount,
+        registration_type AS registration_type,
+        if(
+            emitted_fact_kind = 'historical_client_payment',
+            toFloat64(199),
+            toFloat64(0)
+        ) AS client_payment_amount
+    FROM normalized_client_form_facts_for_conversion
+    ARRAY JOIN
+        if(
+            is_checkout_form = 1 AND offer_id = 'v3WtGzPH',
+            ['client_form', 'historical_client_payment'],
+            ['client_form']
+        ) AS emitted_fact_kind
+
+NODE ranked_client_order_versions_for_conversion
+SQL >
+    SELECT
+        order_versions.*,
+        row_number() OVER (
+            PARTITION BY order_versions.tenant_id, order_versions.event_row_id
+            ORDER BY
+                order_versions.source_priority DESC,
+                order_versions.source_fact_version DESC,
+                order_versions.source_ingested_at DESC,
+                order_versions.payload_hash DESC
+        ) AS conversion_version_rank
+    FROM jitsu_order_completed_versions AS order_versions
+    WHERE order_versions.tenant_id = 'boom'
+
+NODE current_client_order_facts_for_conversion
+SQL >
+    SELECT *
+    FROM ranked_client_order_versions_for_conversion
+    WHERE conversion_version_rank = 1 AND source_deleted = 0 AND completed_at IS NOT NULL
+
+NODE native_order_conversion_facts
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        'client_payment' AS fact_kind,
+        concat('client_payment:segment_order_', assumeNotNull(event_row_id)) AS conversion_id,
+        completed_at AS conversion_time,
+        'client_side' AS conversion_source,
+        'order_completed' AS conversion_type,
+        coalesce(
+            if(email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', email)),
+            if(
+                anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', anonymous_id)
+            )
+        ) AS identity_anchor_key,
+        CAST(NULL AS Nullable(String)) AS manual_profile_id,
+        CAST(NULL AS Nullable(String)) AS payment_source,
+        CAST(NULL AS Nullable(String)) AS payment_id,
+        CAST(NULL AS Nullable(String)) AS payment_customer_id,
+        email AS payment_email,
+        CAST(NULL AS Nullable(String)) AS payment_category,
+        toUInt8(0) AS is_repeat_payment,
+        toFloat64(0) AS net_amount,
+        CAST(NULL AS Nullable(String)) AS registration_type,
+        toFloat64(coalesce(value, 0)) AS client_payment_amount
+    FROM current_client_order_facts_for_conversion
+
+NODE normalized_server_payment_facts_for_conversion
+SQL >
+    WITH
+        replaceRegexpAll(trimBoth(ifNull(payment_phone, '')), '[^0-9]', '') AS phone_digits,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    SELECT
+        payments.*,
+        coalesce(
+            if(
+                payment_email IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('email:', payment_email)
+            ),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS identity_anchor_key,
+        multiIf(
+            payment_source = 'stripe_kajabi',
+            'kajabi',
+            is_bbb_mentorship_installment = 1,
+            'mentorship',
+            product_rule IN (
+                'structured_basic_vip',
+                'structured_keyboard_rich_challenge',
+                'keyboard_rich_challenge_vip'
+            ),
+            'vip',
+            product_rule IN ('keyboard_rich_book', 'top_tax_loopholes'),
+            'book',
+            product_rule IN (
+                'mentorship_deposit',
+                'mentorship_full_payment',
+                'mentorship_3x1997',
+                'mentorship_balance'
+            ),
+            'mentorship',
+            product_rule = 'catalog_product',
+            'catalog',
+            'unknown'
+        ) AS payment_category
+    FROM all_stripe_payments_current AS payments
+    WHERE payment_time IS NOT NULL
+
+NODE server_payment_conversion_facts
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'server_payment' AS fact_kind,
+        concat(
+            'server_payment:', payment_source, ':', assumeNotNull(payment_id)
+        ) AS conversion_id,
+        payment_time AS conversion_time,
+        'server_side' AS conversion_source,
+        if(is_repeat_payment = 1, 'repeat_payment', 'order_completed') AS conversion_type,
+        identity_anchor_key AS identity_anchor_key,
+        nullIf(manual_links.manual_profile_id, '') AS manual_profile_id,
+        payment_source AS payment_source,
+        payment_id AS payment_id,
+        customer_id AS payment_customer_id,
+        payment_email AS payment_email,
+        payment_category AS payment_category,
+        is_repeat_payment AS is_repeat_payment,
+        toFloat64(coalesce(net_amount, 0)) AS net_amount,
+        CAST(NULL AS Nullable(String)) AS registration_type,
+        toFloat64(0) AS client_payment_amount
+    FROM normalized_server_payment_facts_for_conversion AS payments
+    LEFT JOIN
+        (
+            SELECT
+                payment_id AS linked_payment_id,
+                manual_profile_id
+            FROM manual_payment_profile_links_latest
+        ) AS manual_links
+        ON payments.payment_id = manual_links.linked_payment_id
+
+NODE current_reporting_conversion_facts
+SQL >
+    SELECT * FROM server_form_conversion_facts
+    UNION ALL
+    SELECT * FROM client_form_and_historical_payment_conversion_facts
+    UNION ALL
+    SELECT * FROM native_order_conversion_facts
+    UNION ALL
+    SELECT * FROM server_payment_conversion_facts

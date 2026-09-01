@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Narrow immutable identity-mapping baseline for bulk reporting joins. Activated
+    journal changes are overlaid at read time, so recurring identity stays live.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `identifier_key` String `json:$.identifier_key`,
+    `profile_id` String `json:$.profile_id`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, identifier_key
+ENGINE_SETTINGS "index_granularity=128"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/migration_seed/identity_mapping_serving/snapshot_at=20260826230500/*.parquet
+IMPORT_SCHEDULE @on-demand
+IMPORT_FORMAT parquet

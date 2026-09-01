@@ -1,0 +1,81 @@
+DESCRIPTION >
+    Current order-completed contract over physical version state.
+
+NODE recently_ingested_order_completed_keys
+SQL >
+    %
+    SELECT tenant_id, __tb_state_key
+    FROM jitsu_order_completed_versions
+    WHERE
+        {{ String(p_identity_producer, 'all') }} = 'source_identity:segment_order_completed'
+        AND __tb_state_key != ''
+        AND source_ingested_at
+        >= toDateTime64({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    GROUP BY tenant_id, __tb_state_key
+
+NODE ranked_order_completed_versions
+SQL >
+    %
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.event_row_id
+            ORDER BY
+                source.source_priority DESC,
+                source.source_fact_version DESC,
+                source.source_ingested_at DESC,
+                source.payload_hash DESC
+        ) AS current_version_rank
+    FROM jitsu_order_completed_versions AS source
+    WHERE
+        {{ String(p_identity_producer, 'all') }} = 'all'
+        OR (
+            {{ String(p_identity_producer, 'all') }} = 'source_identity:segment_order_completed'
+            AND (source.tenant_id, source.__tb_state_key)
+            IN (SELECT tenant_id, __tb_state_key FROM recently_ingested_order_completed_keys)
+        )
+
+NODE current_order_completed_rows
+SQL >
+    SELECT
+        tenant_id,
+        event_row_id,
+        source_system,
+        event_id,
+        completed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        customer_name,
+        order_id,
+        checkout_id,
+        checkout_submission_id,
+        product_id,
+        product_name,
+        products,
+        value,
+        currency,
+        completion_basis,
+        is_payment_confirmed,
+        payment_status,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        form_id,
+        form_action,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_version
+    FROM ranked_order_completed_versions
+    WHERE current_version_rank = 1 AND source_deleted = 0

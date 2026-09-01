@@ -1,0 +1,191 @@
+DESCRIPTION >
+    Freeze one cursor window before any seed lookup. Later retry-safe Copies classify
+    changed facts and seed the prior profiles that those changes touch.
+
+NODE prepared_identity_compaction_rows
+SQL >
+    %
+    WITH
+        identity_compaction_prepare_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id,
+                parseDateTime64BestEffort(
+                    {{ String(p_cursor_ingested_at, '1970-01-01 00:00:00.000000') }}, 6
+                ) AS cursor_ingested_at,
+                {{
+                    String(
+                        p_cursor_event_id,
+                        '0000000000000000000000000000000000000000000000000000000000000000',
+                    )
+                }} AS cursor_event_id
+        ),
+        selected_identity_input_events AS (
+            SELECT
+                raw.tenant_id AS tenant_id,
+                raw.event_id AS event_id,
+                raw.producer_id AS producer_id,
+                raw.observed_at AS observed_at,
+                raw.ingested_at AS ingested_at,
+                raw.fact_kind AS fact_kind,
+                raw.fact_key AS fact_key,
+                raw.source_fact_version AS source_fact_version,
+                raw.fact_deleted AS fact_deleted,
+                raw.fact_payload_hash AS fact_payload_hash,
+                raw.fact_payload AS fact_payload,
+                raw.evidence_keys AS evidence_keys
+            FROM identity_events_cursor AS raw
+            INNER JOIN
+                identity_compaction_prepare_request AS request ON raw.tenant_id = request.tenant_id
+            WHERE
+                (raw.ingested_at, toString(raw.event_id))
+                > (request.cursor_ingested_at, request.cursor_event_id)
+            ORDER BY raw.ingested_at, raw.event_id
+            LIMIT {{ UInt64(p_batch_limit, 500) }}
+        ),
+        prepare_activated_identity_batches AS (
+            SELECT activated.*
+            FROM activated_identity_batches AS activated
+            INNER JOIN
+                identity_compaction_prepare_request AS request
+                ON activated.tenant_id = request.tenant_id
+        ),
+        selected_identity_input_summary AS (
+            SELECT
+                tenant_id,
+                count() AS input_event_count,
+                lower(
+                    hex(SHA256(arrayStringConcat(arraySort(groupArray(toString(event_id))), '|')))
+                ) AS input_hash,
+                max(ingested_at) AS checkpoint_ingested_at,
+                argMax(toString(event_id), tuple(ingested_at, event_id)) AS checkpoint_event_id
+            FROM selected_identity_input_events
+            GROUP BY tenant_id
+        ),
+        current_prepare_activation AS (
+            SELECT tenant_id, batch_version AS active_batch_version, batch_id AS active_batch_id
+            FROM prepare_activated_identity_batches
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC, batch_id DESC
+                )
+                = 1
+        ),
+        identity_compaction_prepare_metadata AS (
+            SELECT
+                request.tenant_id AS tenant_id,
+                request.batch_version AS batch_version,
+                request.batch_id AS batch_id,
+                now64(6) AS staged_at,
+                if(summary.tenant_id = '', toUInt64(0), summary.input_event_count) AS input_event_count,
+                if(summary.tenant_id = '', lower(hex(SHA256(''))), summary.input_hash) AS input_hash,
+                if(
+                    summary.tenant_id = '', request.cursor_ingested_at, summary.checkpoint_ingested_at
+                ) AS checkpoint_ingested_at,
+                if(
+                    summary.tenant_id = '', request.cursor_event_id, summary.checkpoint_event_id
+                ) AS checkpoint_event_id,
+                activation.active_batch_version AS active_batch_version,
+                activation.active_batch_id AS active_batch_id
+            FROM identity_compaction_prepare_request AS request
+            LEFT JOIN
+                selected_identity_input_summary AS summary ON request.tenant_id = summary.tenant_id
+            INNER JOIN
+                current_prepare_activation AS activation ON request.tenant_id = activation.tenant_id
+            WHERE request.batch_version > 0 AND request.batch_id != ''
+        ),
+        latest_selected_identity_facts AS (
+            SELECT *
+            FROM selected_identity_input_events
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, fact_kind, fact_key
+                    ORDER BY source_fact_version DESC, ingested_at DESC, event_id DESC
+                )
+                = 1
+        ),
+        prepared_metadata_stage_rows AS (
+            SELECT
+                metadata.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'metadata' AS stage_kind,
+                'metadata' AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(
+                    hex(SHA256(concat('prepare:', metadata.batch_id, ':', metadata.input_hash)))
+                ) AS stage_hash,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                metadata.active_batch_version AS active_batch_version,
+                metadata.active_batch_id AS active_batch_id,
+                '' AS producer_id,
+                toDateTime64(0, 6) AS observed_at,
+                '' AS fact_kind,
+                '' AS fact_key,
+                toUInt64(0) AS source_fact_version,
+                toUInt8(0) AS fact_deleted,
+                repeat('0', 64) AS fact_payload_hash,
+                '' AS fact_payload,
+                CAST([], 'Array(String)') AS evidence_keys,
+                toUInt8(0) AS stable_is_deleted,
+                toUInt8(0) AS stable_fact_deleted,
+                toDateTime64(0, 6) AS stable_fact_observed_at,
+                CAST([], 'Array(String)') AS stable_evidence_keys,
+                '' AS prior_profile_id
+            FROM identity_compaction_prepare_metadata AS metadata
+        ),
+        prepared_input_fact_stage_rows AS (
+            SELECT
+                facts.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'input_fact' AS stage_kind,
+                concat(
+                    facts.fact_kind, ':', toString(length(facts.fact_key)), ':', facts.fact_key
+                ) AS stage_key,
+                metadata.staged_at AS staged_at,
+                toString(facts.event_id) AS stage_hash,
+                metadata.input_event_count AS input_event_count,
+                metadata.input_hash AS input_hash,
+                metadata.checkpoint_ingested_at AS checkpoint_ingested_at,
+                metadata.checkpoint_event_id AS checkpoint_event_id,
+                metadata.active_batch_version AS active_batch_version,
+                metadata.active_batch_id AS active_batch_id,
+                facts.producer_id AS producer_id,
+                facts.observed_at AS observed_at,
+                facts.fact_kind AS fact_kind,
+                facts.fact_key AS fact_key,
+                facts.source_fact_version AS source_fact_version,
+                facts.fact_deleted AS fact_deleted,
+                facts.fact_payload_hash AS fact_payload_hash,
+                facts.fact_payload AS fact_payload,
+                facts.evidence_keys AS evidence_keys,
+                toUInt8(0) AS stable_is_deleted,
+                toUInt8(0) AS stable_fact_deleted,
+                toDateTime64(0, 6) AS stable_fact_observed_at,
+                CAST([], 'Array(String)') AS stable_evidence_keys,
+                '' AS prior_profile_id
+            FROM latest_selected_identity_facts AS facts
+            INNER JOIN
+                identity_compaction_prepare_metadata AS metadata ON facts.tenant_id = metadata.tenant_id
+        )
+    SELECT
+        * REPLACE(
+            CAST(stage_hash AS FixedString(64)) AS stage_hash,
+            CAST(input_hash AS FixedString(64)) AS input_hash,
+            CAST(checkpoint_event_id AS FixedString(64)) AS checkpoint_event_id,
+            CAST(fact_payload_hash AS FixedString(64)) AS fact_payload_hash
+        )
+    FROM
+        (
+            SELECT *
+            FROM prepared_metadata_stage_rows
+            UNION ALL
+            SELECT *
+            FROM prepared_input_fact_stage_rows
+        )

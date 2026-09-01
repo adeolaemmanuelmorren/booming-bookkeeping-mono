@@ -1,0 +1,69 @@
+DESCRIPTION >
+    Current active mappings for literal identifier keys.
+
+NODE requested_identity_worker_mapping_heads
+SQL >
+    %
+    WITH candidates AS (
+        SELECT
+            identifier_type,
+            identifier_value,
+            identifier_key,
+            profile_id,
+            first_seen_at,
+            last_seen_at,
+            is_deleted,
+            batch_version,
+            committed_at,
+            row_hash
+        FROM identity_state_seed_enriched
+        WHERE
+            tenant_id = {{ String(p_tenant_id, 'boom') }}
+            AND state_kind = 'mapping'
+            {% if defined(p_state_key) %}
+                AND state_key = {{ String(p_state_key) }}
+            {% else %}
+                AND state_key IN {{ Array(p_state_keys, 'String') }}
+            {% end %}
+        UNION ALL
+        SELECT
+            journal.identifier_type,
+            journal.identifier_value,
+            journal.identifier_key,
+            journal.profile_id,
+            journal.first_seen_at,
+            journal.last_seen_at,
+            journal.is_deleted,
+            journal.batch_version,
+            journal.committed_at,
+            journal.row_hash
+        FROM identity_state_delta_versions AS journal
+        INNER JOIN activated_identity_batches AS activated
+            ON journal.tenant_id = activated.tenant_id
+            AND journal.batch_version = activated.batch_version
+            AND journal.batch_id = activated.batch_id
+        WHERE
+            journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+            AND journal.state_kind = 'mapping'
+            {% if defined(p_identifier_key) %}
+                AND journal.lookup_key = {{ String(p_identifier_key) }}
+            {% else %}
+                AND journal.lookup_key IN {{ Array(p_identifier_keys, 'String') }}
+            {% end %}
+    )
+    SELECT
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        profile_id,
+        first_seen_at,
+        last_seen_at
+    FROM candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identifier_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        ) = 1
+        AND is_deleted = 0
+
+TYPE ENDPOINT

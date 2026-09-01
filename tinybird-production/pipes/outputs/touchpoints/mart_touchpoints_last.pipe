@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Last observed website touchpoint per resolved profile.
+
+NODE last_profile_touchpoints
+SQL >
+    SELECT *
+    FROM mart_touchpoints_all
+    WHERE profile_id IS NOT NULL
+    QUALIFY
+        row_number() OVER (PARTITION BY profile_id ORDER BY touchpoint_time DESC, touchpoint_id DESC)
+        = 1

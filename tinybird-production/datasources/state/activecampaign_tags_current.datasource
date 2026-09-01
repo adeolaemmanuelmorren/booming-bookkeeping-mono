@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Versioned current-state projection of ActiveCampaign tag definitions.
+
+SCHEMA >
+    `tag_id` String `json:$.tag_id`,
+    `tag_name` Nullable(String) `json:$.tag_name`,
+    `tag_created_at` Nullable(DateTime64(6)) `json:$.tag_created_at`,
+    `source_version` DateTime64(6) `json:$.source_version`,
+    `is_deleted` UInt8 `json:$.is_deleted`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY tag_id
+ENGINE_VER source_version

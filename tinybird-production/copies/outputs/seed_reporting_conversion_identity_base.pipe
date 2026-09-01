@@ -1,0 +1,12 @@
+DESCRIPTION >
+    One-time narrow conversion identity base from the frozen migration mart.
+
+NODE build_reporting_conversion_identity_base
+SQL >
+    SELECT conversion_id, any(profile_id) AS profile_id
+    FROM mart_conversions_with_touchpoints_current
+    GROUP BY conversion_id
+
+TYPE COPY
+TARGET_DATASOURCE reporting_conversion_identity_base
+COPY_MODE replace

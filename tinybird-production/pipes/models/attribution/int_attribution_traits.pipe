@@ -1,0 +1,43 @@
+DESCRIPTION >
+    First- and last-known attribution traits per resolved profile.
+
+NODE profile_attribution_trait_rows
+SQL >
+    SELECT
+        profile_id,
+        argMinIf(
+            ip_address, tuple(event_time, event_id), ip_address IS NOT NULL
+        ) AS first_known_ip_address,
+        argMaxIf(
+            ip_address, tuple(event_time, event_id), ip_address IS NOT NULL
+        ) AS last_known_ip_address,
+        argMinIf(
+            user_agent, tuple(event_time, event_id), user_agent IS NOT NULL
+        ) AS first_known_user_agent,
+        argMaxIf(
+            user_agent, tuple(event_time, event_id), user_agent IS NOT NULL
+        ) AS last_known_user_agent,
+        argMinIf(geo_city, tuple(event_time, event_id), geo_city IS NOT NULL) AS first_known_geo_city,
+        argMinIf(
+            geo_region, tuple(event_time, event_id), geo_region IS NOT NULL
+        ) AS first_known_geo_region,
+        argMinIf(
+            geo_country, tuple(event_time, event_id), geo_country IS NOT NULL
+        ) AS first_known_geo_country,
+        argMaxIf(geo_city, tuple(event_time, event_id), geo_city IS NOT NULL) AS last_known_geo_city,
+        argMaxIf(
+            geo_region, tuple(event_time, event_id), geo_region IS NOT NULL
+        ) AS last_known_geo_region,
+        argMaxIf(
+            geo_country, tuple(event_time, event_id), geo_country IS NOT NULL
+        ) AS last_known_geo_country,
+        argMinIf(fbc, tuple(event_time, event_id), fbc IS NOT NULL) AS first_known_fbc,
+        argMinIf(fbp, tuple(event_time, event_id), fbp IS NOT NULL) AS first_known_fbp,
+        argMinIf(uetsid, tuple(event_time, event_id), uetsid IS NOT NULL) AS first_known_uetsid,
+        argMinIf(uetvid, tuple(event_time, event_id), uetvid IS NOT NULL) AS first_known_uetvid,
+        argMaxIf(fbc, tuple(event_time, event_id), fbc IS NOT NULL) AS last_known_fbc,
+        argMaxIf(fbp, tuple(event_time, event_id), fbp IS NOT NULL) AS last_known_fbp,
+        argMaxIf(uetsid, tuple(event_time, event_id), uetsid IS NOT NULL) AS last_known_uetsid,
+        argMaxIf(uetvid, tuple(event_time, event_id), uetvid IS NOT NULL) AS last_known_uetvid
+    FROM int_attribution_events
+    GROUP BY profile_id

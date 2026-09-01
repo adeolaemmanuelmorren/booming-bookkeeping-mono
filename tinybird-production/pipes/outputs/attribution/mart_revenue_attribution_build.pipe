@@ -1,0 +1,171 @@
+DESCRIPTION >
+    Exact canonical payment revenue attributed to browser touchpoints, including
+    explicit classifications for payments without linked browser history.
+
+NODE payment_touchpoint_rows
+SQL >
+    SELECT
+        conversion_rows.conversion_id AS conversion_id,
+        conversion_rows.profile_id AS profile_id,
+        conversion_rows.conversion_time AS conversion_time,
+        conversion_rows.conversion_source AS conversion_source,
+        conversion_rows.conversion_type AS conversion_type,
+        conversion_rows.form_submissions_server_side AS form_submissions_server_side,
+        conversion_rows.krc_registrations_server_side AS krc_registrations_server_side,
+        conversion_rows.form_submissions_client_side AS form_submissions_client_side,
+        conversion_rows.order_completed_server_side AS order_completed_server_side,
+        conversion_rows.order_completed_client_side AS order_completed_client_side,
+        conversion_rows.payments_server_side AS payments_server_side,
+        conversion_rows.payments_client_side AS payments_client_side,
+        conversion_rows.revenue_client_side AS revenue_client_side,
+        conversion_rows.customers_server_side AS customers_server_side,
+        conversion_rows.bbb_buyers_server_side AS bbb_buyers_server_side,
+        conversion_rows.bbb_revenue_server_side AS bbb_revenue_server_side,
+        conversion_rows.payments_vip_server_side AS payments_vip_server_side,
+        conversion_rows.payments_book_server_side AS payments_book_server_side,
+        conversion_rows.payments_mentorship_server_side AS payments_mentorship_server_side,
+        conversion_rows.payments_kajabi_server_side AS payments_kajabi_server_side,
+        conversion_rows.payments_catalog_server_side AS payments_catalog_server_side,
+        conversion_rows.payments_unknown_server_side AS payments_unknown_server_side,
+        conversion_rows.revenue_vip_server_side AS revenue_vip_server_side,
+        conversion_rows.revenue_book_server_side AS revenue_book_server_side,
+        conversion_rows.revenue_mentorship_server_side AS revenue_mentorship_server_side,
+        conversion_rows.revenue_kajabi_server_side AS revenue_kajabi_server_side,
+        conversion_rows.revenue_catalog_server_side AS revenue_catalog_server_side,
+        conversion_rows.revenue_unknown_server_side AS revenue_unknown_server_side,
+        conversion_rows.touchpoint_id AS touchpoint_id,
+        conversion_rows.session_id AS session_id,
+        conversion_rows.session_start_timestamp AS session_start_timestamp,
+        conversion_rows.landing_page_host AS landing_page_host,
+        conversion_rows.landing_page_path AS landing_page_path,
+        conversion_rows.source AS source,
+        conversion_rows.medium AS medium,
+        conversion_rows.utm_campaign AS utm_campaign,
+        conversion_rows.utm_content AS utm_content,
+        conversion_rows.utm_term AS utm_term,
+        conversion_rows.campaign_id AS campaign_id,
+        conversion_rows.adset_id AS adset_id,
+        conversion_rows.ad_id AS ad_id,
+        conversion_rows.campaign_name AS campaign_name,
+        conversion_rows.adset_name AS adset_name,
+        conversion_rows.ad_name AS ad_name,
+        conversion_rows.is_direct_touch AS is_direct_touch,
+        conversion_rows.is_paid_ad_touch AS is_paid_ad_touch,
+        conversion_rows.total_touchpoints AS total_touchpoints,
+        conversion_rows.touchpoint_number AS touchpoint_number,
+        conversion_rows.is_excluded_direct_touch AS is_excluded_direct_touch,
+        conversion_rows.non_direct_touchpoints AS non_direct_touchpoints,
+        conversion_rows.non_direct_touchpoint_number AS non_direct_touchpoint_number,
+        conversion_rows.attribution_touchpoints AS attribution_touchpoints,
+        conversion_rows.attribution_touchpoint_number AS attribution_touchpoint_number,
+        conversion_rows.first_touch_is_direct AS first_touch_is_direct,
+        conversion_rows.excluded_direct_touchpoints AS excluded_direct_touchpoints,
+        conversion_rows.paid_ad_touchpoints AS paid_ad_touchpoints,
+        conversion_rows.paid_ad_touchpoint_number AS paid_ad_touchpoint_number,
+        conversion_rows.journey_direct_status AS journey_direct_status,
+        conversion_rows.multi_touch_weight AS multi_touch_weight,
+        conversion_rows.first_touch_weight AS first_touch_weight,
+        conversion_rows.last_touch_weight AS last_touch_weight,
+        conversion_rows.paid_multi_touch_weight AS paid_multi_touch_weight,
+        conversion_rows.paid_first_touch_weight AS paid_first_touch_weight,
+        conversion_rows.paid_last_touch_weight AS paid_last_touch_weight,
+        conversion_rows.touchpoint_channel_label AS touchpoint_channel_label,
+        conversion_rows.revenue_first_touch_decimal AS revenue_first_touch_decimal,
+        conversion_rows.revenue_last_touch_decimal AS revenue_last_touch_decimal,
+        conversion_rows.revenue_multi_touch_decimal AS revenue_multi_touch_decimal,
+        conversion_rows.revenue_server_side_decimal AS revenue_server_side,
+        payment_rows.payment_source AS payment_source,
+        payment_rows.payment_id AS payment_id,
+        payment_rows.payment_time AS payment_time,
+        payment_rows.payment_category AS payment_category,
+        payment_rows.product_name AS product_name,
+        payment_rows.subscription_id AS subscription_id,
+        payment_rows.payment_link_id AS payment_link_id,
+        timing_rows.payment_plan_started_at AS payment_plan_started_at,
+        toLowCardinality(timing_rows.payment_plan_start_method)
+            AS payment_plan_start_method,
+        toLowCardinality(timing_rows.payment_plan_tracking_status)
+            AS payment_plan_tracking_status
+    FROM reporting_current_journey_rows AS conversion_rows
+    INNER JOIN
+        mart_payments AS payment_rows
+        ON conversion_rows.conversion_id
+        = concat('server_payment:', payment_rows.payment_source, ':', payment_rows.payment_id)
+    INNER JOIN
+        int_payment_plan_timing AS timing_rows
+        ON timing_rows.payment_source = payment_rows.payment_source
+        AND timing_rows.payment_id = payment_rows.payment_id
+
+NODE classified_revenue_attribution_rows
+SQL >
+    SELECT
+        payment_rows.*,
+        toDate(assumeNotNull(payment_rows.payment_time), 'America/Los_Angeles') AS conversion_date,
+        toDate(payment_rows.session_start_timestamp, 'America/Los_Angeles') AS click_date,
+        toLowCardinality(
+            multiIf(
+                payment_rows.touchpoint_id IS NOT NULL,
+                'browser_touchpoint',
+                payment_rows.payment_source = 'stripe_kajabi'
+                AND payment_rows.payment_plan_tracking_status = 'historical_before_jitsu',
+                'historical_kajabi_subscription',
+                payment_rows.payment_source = 'stripe'
+                AND payment_rows.payment_plan_tracking_status = 'historical_before_jitsu',
+                'historical_stripe_payment_plan',
+                payment_rows.payment_source = 'stripe_kajabi',
+                'kajabi_no_linked_touchpoint',
+                'stripe_no_linked_touchpoint'
+            )
+        ) AS attribution_class
+    FROM payment_touchpoint_rows AS payment_rows
+
+NODE revenue_attribution_rows
+SQL >
+    SELECT
+        classified_rows.* EXCEPT (
+            touchpoint_channel_label,
+            revenue_first_touch_decimal,
+            revenue_last_touch_decimal,
+            revenue_multi_touch_decimal
+        ),
+        multiIf(
+            classified_rows.attribution_class = 'historical_kajabi_subscription',
+            'No linked touchpoint / historical Kajabi subscriptions',
+            classified_rows.attribution_class = 'historical_stripe_payment_plan',
+            'No linked touchpoint / historical Stripe payment plans',
+            classified_rows.attribution_class = 'kajabi_no_linked_touchpoint',
+            'No linked touchpoint / Kajabi payments',
+            classified_rows.attribution_class = 'stripe_no_linked_touchpoint',
+            'No linked touchpoint / Stripe payments',
+            classified_rows.touchpoint_channel_label
+        ) AS attribution_label,
+        multiIf(
+            classified_rows.attribution_class = 'historical_kajabi_subscription',
+            'Subscription began before production browser tracking, so its acquisition cannot be attributed retroactively.',
+            classified_rows.attribution_class = 'historical_stripe_payment_plan',
+            'Stripe payment plan began before production browser tracking, so its acquisition cannot be attributed retroactively.',
+            classified_rows.attribution_class = 'kajabi_no_linked_touchpoint',
+            'Kajabi payment occurred during the tracking era but has no linked browser touchpoint.',
+            classified_rows.attribution_class = 'stripe_no_linked_touchpoint',
+            'Stripe payment occurred during the tracking era but has no linked browser touchpoint.',
+            classified_rows.touchpoint_channel_label = 'meta / paid',
+            'First known touchpoint was a Meta paid ad.',
+            classified_rows.touchpoint_channel_label IN ('google / cpc', 'google / paid'),
+            'First known touchpoint was a Google paid ad.',
+            classified_rows.source = 'direct' AND classified_rows.medium = 'none',
+            'Browser history exists, but the first touch had no campaign or referrer attribution.',
+            classified_rows.touchpoint_channel_label = 'meta / organic',
+            'First known touchpoint was a Meta property without paid-ad identification.',
+            classified_rows.touchpoint_channel_label IN (
+                'google / organic',
+                'bing / organic',
+                'youtube / organic',
+                'trustpilot / referral'
+            ),
+            'First known touchpoint was an unpaid referral or organic source.',
+            'Revenue attributed to the linked browser channel and medium.'
+        ) AS attribution_description,
+        classified_rows.revenue_first_touch_decimal AS revenue_first_touch,
+        classified_rows.revenue_last_touch_decimal AS revenue_last_touch,
+        classified_rows.revenue_multi_touch_decimal AS revenue_multi_touch
+    FROM classified_revenue_attribution_rows AS classified_rows

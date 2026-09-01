@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Latest ActiveCampaign tag definition state at one row per tag.
+
+NODE current_activecampaign_tags
+SQL >
+    SELECT
+        tag_id,
+        nullIf(trim(tag_name), '') AS tag_name,
+        tag_created_at,
+        source_version,
+        is_deleted = 1 AS is_deleted
+    FROM activecampaign_tags_current FINAL

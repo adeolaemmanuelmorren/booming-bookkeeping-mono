@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Stripe product sales summarized by source, rule, occurrence type, and local date.
+
+NODE product_sales_rows
+SQL >
+    SELECT
+        payment_date,
+        payment_source,
+        product_rule,
+        product_id,
+        product_name,
+        product_variant,
+        payment_occurrence_type,
+        is_repeat_payment,
+        count() AS payments,
+        uniqExact(customer_id) AS customers,
+        sum(amount_paid) AS gross_revenue,
+        sum(refund_amount) AS refunds,
+        sum(net_amount) AS net_revenue
+    FROM mart_payments
+    GROUP BY
+        payment_date,
+        payment_source,
+        product_rule,
+        product_id,
+        product_name,
+        product_variant,
+        payment_occurrence_type,
+        is_repeat_payment

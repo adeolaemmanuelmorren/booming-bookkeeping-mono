@@ -1,0 +1,90 @@
+DESCRIPTION >
+    Current resolved profiles from the flat identity snapshot plus activated delta.
+
+NODE current_profile_rows
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.profile_id, delta.profile_id) AS profile_id,
+        if(delta.state_key = '', base.profile_key, delta.profile_key) AS profile_key,
+        if(
+            delta.state_key = '', base.winner_identifier_key, delta.winner_identifier_key
+        ) AS winner_identifier_key,
+        if(
+            delta.state_key = '', base.member_identifier_keys, delta.member_identifier_keys
+        ) AS member_identifier_keys,
+        if(delta.state_key = '', base.anonymous_ids, delta.anonymous_ids) AS anonymous_ids,
+        if(delta.state_key = '', base.user_ids, delta.user_ids) AS user_ids,
+        if(delta.state_key = '', base.emails, delta.emails) AS emails,
+        if(delta.state_key = '', base.phones, delta.phones) AS phones,
+        if(
+            delta.state_key = '', base.historical_profile_ids, delta.historical_profile_ids
+        ) AS historical_profile_ids,
+        if(delta.state_key = '', base.first_name, delta.first_name) AS first_name,
+        if(delta.state_key = '', base.last_name, delta.last_name) AS last_name,
+        if(delta.state_key = '', base.first_seen_at, delta.first_seen_at) AS first_seen_at,
+        if(delta.state_key = '', base.last_seen_at, delta.last_seen_at) AS last_seen_at,
+        if(delta.state_key = '', base.batch_version, delta.batch_version) AS batch_version,
+        if(delta.state_key = '', base.committed_at, delta.committed_at) AS committed_at
+    FROM
+        (
+            SELECT
+                tenant_id,
+                state_key,
+                profile_id,
+                profile_key,
+                winner_identifier_key,
+                member_identifier_keys,
+                anonymous_ids,
+                user_ids,
+                emails,
+                phones,
+                historical_profile_ids,
+                first_name,
+                last_name,
+                first_seen_at,
+                last_seen_at,
+                batch_version,
+                committed_at
+            FROM identity_state_seed_enriched
+            WHERE state_kind = 'profile'
+        ) AS base
+    FULL OUTER JOIN
+        (
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.state_key AS state_key,
+                journal.is_deleted AS is_deleted,
+                journal.profile_id AS profile_id,
+                journal.profile_key AS profile_key,
+                journal.winner_identifier_key AS winner_identifier_key,
+                journal.member_identifier_keys AS member_identifier_keys,
+                journal.anonymous_ids AS anonymous_ids,
+                journal.user_ids AS user_ids,
+                journal.emails AS emails,
+                journal.phones AS phones,
+                journal.historical_profile_ids AS historical_profile_ids,
+                journal.first_name AS first_name,
+                journal.last_name AS last_name,
+                journal.first_seen_at AS first_seen_at,
+                journal.last_seen_at AS last_seen_at,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE journal.state_kind = 'profile'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY journal.tenant_id, journal.lookup_key, journal.sub_key
+                    ORDER BY
+                        journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+                )
+                = 1
+        ) AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.state_key = delta.state_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0

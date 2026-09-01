@@ -1,0 +1,62 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bigquery-tinybird-sync",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "observability": {
+    "enabled": true
+  },
+  "upload_source_maps": true,
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TINYBIRD_SYNC_GATE",
+        "class_name": "TinybirdSyncGate"
+      },
+      {
+        "name": "PUBLICATION_COORDINATOR",
+        "class_name": "PublicationCoordinator"
+      },
+      {
+        "name": "JOURNEY_COORDINATOR",
+        "class_name": "JourneyCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["TinybirdSyncGate"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["PublicationCoordinator"]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": ["JourneyCoordinator"]
+    }
+  ],
+  "vars": {
+    "BIGQUERY_PROJECT_ID": "able-folio-499722",
+    "BIGQUERY_LOCATION": "US",
+    "GCS_BUCKET": "booming-data",
+    "GCS_PREFIX": "tinybird",
+    "TINYBIRD_API_URL": "https://api.us-east.tinybird.co",
+    "TINYBIRD_FETCH_TIMEOUT_MS": "30000",
+    "TINYBIRD_GATE_TIMEOUT_MS": "180000",
+    "COPY_POLL_INTERVAL_MS": "5000",
+    "COPY_JOB_TIMEOUT_MS": "3600000",
+    "IDENTITY_BOOTSTRAP_SOURCE_INGESTED_FROM": "2026-08-26 23:05:00",
+    "EXPORT_OVERLAP_MINUTES": "20",
+    "BIGQUERY_POLL_INTERVAL_MS": "5000",
+    "BIGQUERY_JOB_TIMEOUT_MS": "480000"
+  }
+}

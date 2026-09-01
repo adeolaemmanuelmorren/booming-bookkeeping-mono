@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Append-only canonical identify versions. The reader
+    resolves source precedence, revisions, and deletion tombstones at query time.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_system` LowCardinality(String) `json:$.source_system`,
+    `source_priority` UInt8 `json:$.source_priority`,
+    `source_deleted` UInt8 `json:$.source_deleted`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `source_ingested_at` DateTime64(6) `json:$.source_ingested_at`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`,
+    `identify_id` Nullable(String) `json:$.identify_id`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `identified_at` Nullable(DateTime64(6)) `json:$.identified_at`,
+    `ip_address` Nullable(String) `json:$.ip_address`,
+    `user_agent` Nullable(String) `json:$.user_agent`,
+    `geo_city` Nullable(String) `json:$.geo_city`,
+    `geo_region` Nullable(String) `json:$.geo_region`,
+    `geo_country` Nullable(String) `json:$.geo_country`,
+    `source_version` Nullable(DateTime64(6)) `json:$.source_version`,
+    `__tb_state_key` String `json:$.__tb_state_key` DEFAULT ifNull(identify_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, __tb_state_key, source_priority, source_fact_version, source_ingested_at, payload_hash

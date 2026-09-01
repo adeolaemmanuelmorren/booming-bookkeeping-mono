@@ -1,0 +1,197 @@
+DESCRIPTION >
+    Compact reporting resolver over the identity-neutral Stripe payment snapshot.
+    Manual links remain authoritative; otherwise email wins over normalized NANP phone.
+
+NODE reporting_payment_facts
+SQL >
+    WITH
+        replaceRegexpAll(trimBoth(ifNull(payment_phone, '')), '[^0-9]', '') AS phone_digits,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    SELECT
+        payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        billing_address_line_1,
+        billing_address_city,
+        billing_address_region,
+        billing_address_zip,
+        billing_address_country,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        product_variant,
+        price_id,
+        plan_id,
+        product_rule,
+        product_classification_method,
+        is_product_classified,
+        is_bbb_mentorship_installment,
+        payment_sequence_number,
+        payment_occurrence_type,
+        is_repeat_payment,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        checkout_session_id,
+        payment_link_id,
+        invoice_billing_reason,
+        checkout_mode,
+        has_discount,
+        discount_amount,
+        discount_ids,
+        coupon_ids,
+        coupon_names,
+        promotion_code_ids,
+        promotion_codes,
+        coupon_amount_off,
+        coupon_percent_off,
+        charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        payment_intent_description,
+        invoice_description,
+        book_product_text,
+        receipt_url,
+        livemode,
+        product_complete_name,
+        content_ids,
+        coalesce(
+            if(
+                payment_email IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('email:', payment_email)
+            ),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS identity_anchor_key
+    FROM all_stripe_payments_current
+
+NODE reporting_payment_identity_candidates
+SQL >
+    SELECT
+        facts.*,
+        nullIf(identity_mapping.profile_id, '') AS automatic_profile_id,
+        nullIf(manual.manual_profile_id, '') AS manual_profile_id,
+        coalesce(
+            nullIf(manual.manual_profile_id, ''), nullIf(identity_mapping.profile_id, '')
+        ) AS profile_id,
+        if(
+            nullIf(manual.manual_profile_id, '') IS NULL,
+            CAST(NULL AS Nullable(DateTime64(6))),
+            manual.manual_link_created_at
+        ) AS manual_link_created_at,
+        manual.manual_link_created_by AS manual_link_created_by
+    FROM reporting_payment_facts AS facts
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = 'boom'
+        AND identity_mapping.identifier_key = facts.identity_anchor_key
+    LEFT JOIN
+        (
+            SELECT
+                payment_id AS linked_payment_id,
+                manual_profile_id,
+                manual_link_created_at,
+                manual_link_created_by
+            FROM manual_payment_profile_links_latest
+        ) AS manual
+        ON facts.payment_id = manual.linked_payment_id
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY facts.payment_source, facts.payment_id
+            ORDER BY automatic_profile_id ASC NULLS FIRST
+        ) = 1
+
+NODE current_reporting_resolved_payments
+SQL >
+    SELECT
+        resolved_payment_rows.* EXCEPT (payment_id),
+        resolved_payment_rows.payment_id AS payment_id,
+        multiIf(
+            resolved_payment_rows.payment_source = 'stripe_kajabi',
+            'kajabi',
+            resolved_payment_rows.is_bbb_mentorship_installment = 1,
+            'mentorship',
+            resolved_payment_rows.product_rule IN (
+                'structured_basic_vip',
+                'structured_keyboard_rich_challenge',
+                'keyboard_rich_challenge_vip'
+            ),
+            'vip',
+            resolved_payment_rows.product_rule IN ('keyboard_rich_book', 'top_tax_loopholes'),
+            'book',
+            resolved_payment_rows.product_rule IN (
+                'mentorship_deposit',
+                'mentorship_full_payment',
+                'mentorship_3x1997',
+                'mentorship_balance'
+            ),
+            'mentorship',
+            resolved_payment_rows.product_rule = 'catalog_product',
+            'catalog',
+            'unknown'
+        ) AS payment_category,
+        multiIf(
+            resolved_payment_rows.manual_profile_id IS NOT NULL,
+            'manual',
+            resolved_payment_rows.automatic_profile_id IS NOT NULL,
+            'automatic',
+            'unattributed'
+        ) AS attribution_method,
+        coalesce(
+            nullIf(profiles.first_name, ''),
+            if(
+                resolved_payment_rows.payment_name IS NULL,
+                CAST(NULL AS Nullable(String)),
+                nullIf(
+                    arrayElement(
+                        splitByChar(' ', assumeNotNull(resolved_payment_rows.payment_name)), 1
+                    ),
+                    ''
+                )
+            )
+        ) AS first_name,
+        coalesce(
+            nullIf(profiles.last_name, ''),
+            if(
+                resolved_payment_rows.payment_name IS NULL,
+                CAST(NULL AS Nullable(String)),
+                nullIf(
+                    arrayElement(
+                        splitByChar(' ', assumeNotNull(resolved_payment_rows.payment_name)), -1
+                    ),
+                    ''
+                )
+            )
+        ) AS last_name
+    FROM reporting_payment_identity_candidates AS resolved_payment_rows
+    LEFT JOIN reporting_current_identity_profiles_direct AS profiles
+        ON profiles.profile_id = resolved_payment_rows.profile_id

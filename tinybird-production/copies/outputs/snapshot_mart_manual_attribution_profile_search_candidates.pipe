@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Atomically replace manual-attribution profile search candidates after identity activation.
+
+NODE build_manual_attribution_profile_search_candidates_snapshot
+SQL >
+    SELECT
+        candidate_rows.*,
+        ifNull(candidate_rows.candidate_id, '') AS __tb_sort_candidate_id
+    FROM mart_manual_attribution_profile_search_candidates_build AS candidate_rows
+
+TYPE COPY
+TARGET_DATASOURCE mart_manual_attribution_profile_search_candidates_current
+COPY_MODE replace

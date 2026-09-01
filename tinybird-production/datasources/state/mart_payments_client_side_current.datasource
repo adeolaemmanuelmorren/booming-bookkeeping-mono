@@ -1,0 +1,38 @@
+DESCRIPTION >
+    Replace-mode boundary for client-side payment submissions.
+
+SCHEMA >
+    `client_payment_id` String `json:$.client_payment_id`,
+    `event_id` Nullable(String) `json:$.event_id`,
+    `source_row_id` Nullable(String) `json:$.source_row_id`,
+    `source_event_name` String `json:$.source_event_name`,
+    `event_source` String `json:$.event_source`,
+    `payment_time` Nullable(DateTime64(6)) `json:$.payment_time`,
+    `profile_id` Nullable(String) `json:$.profile_id`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `customer_name` Nullable(String) `json:$.customer_name`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `product_name` Nullable(String) `json:$.product_name`,
+    `amount` Nullable(Decimal(38, 9)) `json:$.amount`,
+    `currency` Nullable(String) `json:$.currency`,
+    `completion_basis` String `json:$.completion_basis`,
+    `is_payment_confirmed` Bool `json:$.is_payment_confirmed`,
+    `payment_status` String `json:$.payment_status`,
+    `product_amount_source` String `json:$.product_amount_source`,
+    `stripe_payment_method_id` Nullable(String) `json:$.stripe_payment_method_id`,
+    `payment_method_type` Nullable(String) `json:$.payment_method_type`,
+    `payment_provider` Nullable(String) `json:$.payment_provider`,
+    `page_url` Nullable(String) `json:$.page_url`,
+    `page_path` Nullable(String) `json:$.page_path`,
+    `ip_address` Nullable(String) `json:$.ip_address`,
+    `user_agent` Nullable(String) `json:$.user_agent`,
+    `geo_city` Nullable(String) `json:$.geo_city`,
+    `geo_region` Nullable(String) `json:$.geo_region`,
+    `geo_country` Nullable(String) `json:$.geo_country`,
+    `__tb_sort_client_payment_id` String `json:$.__tb_sort_client_payment_id` DEFAULT client_payment_id
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY __tb_sort_client_payment_id

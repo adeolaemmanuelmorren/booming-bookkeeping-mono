@@ -1,0 +1,218 @@
+DESCRIPTION >
+    Freeze the retained fact keys linked to one affected identity scope.
+
+NODE selected_identity_compaction_fact_keys
+SQL >
+    %
+    WITH
+        fact_keys_request AS (
+            SELECT
+                {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+                {{ UInt64(p_batch_version, 0) }} AS batch_version,
+                {{ String(p_batch_id, '') }} AS batch_id
+        ),
+        selected_prepared_metadata AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                fact_keys_request AS request
+                ON prepared.tenant_id = request.tenant_id
+                AND prepared.batch_version = request.batch_version
+                AND prepared.batch_id = request.batch_id
+            WHERE prepared.stage_kind = 'metadata'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.batch_version, prepared.batch_id
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                ) = 1
+        ),
+        selected_prepared_changes AS (
+            SELECT prepared.*
+            FROM identity_compaction_changes_stage AS prepared
+            INNER JOIN
+                selected_prepared_metadata AS metadata
+                ON prepared.tenant_id = metadata.tenant_id
+                AND prepared.batch_version = metadata.batch_version
+                AND prepared.batch_id = metadata.batch_id
+                AND prepared.input_hash = metadata.input_hash
+            WHERE prepared.stage_kind = 'changed_fact'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY prepared.tenant_id, prepared.stage_kind, prepared.stage_key
+                    ORDER BY prepared.staged_at, prepared.stage_hash
+                ) = 1
+        ),
+        selected_scope_metadata AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                selected_prepared_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            WHERE scoped.stage_kind = 'scope_metadata'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY scoped.tenant_id, scoped.batch_version, scoped.batch_id
+                    ORDER BY scoped.staged_at, scoped.stage_hash
+                ) = 1
+        ),
+        selected_scope_rows AS (
+            SELECT scoped.*
+            FROM identity_compaction_scope_stage AS scoped
+            INNER JOIN
+                selected_scope_metadata AS metadata
+                ON scoped.tenant_id = metadata.tenant_id
+                AND scoped.batch_version = metadata.batch_version
+                AND scoped.batch_id = metadata.batch_id
+                AND scoped.input_hash = metadata.input_hash
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY scoped.tenant_id, scoped.stage_kind, scoped.stage_key
+                    ORDER BY scoped.staged_at, scoped.stage_hash
+                ) = 1
+        ),
+        affected_identifier_keys AS (
+            SELECT changed.tenant_id AS tenant_id, identifier_key
+            FROM selected_prepared_changes AS changed ARRAY
+            JOIN changed.stable_evidence_keys AS identifier_key
+            WHERE
+                changed.stable_is_deleted = 0
+                AND changed.stable_fact_deleted = 0
+                AND position(identifier_key, ':') > 1
+            UNION DISTINCT
+            SELECT changed.tenant_id AS tenant_id, identifier_key
+            FROM selected_prepared_changes AS changed ARRAY
+            JOIN changed.evidence_keys AS identifier_key
+            WHERE changed.fact_deleted = 0 AND position(identifier_key, ':') > 1
+            UNION DISTINCT
+            SELECT scoped.tenant_id AS tenant_id, identifier_key
+            FROM selected_scope_rows AS scoped ARRAY
+            JOIN scoped.member_identifier_keys AS identifier_key
+            WHERE scoped.stage_kind = 'touched_profile'
+            UNION DISTINCT
+            SELECT tenant_id, identifier_key
+            FROM selected_scope_rows
+            WHERE stage_kind = 'current_mapping'
+        ),
+        activated_batches AS (
+            SELECT tenant_id, batch_version, batch_id
+            FROM (
+                SELECT
+                    journal.tenant_id AS tenant_id,
+                    journal.batch_version AS batch_version,
+                    journal.batch_id AS batch_id,
+                    journal.committed_at AS committed_at,
+                    journal.row_hash AS row_hash,
+                    metadata.active_batch_version AS active_batch_version,
+                    metadata.active_batch_id AS active_batch_id
+                FROM identity_state_delta_versions AS journal
+                INNER JOIN selected_prepared_metadata AS metadata
+                    ON journal.tenant_id = metadata.tenant_id
+                WHERE journal.state_kind = 'activation_audit' AND journal.is_deleted = 0
+                QUALIFY
+                    row_number() OVER (
+                        PARTITION BY journal.tenant_id, journal.batch_version
+                        ORDER BY
+                            journal.committed_at DESC, journal.row_hash DESC, journal.batch_id DESC
+                    ) = 1
+            ) AS activated
+            WHERE
+                activated.batch_version < activated.active_batch_version
+                OR (
+                    activated.batch_version = activated.active_batch_version
+                    AND activated.batch_id = activated.active_batch_id
+                )
+        ),
+        candidate_evidence_versions AS (
+            SELECT
+                base.tenant_id AS tenant_id,
+                base.identifier_key AS identifier_key,
+                base.fact_key AS fact_key,
+                toUInt8(0) AS is_deleted,
+                base.base_batch_version AS batch_version,
+                base.committed_at AS committed_at,
+                base.row_hash AS row_hash
+            FROM identity_fact_evidence_seed AS base
+            WHERE
+                (base.tenant_id, base.identifier_key)
+                IN (SELECT tenant_id, identifier_key FROM affected_identifier_keys)
+            UNION ALL
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.identifier_key AS identifier_key,
+                journal.fact_key AS fact_key,
+                journal.is_deleted AS is_deleted,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at,
+                journal.row_hash AS row_hash
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN activated_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE
+                journal.state_kind = 'evidence'
+                AND (journal.tenant_id, journal.lookup_key)
+                IN (SELECT tenant_id, identifier_key FROM affected_identifier_keys)
+        ),
+        latest_evidence_versions AS (
+            SELECT *
+            FROM candidate_evidence_versions
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY tenant_id, identifier_key, fact_key
+                    ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+                ) = 1
+        ),
+        retained_fact_keys AS (
+            SELECT tenant_id, fact_key
+            FROM latest_evidence_versions
+            WHERE is_deleted = 0
+            GROUP BY tenant_id, fact_key
+            UNION DISTINCT
+            SELECT tenant_id, fact_key
+            FROM selected_prepared_changes
+        ),
+        metadata_rows AS (
+            SELECT
+                metadata.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'metadata' AS stage_kind,
+                'metadata' AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(hex(SHA256(concat('fact_keys:', metadata.batch_id, ':', metadata.input_hash)))) AS row_hash,
+                metadata.input_hash AS input_hash,
+                '' AS fact_key
+            FROM selected_prepared_metadata AS metadata
+            INNER JOIN selected_scope_metadata AS scoped
+                ON metadata.tenant_id = scoped.tenant_id
+                AND metadata.batch_version = scoped.batch_version
+                AND metadata.batch_id = scoped.batch_id
+                AND metadata.input_hash = scoped.input_hash
+        ),
+        fact_key_rows AS (
+            SELECT
+                keys.tenant_id AS tenant_id,
+                metadata.batch_version AS batch_version,
+                metadata.batch_id AS batch_id,
+                'fact_key' AS stage_kind,
+                keys.fact_key AS stage_key,
+                metadata.staged_at AS staged_at,
+                lower(hex(SHA256(concat('fact_key:', keys.fact_key, ':', metadata.input_hash)))) AS row_hash,
+                metadata.input_hash AS input_hash,
+                keys.fact_key AS fact_key
+            FROM retained_fact_keys AS keys
+            INNER JOIN selected_prepared_metadata AS metadata ON keys.tenant_id = metadata.tenant_id
+        )
+    SELECT * REPLACE(
+        CAST(row_hash AS FixedString(64)) AS row_hash,
+        CAST(input_hash AS FixedString(64)) AS input_hash
+    )
+    FROM (
+        SELECT * FROM metadata_rows
+        UNION ALL
+        SELECT * FROM fact_key_rows
+    )

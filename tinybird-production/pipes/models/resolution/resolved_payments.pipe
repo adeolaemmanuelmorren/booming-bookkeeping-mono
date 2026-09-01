@@ -1,0 +1,199 @@
+DESCRIPTION >
+    Canonical successful payments resolved to the active identity generation. Email
+    wins over normalized NANP phone unless a literal manual profile override exists.
+
+NODE payment_phone_digits
+SQL >
+    SELECT
+        payment_rows.*,
+        replaceRegexpAll(trimBoth(ifNull(payment_rows.payment_phone, '')), '[^0-9]', '') AS phone_digits
+    FROM all_stripe_payments_adapter AS payment_rows
+
+NODE payment_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM payment_phone_digits
+
+NODE normalized_payment_identifiers
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(
+                national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS normalized_phone
+    FROM payment_national_phones
+
+NODE automatically_resolved_payment_candidates
+SQL >
+    SELECT
+        payment_rows.payment_source AS payment_source,
+        payment_rows.payment_id AS payment_id,
+        payment_rows.payment_time AS payment_time,
+        payment_rows.payment_date AS payment_date,
+        payment_rows.customer_id AS customer_id,
+        payment_rows.payment_email AS payment_email,
+        payment_rows.payment_name AS payment_name,
+        payment_rows.payment_phone AS payment_phone,
+        payment_rows.billing_address_line_1 AS billing_address_line_1,
+        payment_rows.billing_address_city AS billing_address_city,
+        payment_rows.billing_address_region AS billing_address_region,
+        payment_rows.billing_address_zip AS billing_address_zip,
+        payment_rows.billing_address_country AS billing_address_country,
+        payment_rows.currency AS currency,
+        payment_rows.amount_paid AS amount_paid,
+        payment_rows.refund_amount AS refund_amount,
+        payment_rows.net_amount AS net_amount,
+        payment_rows.has_refund AS has_refund,
+        payment_rows.product_id AS product_id,
+        payment_rows.product_name AS product_name,
+        payment_rows.product_variant AS product_variant,
+        payment_rows.price_id AS price_id,
+        payment_rows.plan_id AS plan_id,
+        payment_rows.product_rule AS product_rule,
+        payment_rows.product_classification_method AS product_classification_method,
+        payment_rows.is_product_classified AS is_product_classified,
+        payment_rows.is_bbb_mentorship_installment AS is_bbb_mentorship_installment,
+        payment_rows.payment_sequence_number AS payment_sequence_number,
+        payment_rows.payment_occurrence_type AS payment_occurrence_type,
+        payment_rows.is_repeat_payment AS is_repeat_payment,
+        payment_rows.payment_intent_id AS payment_intent_id,
+        payment_rows.payment_method_id AS payment_method_id,
+        payment_rows.invoice_id AS invoice_id,
+        payment_rows.subscription_id AS subscription_id,
+        payment_rows.checkout_session_id AS checkout_session_id,
+        payment_rows.payment_link_id AS payment_link_id,
+        payment_rows.invoice_billing_reason AS invoice_billing_reason,
+        payment_rows.checkout_mode AS checkout_mode,
+        payment_rows.has_discount AS has_discount,
+        payment_rows.discount_amount AS discount_amount,
+        payment_rows.discount_ids AS discount_ids,
+        payment_rows.coupon_ids AS coupon_ids,
+        payment_rows.coupon_names AS coupon_names,
+        payment_rows.promotion_code_ids AS promotion_code_ids,
+        payment_rows.promotion_codes AS promotion_codes,
+        payment_rows.coupon_amount_off AS coupon_amount_off,
+        payment_rows.coupon_percent_off AS coupon_percent_off,
+        payment_rows.charge_description AS charge_description,
+        payment_rows.calculated_statement_descriptor AS calculated_statement_descriptor,
+        payment_rows.statement_descriptor AS statement_descriptor,
+        payment_rows.payment_intent_description AS payment_intent_description,
+        payment_rows.invoice_description AS invoice_description,
+        payment_rows.book_product_text AS book_product_text,
+        payment_rows.receipt_url AS receipt_url,
+        payment_rows.livemode AS livemode,
+        payment_rows.product_complete_name AS product_complete_name,
+        payment_rows.content_ids AS content_ids,
+        nullIf(identity_mapping.profile_id, '') AS automatic_profile_id
+    FROM normalized_payment_identifiers AS payment_rows
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = 'boom'
+        AND identity_mapping.identifier_key = coalesce(
+            if(
+                payment_rows.payment_email IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('email:', payment_rows.payment_email)
+            ),
+            if(
+                payment_rows.normalized_phone IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('phone:', payment_rows.normalized_phone)
+            )
+        )
+
+NODE automatically_resolved_payments
+SQL >
+    SELECT *
+    FROM automatically_resolved_payment_candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payment_source, payment_id ORDER BY automatic_profile_id ASC NULLS FIRST
+        )
+        = 1
+
+NODE manually_resolved_payments
+SQL >
+    SELECT
+        payment_rows.*,
+        nullIf(manual.manual_profile_id, '') AS manual_profile_id,
+        coalesce(nullIf(manual.manual_profile_id, ''), payment_rows.automatic_profile_id) AS profile_id,
+        if(
+            nullIf(manual.manual_profile_id, '') IS NULL,
+            CAST(NULL AS Nullable(DateTime64(6))),
+            manual.manual_link_created_at
+        ) AS manual_link_created_at,
+        manual.manual_link_created_by AS manual_link_created_by
+    FROM automatically_resolved_payments AS payment_rows
+    LEFT JOIN
+        manual_payment_profile_links_latest AS manual ON payment_rows.payment_id = manual.payment_id
+
+NODE current_resolved_payments
+SQL >
+    SELECT
+        payment_rows.*,
+        multiIf(
+            payment_rows.payment_source = 'stripe_kajabi',
+            'kajabi',
+            payment_rows.is_bbb_mentorship_installment = 1,
+            'mentorship',
+            payment_rows.product_rule IN (
+                'structured_basic_vip',
+                'structured_keyboard_rich_challenge',
+                'keyboard_rich_challenge_vip'
+            ),
+            'vip',
+            payment_rows.product_rule IN ('keyboard_rich_book', 'top_tax_loopholes'),
+            'book',
+            payment_rows.product_rule IN (
+                'mentorship_deposit',
+                'mentorship_full_payment',
+                'mentorship_3x1997',
+                'mentorship_balance'
+            ),
+            'mentorship',
+            payment_rows.product_rule = 'catalog_product',
+            'catalog',
+            'unknown'
+        ) AS payment_category,
+        multiIf(
+            payment_rows.manual_profile_id IS NOT NULL,
+            'manual',
+            payment_rows.automatic_profile_id IS NOT NULL,
+            'automatic',
+            'unattributed'
+        ) AS attribution_method,
+        coalesce(
+            nullIf(profiles.first_name, ''),
+            if(
+                payment_rows.payment_name IS NULL,
+                CAST(NULL AS Nullable(String)),
+                nullIf(arrayElement(splitByChar(' ', assumeNotNull(payment_rows.payment_name)), 1), '')
+            )
+        ) AS first_name,
+        coalesce(
+            nullIf(profiles.last_name, ''),
+            if(
+                payment_rows.payment_name IS NULL,
+                CAST(NULL AS Nullable(String)),
+                nullIf(arrayElement(splitByChar(' ', assumeNotNull(payment_rows.payment_name)), -1), '')
+            )
+        ) AS last_name
+    FROM manually_resolved_payments AS payment_rows
+    LEFT JOIN reporting_current_identity_profiles_direct AS profiles
+        ON profiles.profile_id = payment_rows.profile_id

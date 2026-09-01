@@ -1,0 +1,180 @@
+DESCRIPTION >
+    Hourly Meta delivery with KRC first-touch, last-touch, and solo-touch outcomes.
+    This is the shared semantic model used by both Bill reporting views.
+
+NODE hourly_meta_delivery
+SQL >
+    SELECT
+        CAST(assumeNotNull(hour_start), 'DateTime64(6)') AS hour_start,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any (campaign_name) AS campaign_name,
+        any (adset_name) AS adset_name,
+        any (ad_name) AS ad_name,
+        sum(spend) AS spend,
+        sum(impressions) AS impressions,
+        sum(clicks) AS clicks,
+        toUInt8(1) AS has_delivery_row
+    FROM model_mart_ad_performance_hourly
+    WHERE source = 'meta' AND hour_start IS NOT NULL
+    GROUP BY hour_start, campaign_id, adset_id, ad_id
+
+NODE krc_attribution_rows
+SQL >
+    SELECT
+        attribution_method,
+        assumeNotNull(
+            if(attribution_method = 'last', last_touch_click_hour, first_touch_click_hour)
+        ) AS attributed_hour,
+        if(
+            attribution_method = 'last', last_touch_campaign_id, first_touch_campaign_id
+        ) AS attributed_campaign_id,
+        if(attribution_method = 'last', last_touch_adset_id, first_touch_adset_id)
+            AS attributed_adset_id,
+        if(attribution_method = 'last', last_touch_ad_id, first_touch_ad_id)
+            AS attributed_ad_id,
+        if(
+            attribution_method = 'last', last_touch_campaign_name, first_touch_campaign_name
+        ) AS attributed_campaign_name,
+        if(attribution_method = 'last', last_touch_adset_name, first_touch_adset_name)
+            AS attributed_adset_name,
+        if(attribution_method = 'last', last_touch_ad_name, first_touch_ad_name)
+            AS attributed_ad_name,
+        registration_id,
+        is_immediate_vip,
+        is_5k_purchaser
+    FROM mart_krc_acquisition
+    ARRAY JOIN ['first', 'last', 'solo'] AS attribution_method
+    WHERE
+        (attribution_method != 'solo' OR is_solo_touch = 1)
+        AND if(
+            attribution_method = 'last', last_touch_click_hour, first_touch_click_hour
+        ) IS NOT NULL
+
+NODE hourly_krc_attribution
+SQL >
+    SELECT
+        attributed_hour,
+        attributed_campaign_id,
+        attributed_adset_id,
+        attributed_ad_id,
+        any (attributed_campaign_name) AS attributed_campaign_name,
+        any (attributed_adset_name) AS attributed_adset_name,
+        any (attributed_ad_name) AS attributed_ad_name,
+        uniqExactIf(registration_id, attribution_method = 'last') AS last_touch_registrations,
+        uniqExactIf(
+            registration_id, attribution_method = 'last' AND is_immediate_vip = 1
+        ) AS last_touch_immediate_vips,
+        uniqExactIf(registration_id, attribution_method = 'first') AS first_touch_registrations,
+        uniqExactIf(
+            registration_id, attribution_method = 'first' AND is_immediate_vip = 1
+        ) AS first_touch_immediate_vips,
+        uniqExactIf(registration_id, attribution_method = 'solo') AS solo_touch_registrations,
+        uniqExactIf(
+            registration_id, attribution_method = 'solo' AND is_immediate_vip = 1
+        ) AS solo_touch_immediate_vips,
+        uniqExactIf(
+            registration_id, attribution_method = 'last' AND is_5k_purchaser = 1
+        ) AS last_touch_5k_purchasers,
+        uniqExactIf(
+            registration_id,
+            attribution_method = 'last' AND is_immediate_vip = 1 AND is_5k_purchaser = 1
+        ) AS last_touch_immediate_vip_5k_purchasers,
+        uniqExactIf(
+            registration_id, attribution_method = 'first' AND is_5k_purchaser = 1
+        ) AS first_touch_5k_purchasers,
+        uniqExactIf(
+            registration_id, attribution_method = 'solo' AND is_5k_purchaser = 1
+        ) AS solo_touch_5k_purchasers,
+        toUInt8(1) AS has_attribution_row
+    FROM krc_attribution_rows
+    GROUP BY attributed_hour, attributed_campaign_id, attributed_adset_id, attributed_ad_id
+
+NODE mart_meta_krc_reporting_hourly_rows
+SQL >
+    SELECT
+        if(
+            delivery.has_delivery_row = 1, delivery.hour_start, attribution.attributed_hour
+        ) AS hour_start,
+        'meta' AS source,
+        if(
+            delivery.has_delivery_row = 1, delivery.campaign_id, attribution.attributed_campaign_id
+        ) AS campaign_id,
+        if(
+            delivery.has_delivery_row = 1, delivery.adset_id, attribution.attributed_adset_id
+        ) AS adset_id,
+        if(delivery.has_delivery_row = 1, delivery.ad_id, attribution.attributed_ad_id) AS ad_id,
+        coalesce(
+            if(delivery.has_delivery_row = 1, delivery.campaign_name, CAST(NULL AS Nullable(String))),
+            if(
+                attribution.has_attribution_row = 1,
+                attribution.attributed_campaign_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'Unknown campaign'
+        ) AS campaign_name,
+        coalesce(
+            if(delivery.has_delivery_row = 1, delivery.adset_name, CAST(NULL AS Nullable(String))),
+            if(
+                attribution.has_attribution_row = 1,
+                attribution.attributed_adset_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'Unknown ad set'
+        ) AS adset_name,
+        coalesce(
+            if(delivery.has_delivery_row = 1, delivery.ad_name, CAST(NULL AS Nullable(String))),
+            if(
+                attribution.has_attribution_row = 1,
+                attribution.attributed_ad_name,
+                CAST(NULL AS Nullable(String))
+            ),
+            'Unknown ad'
+        ) AS ad_name,
+        if(delivery.has_delivery_row = 1, coalesce(delivery.spend, 0), 0) AS spend,
+        if(delivery.has_delivery_row = 1, coalesce(delivery.impressions, 0), 0) AS impressions,
+        if(delivery.has_delivery_row = 1, coalesce(delivery.clicks, 0), 0) AS clicks,
+        if(
+            attribution.has_attribution_row = 1, attribution.last_touch_registrations, 0
+        ) AS last_touch_registrations,
+        if(
+            attribution.has_attribution_row = 1, attribution.last_touch_immediate_vips, 0
+        ) AS last_touch_immediate_vips,
+        if(
+            attribution.has_attribution_row = 1, attribution.first_touch_registrations, 0
+        ) AS first_touch_registrations,
+        if(
+            attribution.has_attribution_row = 1, attribution.first_touch_immediate_vips, 0
+        ) AS first_touch_immediate_vips,
+        if(
+            attribution.has_attribution_row = 1, attribution.solo_touch_registrations, 0
+        ) AS solo_touch_registrations,
+        if(
+            attribution.has_attribution_row = 1, attribution.solo_touch_immediate_vips, 0
+        ) AS solo_touch_immediate_vips,
+        if(
+            attribution.has_attribution_row = 1, attribution.last_touch_5k_purchasers, 0
+        ) AS last_touch_5k_purchasers,
+        if(attribution.has_attribution_row = 1, attribution.last_touch_5k_purchasers, 0)
+        * 4997 AS last_touch_5k_revenue,
+        if(
+            attribution.has_attribution_row = 1, attribution.last_touch_immediate_vip_5k_purchasers, 0
+        ) AS last_touch_immediate_vip_5k_purchasers,
+        if(
+            attribution.has_attribution_row = 1, attribution.first_touch_5k_purchasers, 0
+        ) AS first_touch_5k_purchasers,
+        if(attribution.has_attribution_row = 1, attribution.first_touch_5k_purchasers, 0)
+        * 4997 AS first_touch_5k_revenue,
+        if(
+            attribution.has_attribution_row = 1, attribution.solo_touch_5k_purchasers, 0
+        ) AS solo_touch_5k_purchasers,
+        if(attribution.has_attribution_row = 1, attribution.solo_touch_5k_purchasers, 0)
+        * 4997 AS solo_touch_5k_revenue
+    FROM hourly_meta_delivery AS delivery
+    FULL OUTER JOIN
+        hourly_krc_attribution AS attribution
+        ON delivery.hour_start = attribution.attributed_hour
+        AND isNotDistinctFrom(delivery.campaign_id, attribution.attributed_campaign_id)
+        AND isNotDistinctFrom(delivery.adset_id, attribution.attributed_adset_id)
+        AND isNotDistinctFrom(delivery.ad_id, attribution.attributed_ad_id)

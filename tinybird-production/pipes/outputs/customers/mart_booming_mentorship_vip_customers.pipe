@@ -1,0 +1,150 @@
+DESCRIPTION >
+    Deduplicated Google Ads Customer Match audience of positive-net VIP and mentorship purchasers.
+
+NODE customer_match_profiles
+SQL >
+    SELECT
+        profile_id AS profile_id,
+        nullIf(lowerUTF8(trimBoth(ifNull(first_name, ''))), '') AS first_name,
+        nullIf(lowerUTF8(trimBoth(ifNull(last_name, ''))), '') AS last_name,
+        nullIf(arrayMin(arrayFilter(phone -> trimBoth(phone) != '', phones)), '') AS phone
+    FROM mart_customers
+
+NODE customer_match_payment_phone_digits
+SQL >
+    SELECT
+        payment_rows.profile_id AS profile_id,
+        payment_rows.payment_email AS payment_email,
+        payment_rows.payment_phone AS payment_phone,
+        payment_rows.payment_name AS payment_name,
+        payment_rows.billing_address_country AS billing_address_country,
+        payment_rows.billing_address_zip AS billing_address_zip,
+        payment_rows.payment_time AS payment_time,
+        payment_rows.payment_source AS payment_source,
+        payment_rows.payment_id AS payment_id,
+        replaceRegexpAll(trimBoth(ifNull(payment_rows.payment_phone, '')), '[^0-9]', '') AS phone_digits
+    FROM mart_payments AS payment_rows
+    WHERE payment_rows.payment_category IN ('vip', 'mentorship') AND payment_rows.net_amount > 0
+
+NODE customer_match_payment_national_phones
+SQL >
+    SELECT
+        profile_id AS profile_id,
+        payment_email AS payment_email,
+        payment_phone AS payment_phone,
+        payment_name AS payment_name,
+        billing_address_country AS billing_address_country,
+        billing_address_zip AS billing_address_zip,
+        payment_time AS payment_time,
+        payment_source AS payment_source,
+        payment_id AS payment_id,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM customer_match_payment_phone_digits
+
+NODE normalized_customer_match_payments
+SQL >
+    SELECT
+        profile_id AS profile_id,
+        payment_email AS payment_email,
+        payment_phone AS payment_phone,
+        payment_name AS payment_name,
+        billing_address_country AS billing_address_country,
+        billing_address_zip AS billing_address_zip,
+        payment_time AS payment_time,
+        payment_source AS payment_source,
+        payment_id AS payment_id,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(
+                national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS normalized_phone,
+        replaceRegexpAll(trimBoth(ifNull(payment_name, '')), '\\s+', ' ') AS normalized_name
+    FROM customer_match_payment_national_phones
+
+NODE eligible_customer_match_rows
+SQL >
+    SELECT
+        multiIf(
+            payment_rows.profile_id IS NOT NULL,
+            concat('profile:', assumeNotNull(payment_rows.profile_id)),
+            payment_rows.payment_email IS NOT NULL,
+            concat('email:', lowerUTF8(trimBoth(assumeNotNull(payment_rows.payment_email)))),
+            payment_rows.normalized_phone IS NOT NULL,
+            concat('phone:', assumeNotNull(payment_rows.normalized_phone)),
+            CAST(NULL AS Nullable(String))
+        ) AS customer_key,
+        nullIf(lowerUTF8(trimBoth(ifNull(payment_rows.payment_email, ''))), '') AS payment_email,
+        coalesce(payment_rows.normalized_phone, profiles.phone) AS payment_phone,
+        coalesce(
+            profiles.first_name,
+            nullIf(lowerUTF8(arrayElement(splitByChar(' ', payment_rows.normalized_name), 1)), '')
+        ) AS first_name,
+        coalesce(
+            profiles.last_name,
+            if(
+                length(splitByChar(' ', payment_rows.normalized_name)) > 1,
+                nullIf(lowerUTF8(arrayElement(splitByChar(' ', payment_rows.normalized_name), -1)), ''),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS last_name,
+        nullIf(
+            upperUTF8(trimBoth(ifNull(payment_rows.billing_address_country, ''))), ''
+        ) AS billing_address_country,
+        nullIf(trimBoth(ifNull(payment_rows.billing_address_zip, '')), '') AS billing_address_zip,
+        payment_rows.payment_time AS payment_time,
+        payment_rows.payment_source AS payment_source,
+        payment_rows.payment_id AS payment_id
+    FROM normalized_customer_match_payments AS payment_rows
+    LEFT JOIN customer_match_profiles AS profiles ON payment_rows.profile_id = profiles.profile_id
+
+NODE ranked_customer_match_rows
+SQL >
+    SELECT
+        customer_key AS customer_key,
+        payment_email AS payment_email,
+        payment_phone AS payment_phone,
+        first_name AS first_name,
+        last_name AS last_name,
+        billing_address_country AS billing_address_country,
+        billing_address_zip AS billing_address_zip,
+        row_number() OVER (
+            PARTITION BY customer_key
+            ORDER BY
+                (
+                    toUInt8(payment_email IS NOT NULL)
+                    + toUInt8(payment_phone IS NOT NULL)
+                    + toUInt8(first_name IS NOT NULL)
+                    + toUInt8(last_name IS NOT NULL)
+                    + toUInt8(billing_address_country IS NOT NULL)
+                    + toUInt8(billing_address_zip IS NOT NULL)
+                ) DESC,
+                payment_time DESC,
+                payment_source ASC,
+                payment_id ASC
+        ) AS customer_rank
+    FROM eligible_customer_match_rows
+    WHERE customer_key IS NOT NULL AND (payment_email IS NOT NULL OR payment_phone IS NOT NULL)
+
+NODE customer_match_rows
+SQL >
+    SELECT
+        payment_phone AS payment_phone,
+        payment_email AS payment_email,
+        first_name AS first_name,
+        last_name AS last_name,
+        billing_address_country AS billing_address_country,
+        billing_address_zip AS billing_address_zip
+    FROM ranked_customer_match_rows
+    WHERE customer_rank = 1

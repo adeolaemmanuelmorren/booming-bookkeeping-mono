@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Current server-side form submissions with profile identity resolved at read time.
+
+NODE current_server_form_submission_rows
+SQL >
+    SELECT * FROM resolved_server_form_facts

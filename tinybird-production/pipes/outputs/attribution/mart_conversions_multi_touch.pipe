@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Live daily multi-touch attribution from current incremental journeys.
+
+NODE current_multi_touch_conversion_rows
+SQL >
+    SELECT * FROM mart_conversions_multi_touch_build

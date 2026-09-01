@@ -1,0 +1,107 @@
+DESCRIPTION >
+    One-time seed of current historical and pre-existing live attribution-param
+    versions. It has no schedule and is safe to replay because readers deduplicate versions.
+
+NODE backfill_attribution_param_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        multiIf(source_system = 'jitsu_data', toUInt8(2), toUInt8(1)) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        toUInt64(
+            greatest(toUnixTimestamp64Micro(ifNull(source_version, toDateTime64(0, 6))), 0)
+        ) AS source_fact_version,
+        ifNull(source_version, toDateTime64(0, 6)) AS source_ingested_at,
+        CAST(
+            hex(
+                SHA256(
+                    concat(
+                        source_system,
+                        '|',
+                        ifNull(attribution_event_id, ''),
+                        '|',
+                        toString(ifNull(source_version, toDateTime64(0, 6)))
+                    )
+                )
+            ),
+            'FixedString(64)'
+        ) AS payload_hash,
+        attribution_event_id,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        utm_source,
+        source_version,
+        ifNull(attribution_event_id, '') AS __tb_state_key
+    FROM jitsu_attribution_params_build
+    WHERE source_system != 'jitsu_events_api'
+    UNION ALL
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        attribution_event_id,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        utm_source,
+        source_version,
+        __tb_state_key
+    FROM jitsu_attribution_params_live_build
+
+TYPE COPY
+TARGET_DATASOURCE jitsu_attribution_param_versions
+COPY_MODE append

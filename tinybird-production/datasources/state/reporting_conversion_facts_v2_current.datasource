@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Identity-neutral conversion facts indexed by their stored identity anchor.
+    Journey builds filter this table before resolving current profile identity.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `identity_anchor_key` String `json:$.identity_anchor_key`,
+    `conversion_id` String `json:$.conversion_id`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `conversion_time` Nullable(DateTime64(6)) `json:$.conversion_time`,
+    `conversion_source` LowCardinality(String) `json:$.conversion_source`,
+    `conversion_type` LowCardinality(String) `json:$.conversion_type`,
+    `manual_profile_id` Nullable(String) `json:$.manual_profile_id`,
+    `payment_source` Nullable(String) `json:$.payment_source`,
+    `payment_id` Nullable(String) `json:$.payment_id`,
+    `payment_customer_id` Nullable(String) `json:$.payment_customer_id`,
+    `payment_email` Nullable(String) `json:$.payment_email`,
+    `payment_category` Nullable(String) `json:$.payment_category`,
+    `is_repeat_payment` UInt8 `json:$.is_repeat_payment`,
+    `net_amount` Float64 `json:$.net_amount`,
+    `registration_type` Nullable(String) `json:$.registration_type`,
+    `client_payment_amount` Float64 `json:$.client_payment_amount`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY tenant_id, identity_anchor_key, conversion_id
+ENGINE_SETTINGS "index_granularity=128"
+
+INDEXES >
+    INDEX conversion_id_bloom conversion_id TYPE bloom_filter(0.01) GRANULARITY 1

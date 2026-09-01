@@ -1,0 +1,142 @@
+DESCRIPTION >
+    Daily Meta campaign, ad-set, and ad delivery. Reach and frequency remain at their
+    native hierarchy level and are never summed across levels.
+
+NODE current_campaign_rows
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_campaign
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY date, account_id, campaign_id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE current_adset_rows
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad_set
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY date, account_id, adset_id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE current_ad_rows
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY date, account_id, ad_id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE campaign_delivery_rows
+SQL >
+    SELECT
+        delivery.date,
+        'campaign' AS level,
+        toString(delivery.account_id) AS account_id,
+        toString(delivery.campaign_id) AS campaign_id,
+        CAST(NULL AS Nullable(String)) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        coalesce(
+            dimensions.campaign_name,
+            nullIf(trim(delivery.campaign_name), ''),
+            'unknown'
+        ) AS campaign_name,
+        CAST(NULL AS Nullable(String)) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        delivery.impressions,
+        toDecimal128(toString(delivery.spend), 9) AS spend,
+        delivery.reach,
+        if(
+            delivery.reach IS NULL OR delivery.reach = 0,
+            CAST(NULL AS Nullable(Float64)),
+            delivery.impressions / toFloat64(delivery.reach)
+        ) AS frequency,
+        'USD' AS currency
+    FROM current_campaign_rows AS delivery
+    LEFT JOIN meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'campaign'
+       AND toString(delivery.campaign_id) = dimensions.campaign_id
+    WHERE coalesce(delivery.impressions, 0) > 0
+       OR coalesce(delivery.spend, 0) > 0
+
+NODE adset_delivery_rows
+SQL >
+    SELECT
+        delivery.date,
+        'adset' AS level,
+        toString(delivery.account_id) AS account_id,
+        dimensions.campaign_id AS campaign_id,
+        toString(delivery.adset_id) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        coalesce(
+            dimensions.campaign_name,
+            nullIf(trim(delivery.campaign_name), ''),
+            'unknown'
+        ) AS campaign_name,
+        coalesce(
+            dimensions.adset_name,
+            nullIf(trim(delivery.adset_name), '')
+        ) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        delivery.impressions,
+        toDecimal128(toString(delivery.spend), 9) AS spend,
+        delivery.reach,
+        if(
+            delivery.reach IS NULL OR delivery.reach = 0,
+            CAST(NULL AS Nullable(Float64)),
+            delivery.impressions / toFloat64(delivery.reach)
+        ) AS frequency,
+        'USD' AS currency
+    FROM current_adset_rows AS delivery
+    LEFT JOIN meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'adset'
+       AND toString(delivery.adset_id) = dimensions.adset_id
+    WHERE coalesce(delivery.impressions, 0) > 0
+       OR coalesce(delivery.spend, 0) > 0
+
+NODE ad_delivery_rows
+SQL >
+    SELECT
+        delivery.date,
+        'ad' AS level,
+        toString(delivery.account_id) AS account_id,
+        coalesce(dimensions.campaign_id, toString(delivery.campaign_id)) AS campaign_id,
+        dimensions.adset_id AS adset_id,
+        toString(delivery.ad_id) AS ad_id,
+        coalesce(dimensions.campaign_name, 'unknown') AS campaign_name,
+        coalesce(
+            dimensions.adset_name,
+            nullIf(trim(delivery.adset_name), '')
+        ) AS adset_name,
+        coalesce(
+            dimensions.ad_name,
+            nullIf(trim(delivery.ad_name), '')
+        ) AS ad_name,
+        delivery.impressions,
+        toDecimal128(toString(delivery.spend), 9) AS spend,
+        delivery.reach,
+        if(
+            delivery.reach IS NULL OR delivery.reach = 0,
+            CAST(NULL AS Nullable(Float64)),
+            delivery.impressions / toFloat64(delivery.reach)
+        ) AS frequency,
+        'USD' AS currency
+    FROM current_ad_rows AS delivery
+    LEFT JOIN meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'ad'
+       AND toString(delivery.ad_id) = dimensions.ad_id
+    WHERE coalesce(delivery.impressions, 0) > 0
+       OR coalesce(delivery.spend, 0) > 0
+
+NODE mart_meta_delivery_daily_rows
+SQL >
+    SELECT * FROM campaign_delivery_rows
+    UNION ALL
+    SELECT * FROM adset_delivery_rows
+    UNION ALL
+    SELECT * FROM ad_delivery_rows

@@ -1,0 +1,23 @@
+DESCRIPTION >
+    Latest active manual payment-to-profile override. The profile ID remains a
+    literal business override and is never rewritten through identity aliases.
+
+NODE ranked_manual_payment_profile_link_events
+SQL >
+    SELECT
+        nullIf(trimBoth(payment_id), '') AS payment_id,
+        nullIf(trimBoth(ifNull(profile_id, '')), '') AS manual_profile_id,
+        lowerUTF8(nullIf(trimBoth(action), '')) AS action,
+        created_at AS manual_link_created_at,
+        nullIf(trimBoth(ifNull(created_by, '')), '') AS manual_link_created_by,
+        row_number() OVER (
+            PARTITION BY nullIf(trimBoth(payment_id), '') ORDER BY created_at DESC, link_event_id DESC
+        ) AS event_rank
+    FROM raw_manual_attribution_manual_payment_profile_link_events
+    WHERE nullIf(trimBoth(payment_id), '') IS NOT NULL
+
+NODE current_manual_payment_profile_links
+SQL >
+    SELECT payment_id, manual_profile_id, manual_link_created_at, manual_link_created_by
+    FROM ranked_manual_payment_profile_link_events
+    WHERE event_rank = 1 AND action = 'link' AND manual_profile_id IS NOT NULL

@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Replace-mode boundary for canonical payment-plan start timing.
+
+SCHEMA >
+    `payment_source` String `json:$.payment_source`,
+    `payment_id` Nullable(String) `json:$.payment_id`,
+    `payment_plan_started_at` Nullable(DateTime64(6)) `json:$.payment_plan_started_at`,
+    `payment_plan_start_method` LowCardinality(String) `json:$.payment_plan_start_method`,
+    `is_payment_plan` UInt8 `json:$.is_payment_plan`,
+    `payment_plan_tracking_status` LowCardinality(String) `json:$.payment_plan_tracking_status`,
+    `__tb_sort_payment_id` String `json:$.__tb_sort_payment_id` DEFAULT ifNull(payment_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY payment_source, __tb_sort_payment_id

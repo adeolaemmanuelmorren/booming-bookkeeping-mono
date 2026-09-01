@@ -1,0 +1,77 @@
+DESCRIPTION >
+    Hourly Meta ad performance at the exact Dataform mart grain. Immutable export copies
+    are collapsed before the reusable Meta dimension hierarchy is joined.
+
+NODE current_hourly_source_rows
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad_hourly
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+      AND hourly_stats_aggregated_by_advertiser_time_zone IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY
+            date,
+            account_id,
+            ad_id,
+            hourly_stats_aggregated_by_advertiser_time_zone
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE parsed_hourly_source_rows
+SQL >
+    SELECT
+        parseDateTime64BestEffortOrNull(
+            concat(
+                toString(date),
+                ' ',
+                splitByString(
+                    ' - ',
+                    assumeNotNull(
+                        hourly_stats_aggregated_by_advertiser_time_zone
+                    )
+                )[1]
+            ),
+            6,
+            'America/Los_Angeles'
+        ) AS hour_start,
+        date,
+        hourly_stats_aggregated_by_advertiser_time_zone AS hour_bucket,
+        'advertiser' AS hour_breakdown_type,
+        toString(account_id) AS account_id,
+        toString(campaign_id) AS campaign_id,
+        toString(adset_id) AS adset_id,
+        toString(ad_id) AS ad_id,
+        nullIf(trim(campaign_name), '') AS campaign_name,
+        nullIf(trim(adset_name), '') AS adset_name,
+        nullIf(trim(ad_name), '') AS ad_name,
+        impressions,
+        inline_link_clicks AS clicks,
+        toDecimal128(toString(spend), 9) AS spend
+    FROM current_hourly_source_rows
+
+NODE mart_ad_performance_hourly_rows
+SQL >
+    SELECT
+        hourly.hour_start,
+        hourly.date,
+        hourly.hour_bucket,
+        hourly.hour_breakdown_type,
+        hourly.account_id,
+        CAST(NULL AS Nullable(String)) AS account_name,
+        'meta' AS source,
+        'Meta Ads' AS formatted_source,
+        coalesce(dimensions.campaign_id, hourly.campaign_id) AS campaign_id,
+        coalesce(dimensions.campaign_name, hourly.campaign_name) AS campaign_name,
+        coalesce(dimensions.adset_id, hourly.adset_id) AS adset_id,
+        coalesce(dimensions.adset_name, hourly.adset_name) AS adset_name,
+        hourly.ad_id,
+        coalesce(dimensions.ad_name, hourly.ad_name) AS ad_name,
+        hourly.impressions,
+        hourly.clicks,
+        hourly.spend,
+        'USD' AS currency
+    FROM parsed_hourly_source_rows AS hourly
+    LEFT JOIN meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'ad'
+       AND hourly.ad_id = dimensions.ad_id
+    WHERE hourly.hour_start IS NOT NULL

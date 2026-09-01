@@ -1,0 +1,26 @@
+DESCRIPTION >
+    Unified Google and Meta daily ad performance using the exact 19-column Dataform contract.
+
+NODE ad_performance_rows
+SQL >
+    SELECT
+        CAST(assumeNotNull(time), 'DateTime64(6)') AS time,
+        assumeNotNull(account_id) AS account_id,
+        account_name,
+        source,
+        formatted_source,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        assumeNotNull(ad_id) AS ad_id,
+        ad_name,
+        impressions,
+        clicks,
+        unique_clicks,
+        unique_inline_link_clicks,
+        spend,
+        platform_conversions,
+        platform_conversion_value,
+        currency
+    FROM daily_ad_performance_adapter

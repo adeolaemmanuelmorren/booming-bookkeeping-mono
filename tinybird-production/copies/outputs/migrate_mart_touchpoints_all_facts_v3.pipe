@@ -1,0 +1,24 @@
+DESCRIPTION >
+    One-time, bounded layout migration for anchor-pruned incremental journey
+    builds. Explicit migration shard parameters keep every standard-compute
+    Copy below Tinybird's 30-second limit. The ReplacingMergeTree target makes
+    a retried shard safe.
+
+NODE indexed_touchpoint_facts
+SQL >
+    %
+    SELECT
+        coalesce(
+            if(anonymous_id IS NULL, CAST(NULL AS Nullable(String)), concat('anonymous_id:', anonymous_id)),
+            if(user_id IS NULL, CAST(NULL AS Nullable(String)), concat('user_id:', lowerUTF8(user_id))),
+            ''
+        ) AS identity_anchor_key,
+        *
+    FROM mart_touchpoints_all_facts_v2_current
+    WHERE
+        cityHash64(touchpoint_id) % {{ UInt64(p_migration_shard_count, 1) }}
+            = {{ UInt64(p_migration_shard_index, 999) }}
+
+TYPE COPY
+TARGET_DATASOURCE mart_touchpoints_all_facts_v3_current
+COPY_MODE append

@@ -1,0 +1,121 @@
+DESCRIPTION >
+    One-time seed of current historical and pre-existing live order-completed
+    versions. It has no schedule and is safe to replay because readers deduplicate versions.
+
+NODE backfill_order_completed_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        multiIf(source_system = 'jitsu_data', toUInt8(2), toUInt8(1)) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        toUInt64(
+            greatest(toUnixTimestamp64Micro(ifNull(source_version, toDateTime64(0, 6))), 0)
+        ) AS source_fact_version,
+        ifNull(source_version, toDateTime64(0, 6)) AS source_ingested_at,
+        CAST(
+            hex(
+                SHA256(
+                    concat(
+                        source_system,
+                        '|',
+                        ifNull(event_row_id, ''),
+                        '|',
+                        toString(ifNull(source_version, toDateTime64(0, 6)))
+                    )
+                )
+            ),
+            'FixedString(64)'
+        ) AS payload_hash,
+        event_row_id,
+        event_id,
+        completed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        customer_name,
+        order_id,
+        checkout_id,
+        checkout_submission_id,
+        product_id,
+        product_name,
+        products,
+        value,
+        currency,
+        completion_basis,
+        is_payment_confirmed,
+        payment_status,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        form_id,
+        form_action,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_version,
+        ifNull(event_row_id, '') AS __tb_state_key
+    FROM jitsu_order_completed_build
+    WHERE source_system != 'jitsu_events_api'
+    UNION ALL
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        event_row_id,
+        event_id,
+        completed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        customer_name,
+        order_id,
+        checkout_id,
+        checkout_submission_id,
+        product_id,
+        product_name,
+        products,
+        value,
+        currency,
+        completion_basis,
+        is_payment_confirmed,
+        payment_status,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        form_id,
+        form_action,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_version,
+        __tb_state_key
+    FROM jitsu_order_completed_live_build
+
+TYPE COPY
+TARGET_DATASOURCE jitsu_order_completed_versions
+COPY_MODE append

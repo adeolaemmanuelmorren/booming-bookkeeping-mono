@@ -1,0 +1,33 @@
+DESCRIPTION >
+    Server-form facts joined once to the currently activated identity mapping.
+
+NODE current_resolved_server_form_facts
+SQL >
+    SELECT
+        facts.form_submission_id,
+        facts.submitted_at,
+        facts.contact_id,
+        facts.email,
+        facts.phone,
+        facts.first_name,
+        facts.last_name,
+        facts.full_name,
+        facts.tag_id,
+        facts.tag_name,
+        facts.registration_type,
+        facts.content_name,
+        facts.canonical_event_id,
+        facts.form_type,
+        facts.event_source,
+        facts.registration_tag_type,
+        nullIf(identity_mapping.profile_id, '') AS profile_id
+    FROM mart_form_submissions_server_side_facts_current AS facts
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = 'boom'
+        AND identity_mapping.identifier_key = facts.identity_anchor_key
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY facts.form_submission_id
+            ORDER BY profile_id ASC NULLS FIRST
+        ) = 1

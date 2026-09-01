@@ -1,0 +1,180 @@
+DESCRIPTION >
+    One row per browser session with first-touch marketing fields, last-page fields, and the
+    Meta campaign fallback used by the Dataform mart. Timestamps remain absolute UTC instants;
+    the Meta delivery cutoff uses the reporting timezone America/Los_Angeles.
+
+NODE current_session_meta_delivery_rows
+SQL >
+    SELECT
+        source.date AS date,
+        toString(source.campaign_id) AS campaign_id,
+        toString(source.ad_id) AS ad_id
+    FROM raw_facebook_ads_basic_ad AS source
+    WHERE
+        source.date IS NOT NULL
+        AND source.date <= toDate(now(), 'America/Los_Angeles')
+        AND source.ad_id IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY source.date, source.account_id, source.ad_id
+            ORDER BY source._fivetran_synced DESC, source._fivetran_id DESC
+        )
+        = 1
+
+NODE session_meta_delivery_dimensions
+SQL >
+    SELECT
+        delivery.date AS date,
+        coalesce(dimensions.campaign_id, delivery.campaign_id) AS campaign_id,
+        dimensions.adset_id AS adset_id,
+        delivery.ad_id AS ad_id
+    FROM current_session_meta_delivery_rows AS delivery
+    LEFT JOIN
+        meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'ad'
+        AND delivery.ad_id = dimensions.ad_id
+
+NODE session_meta_ad_lookup
+SQL >
+    SELECT campaign_id AS campaign_id, adset_id AS adset_id, ad_id AS ad_id
+    FROM session_meta_delivery_dimensions
+    QUALIFY
+        row_number() OVER (PARTITION BY adset_id, ad_id ORDER BY date DESC, campaign_id ASC NULLS FIRST)
+        = 1
+
+NODE session_page_view_rollups
+SQL >
+    SELECT
+        source.tenant_id AS tenant_id,
+        source.session_id AS session_id,
+        argMin(
+            tuple(
+                source.visitor_key AS visitor_key,
+                source.anonymous_id AS anonymous_id,
+                source.user_id AS user_id,
+                source.page_view_timestamp AS page_view_timestamp,
+                source.page_view_id AS page_view_id,
+                source.page_url AS page_url,
+                source.page_host AS page_host,
+                source.page_path AS page_path,
+                source.page_path_host AS page_path_host,
+                source.ip_address AS ip_address,
+                source.user_agent AS user_agent,
+                source.device_platform AS device_platform,
+                source.device_is_mobile AS device_is_mobile,
+                source.geo_city AS geo_city,
+                source.geo_region AS geo_region,
+                source.geo_region_code AS geo_region_code,
+                source.geo_country AS geo_country,
+                source.geo_timezone AS geo_timezone,
+                source.utm_source AS utm_source,
+                source.utm_medium AS utm_medium,
+                source.utm_campaign AS utm_campaign,
+                source.utm_content AS utm_content,
+                source.utm_term AS utm_term,
+                source.utm_id AS utm_id,
+                source.campaign_id AS campaign_id,
+                source.adset_id AS adset_id,
+                source.ad_id AS ad_id,
+                source.google_keyword_id AS google_keyword_id,
+                source.google_keyword AS google_keyword,
+                source.click_id AS click_id,
+                source.click_id_type AS click_id_type,
+                source.gclid AS gclid,
+                source.gbraid AS gbraid,
+                source.wbraid AS wbraid,
+                source.fbclid AS fbclid,
+                source.ttclid AS ttclid,
+                source.li_fat_id AS li_fat_id,
+                source.rdt_cid AS rdt_cid,
+                source.twclid AS twclid,
+                source.fbc AS fbc,
+                source.fbp AS fbp,
+                source.ttp AS ttp,
+                source.uetsid AS uetsid,
+                source.uetvid AS uetvid,
+                source.channel_source AS channel_source,
+                source.channel_medium AS channel_medium
+            ),
+            tuple(source.page_view_timestamp, source.page_view_id)
+        ) AS first_page,
+        argMax(
+            tuple(
+                source.page_view_timestamp AS page_view_timestamp,
+                source.page_view_id AS page_view_id,
+                source.page_url AS page_url,
+                source.page_path AS page_path
+            ),
+            tuple(source.page_view_timestamp, source.page_view_id)
+        ) AS last_page,
+        count() AS page_view_count
+    FROM sessionized_page_views AS source
+    GROUP BY source.tenant_id, source.session_id
+
+NODE website_session_rows
+SQL >
+    SELECT
+        sessions.tenant_id AS tenant_id,
+        sessions.session_id AS session_id,
+        tupleElement(sessions.first_page, 1) AS visitor_key,
+        tupleElement(sessions.first_page, 2) AS anonymous_id,
+        tupleElement(sessions.first_page, 3) AS user_id,
+        tupleElement(sessions.first_page, 4) AS session_start_timestamp,
+        tupleElement(sessions.last_page, 1) AS session_end_timestamp,
+        intDiv(
+            toUnixTimestamp64Micro(assumeNotNull(tupleElement(sessions.last_page, 1)))
+            - toUnixTimestamp64Micro(assumeNotNull(tupleElement(sessions.first_page, 4))),
+            1000000
+        ) AS session_duration_seconds,
+        sessions.page_view_count AS page_view_count,
+        tupleElement(sessions.first_page, 5) AS first_page_view_id,
+        tupleElement(sessions.first_page, 6) AS first_page_url,
+        tupleElement(sessions.first_page, 7) AS first_page_host,
+        tupleElement(sessions.first_page, 8) AS first_page_path,
+        tupleElement(sessions.first_page, 9) AS first_page_path_host,
+        tupleElement(sessions.first_page, 10) AS ip_address,
+        tupleElement(sessions.first_page, 11) AS user_agent,
+        tupleElement(sessions.first_page, 12) AS device_platform,
+        tupleElement(sessions.first_page, 13) AS device_is_mobile,
+        tupleElement(sessions.first_page, 14) AS geo_city,
+        tupleElement(sessions.first_page, 15) AS geo_region,
+        tupleElement(sessions.first_page, 16) AS geo_region_code,
+        tupleElement(sessions.first_page, 17) AS geo_country,
+        tupleElement(sessions.first_page, 18) AS geo_timezone,
+        tupleElement(sessions.last_page, 2) AS last_page_view_id,
+        tupleElement(sessions.last_page, 3) AS last_page_url,
+        tupleElement(sessions.last_page, 4) AS last_page_path,
+        tupleElement(sessions.first_page, 19) AS utm_source,
+        tupleElement(sessions.first_page, 20) AS utm_medium,
+        tupleElement(sessions.first_page, 21) AS utm_campaign,
+        tupleElement(sessions.first_page, 22) AS utm_content,
+        tupleElement(sessions.first_page, 23) AS utm_term,
+        tupleElement(sessions.first_page, 24) AS utm_id,
+        coalesce(tupleElement(sessions.first_page, 25), meta.campaign_id) AS campaign_id,
+        tupleElement(sessions.first_page, 26) AS adset_id,
+        tupleElement(sessions.first_page, 27) AS ad_id,
+        tupleElement(sessions.first_page, 28) AS google_keyword_id,
+        tupleElement(sessions.first_page, 29) AS google_keyword,
+        tupleElement(sessions.first_page, 30) AS click_id,
+        tupleElement(sessions.first_page, 31) AS click_id_type,
+        tupleElement(sessions.first_page, 32) AS gclid,
+        tupleElement(sessions.first_page, 33) AS gbraid,
+        tupleElement(sessions.first_page, 34) AS wbraid,
+        tupleElement(sessions.first_page, 35) AS fbclid,
+        tupleElement(sessions.first_page, 36) AS ttclid,
+        tupleElement(sessions.first_page, 37) AS li_fat_id,
+        tupleElement(sessions.first_page, 38) AS rdt_cid,
+        tupleElement(sessions.first_page, 39) AS twclid,
+        tupleElement(sessions.first_page, 40) AS fbc,
+        tupleElement(sessions.first_page, 41) AS fbp,
+        tupleElement(sessions.first_page, 42) AS ttp,
+        tupleElement(sessions.first_page, 43) AS uetsid,
+        tupleElement(sessions.first_page, 44) AS uetvid,
+        tupleElement(sessions.first_page, 45) AS channel_source,
+        tupleElement(sessions.first_page, 46) AS channel_medium
+    FROM session_page_view_rollups AS sessions
+    LEFT JOIN
+        session_meta_ad_lookup AS meta
+        ON tupleElement(sessions.first_page, 19) = 'meta'
+        AND tupleElement(sessions.first_page, 26) = meta.adset_id
+        AND tupleElement(sessions.first_page, 27) = meta.ad_id

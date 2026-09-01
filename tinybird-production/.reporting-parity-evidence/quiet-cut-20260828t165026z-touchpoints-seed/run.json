@@ -1,0 +1,26 @@
+{
+  "contract_version": 1,
+  "contract_sha256": "1ff87430d108668df558e669c5d66ba6170f02a197c6eaa5509974b465e76ecd",
+  "generation": "quiet-cut-20260828t165026z-touchpoints-seed",
+  "snapshot_at": "2026-08-28T16:50:26.828Z",
+  "quiet_cut_confirmed": true,
+  "target": "cloud",
+  "branch": null,
+  "diagnostics": "summary",
+  "started_at": "2026-08-28T17:56:22.832Z",
+  "completed_at": "2026-08-28T17:56:53.664Z",
+  "status": "failed",
+  "stopped_after_layer": 1,
+  "outputs": [
+    {
+      "name": "mart_touchpoints_all",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:56:22.833Z",
+      "completed_at": "2026-08-28T17:56:53.663Z",
+      "error": "Command failed: tb --cloud --output json sql --rows-limit 266 \n    SELECT\n      toString(fingerprint % 256) AS bucket,\n      toString(count()) AS row_count,\n      toString(sum(toUInt128(fingerprint))) AS fingerprint_sum,\n      toString(groupBitXor(fingerprint)) AS fingerprint_xor,\n      toString(sum(n_0)) AS n_0,\n      toString(sum(n_1)) AS n_1,\n      toString(sum(n_2)) AS n_2,\n      toString(sum(n_3)) AS n_3,\n      toString(sum(n_4)) AS n_4,\n      toString(sum(n_5)) AS n_5,\n      toString(sum(n_6)) AS n_6,\n      toString(sum(n_7)) AS n_7,\n      toString(sum(n_8)) AS n_8,\n      toString(sum(n_9)) AS n_9,\n      toString(sum(s_9)) AS s_9,\n      toString(sum(n_10)) AS n_10,\n      toString(sum(s_10)) AS s_10,\n      toString(sum(n_11)) AS n_11,\n      toString(sum(n_12)) AS n_12,\n      toString(sum(n_13)) AS n_13,\n      toString(sum(n_14)) AS n_14,\n      toString(sum(n_15)) AS n_15,\n      toString(sum(n_16)) AS n_16,\n      toString(sum(n_17)) AS n_17,\n      toString(sum(n_18)) AS n_18,\n      toString(sum(n_19)) AS n_19,\n      toString(sum(n_20)) AS n_20,\n      toString(sum(n_21)) AS n_21,\n      toString(sum(n_22)) AS n_22,\n      toString(sum(n_23)) AS n_23,\n      toString(sum(n_24)) AS n_24,\n      toString(sum(n_25)) AS n_25,\n      toString(sum(n_26)) AS n_26,\n      toString(sum(n_27)) AS n_27,\n      toString(sum(n_28)) AS n_28,\n      toString(sum(n_29)) AS n_29,\n      toString(sum(n_30)) AS n_30,\n      toString(sum(n_31)) AS n_31,\n      toString(sum(n_32)) AS n_32,\n      toString(sum(n_33)) AS n_33,\n      toString(sum(n_34)) AS n_34,\n      toString(sum(n_35)) AS n_35,\n      toString(sum(n_36)) AS n_36,\n      toString(sum(n_37)) AS n_37,\n      toString(sum(n_38)) AS n_38,\n      toString(sum(n_39)) AS n_39,\n      toString(sum(n_40)) AS n_40,\n      toString(sum(n_41)) AS n_41,\n      toString(sum(n_42)) AS n_42,\n      toString(sum(n_43)) AS n_43,\n      toString(sum(n_44)) AS n_44,\n      toString(sum(n_45)) AS n_45,\n      toString(sum(n_46)) AS n_46,\n      toString(sum(n_47)) AS n_47,\n      toString(sum(n_48)) AS n_48,\n      toString(sum(n_49)) AS n_49,\n      toString(sum(n_50)) AS n_50,\n      toString(sum(n_51)) AS n_51,\n      toString(sum(n_52)) AS n_52,\n      toString(sum(n_53)) AS n_53,\n      toString(sum(n_54)) AS n_54,\n      toString(sum(n_55)) AS n_55,\n      toString(sum(n_56)) AS n_56,\n      toString(sum(n_57)) AS n_57\n    FROM (\n      SELECT\n        farmFingerprint64(concat(\n          if(\n            `touchpoint_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`touchpoint_id`)))), ':', toString(assumeNotNull(`touchpoint_id`)))\n          ),\n          if(\n            `session_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`session_id`)))), ':', toString(assumeNotNull(`session_id`)))\n          ),\n          if(\n            `profile_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`profile_id`)))), ':', toString(assumeNotNull(`profile_id`)))\n          ),\n          if(\n            `visitor_key` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`visitor_key`)))), ':', toString(assumeNotNull(`visitor_key`)))\n          ),\n          if(\n            `anonymous_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`anonymous_id`)))), ':', toString(assumeNotNull(`anonymous_id`)))\n          ),\n          if(\n            `user_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`user_id`)))), ':', toString(assumeNotNull(`user_id`)))\n          ),\n          if(\n            `session_start_timestamp` IS NULL,\n            'N;',\n            concat('V', toString(length(formatDateTime(toTimeZone(assumeNotNull(`session_start_timestamp`), 'UTC'), '%Y-%m-%dT%H:%i:%S.%fZ'))), ':', formatDateTime(toTimeZone(assumeNotNull(`session_start_timestamp`), 'UTC'), '%Y-%m-%dT%H:%i:%S.%fZ'))\n          ),\n       \n[TRUNCATED]"
+    }
+  ],
+  "duration_ms": 30832,
+  "evidence_file": "/Users/adeola/Boom Bookkeeping/tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-touchpoints-seed/run.json"
+}

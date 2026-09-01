@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Shallow current reader for browser-compatible Stripe product arrays.
+
+NODE current_stripe_browser_product_resolution_rows
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        product_resolution_source,
+        product_id,
+        product_name,
+        content_ids,
+        product_names
+    FROM int_stripe_browser_product_resolution_current

@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Client-side checkout-form submissions, separate from confirmed payments.
+
+NODE payment_info_submission_rows
+SQL >
+    SELECT * FROM mart_form_submissions_client_side WHERE is_checkout_form = 1

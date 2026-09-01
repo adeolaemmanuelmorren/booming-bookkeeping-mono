@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Atomically replace the client-side form mart after an identity generation activates.
+
+NODE build_client_form_mart_snapshot
+SQL >
+    SELECT source.*, ifNull(source.form_submission_id, '') AS __tb_sort_form_submission_id
+    FROM mart_form_submissions_client_side_build AS source
+
+TYPE COPY
+TARGET_DATASOURCE mart_form_submissions_client_side_current
+COPY_MODE replace

@@ -1,0 +1,39 @@
+DESCRIPTION >
+    Query the hourly ad-performance mart over a half-open Pacific time range.
+
+NODE endpoint
+SQL >
+    %
+    SELECT
+        toTimeZone(hour_start, 'UTC') AS hour_start,
+        date,
+        hour_bucket,
+        hour_breakdown_type,
+        account_id,
+        account_name,
+        source,
+        formatted_source,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        ad_id,
+        ad_name,
+        impressions,
+        clicks,
+        spend,
+        currency
+    FROM model_mart_ad_performance_hourly
+    WHERE hour_start >= parseDateTime64BestEffort(
+        {{ String(p_range_start_pacific, '2000-01-01 00:00:00') }},
+        6,
+        'America/Los_Angeles'
+    )
+      AND hour_start < parseDateTime64BestEffort(
+        {{ String(p_range_end_pacific, '2100-01-01 00:00:00') }},
+        6,
+        'America/Los_Angeles'
+    )
+    ORDER BY hour_start, account_id, ad_id
+
+TYPE endpoint

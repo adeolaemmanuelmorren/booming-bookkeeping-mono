@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Append the retry-safe affected component members for one scoped identity batch.
+    The coordinator runs this after scope expansion and before final compaction.
+
+NODE append_identity_compaction_components
+SQL >
+    SELECT * FROM identity_compaction_components_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_components_stage
+COPY_MODE append

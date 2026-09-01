@@ -1,0 +1,160 @@
+DESCRIPTION >
+    Client-side payment submissions combining historical Kajabi checkout forms with
+    native Jitsu Order Completed events.
+
+NODE ranked_client_order_versions_for_reporting
+SQL >
+    SELECT
+        order_versions_for_reporting.*,
+        row_number() OVER (
+            PARTITION BY
+                order_versions_for_reporting.tenant_id,
+                order_versions_for_reporting.event_row_id
+            ORDER BY
+                order_versions_for_reporting.source_priority DESC,
+                order_versions_for_reporting.source_fact_version DESC,
+                order_versions_for_reporting.source_ingested_at DESC,
+                order_versions_for_reporting.payload_hash DESC
+        ) AS reporting_version_rank
+    FROM jitsu_order_completed_versions AS order_versions_for_reporting
+    WHERE order_versions_for_reporting.tenant_id = 'boom'
+
+NODE current_client_order_facts_for_reporting
+SQL >
+    SELECT *
+    FROM ranked_client_order_versions_for_reporting
+    WHERE reporting_version_rank = 1 AND source_deleted = 0
+
+NODE historical_kajabi_client_payments
+SQL >
+    SELECT
+        concat('historical_form_', assumeNotNull(form_submission_id)) AS client_payment_id,
+        event_id,
+        form_submission_id AS source_row_id,
+        'Form Submitted' AS source_event_name,
+        'historical_kajabi_form_submitted' AS event_source,
+        submitted_at AS payment_time,
+        profile_id,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        checkout_member_name AS customer_name,
+        offer_id AS product_id,
+        if(
+            offer_id = 'v3WtGzPH',
+            'Booming Bookkeeping Mentorship Program',
+            CAST(NULL AS Nullable(String))
+        ) AS product_name,
+        toDecimal128(199, 9) AS amount,
+        'USD' AS currency,
+        'checkout_form_submission' AS completion_basis,
+        false AS is_payment_confirmed,
+        'submitted_unconfirmed' AS payment_status,
+        'historical_offer_slug' AS product_amount_source,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country
+    FROM mart_form_submissions_client_side
+    WHERE is_checkout_form = 1 AND offer_id = 'v3WtGzPH'
+
+NODE resolved_native_order_candidates
+SQL >
+    SELECT
+        orders.tenant_id AS tenant_id,
+        orders.event_row_id AS event_row_id,
+        orders.event_id AS event_id,
+        orders.completed_at AS completed_at,
+        orders.anonymous_id AS anonymous_id,
+        orders.user_id AS user_id,
+        orders.email AS email,
+        orders.phone AS phone,
+        orders.customer_name AS customer_name,
+        orders.product_id AS product_id,
+        orders.product_name AS product_name,
+        orders.products AS products,
+        orders.value AS value,
+        orders.currency AS currency,
+        orders.completion_basis AS completion_basis,
+        orders.is_payment_confirmed AS is_payment_confirmed,
+        orders.payment_status AS payment_status,
+        orders.stripe_payment_method_id AS stripe_payment_method_id,
+        orders.payment_method_type AS payment_method_type,
+        orders.payment_provider AS payment_provider,
+        orders.page_url AS page_url,
+        orders.page_path AS page_path,
+        orders.ip_address AS ip_address,
+        orders.user_agent AS user_agent,
+        orders.geo_city AS geo_city,
+        orders.geo_region AS geo_region,
+        orders.geo_country AS geo_country,
+        nullIf(identity_mapping.profile_id, '') AS profile_id
+    FROM current_client_order_facts_for_reporting AS orders
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = orders.tenant_id
+        AND identity_mapping.identifier_key = coalesce(
+            if(orders.email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', orders.email)),
+            if(
+                orders.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', orders.anonymous_id)
+            )
+        )
+
+NODE resolved_native_orders
+SQL >
+    SELECT *
+    FROM resolved_native_order_candidates
+    QUALIFY
+        row_number() OVER (PARTITION BY tenant_id, event_row_id ORDER BY profile_id ASC NULLS FIRST) = 1
+
+NODE native_order_completed_client_payments
+SQL >
+    SELECT
+        concat('segment_order_', assumeNotNull(event_row_id)) AS client_payment_id,
+        event_id,
+        event_row_id AS source_row_id,
+        'Order Completed' AS source_event_name,
+        'segment_order_completed' AS event_source,
+        completed_at AS payment_time,
+        profile_id,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        customer_name,
+        product_id,
+        coalesce(product_name, products) AS product_name,
+        value AS amount,
+        currency,
+        coalesce(completion_basis, 'checkout_form_submission') AS completion_basis,
+        coalesce(is_payment_confirmed, false) AS is_payment_confirmed,
+        coalesce(payment_status, 'submitted_unconfirmed') AS payment_status,
+        'captured_event' AS product_amount_source,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country
+    FROM resolved_native_orders
+
+NODE client_payment_rows
+SQL >
+    SELECT *
+    FROM historical_kajabi_client_payments
+    UNION ALL
+    SELECT *
+    FROM native_order_completed_client_payments

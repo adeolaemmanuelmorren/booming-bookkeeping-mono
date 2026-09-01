@@ -1,0 +1,116 @@
+DESCRIPTION >
+    Canonical identify versions derived from the single
+    Jitsu Events API origin. Tombstones remain in the version contract.
+
+NODE identify_live_ranked_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY source.source_fact_version DESC, source.ingested_at DESC, source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    WHERE source.tenant_id = 'boom'
+
+NODE identify_live_current_versions
+SQL >
+    SELECT * FROM identify_live_ranked_versions WHERE logical_version_rank = 1
+
+NODE identify_live_rows
+SQL >
+    SELECT
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.source_deleted,
+        nullIf(trim(source.message_id), '') AS identify_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(source.email)), ''), nullIf(lowerUTF8(trim(source.user_id)), '')
+        ) AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        source.observed_at AS identified_at,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'ip')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_ip')), '')
+        ) AS ip_address,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'userAgent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'user_agent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent')), '')
+        ) AS user_agent,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'cityName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_city_name')), '')
+        ) AS geo_city,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'regionName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_region_name')), '')
+        ) AS geo_region,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'countryCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_country_code')), '')
+        ) AS geo_country,
+        source.ingested_at AS source_version,
+        source.source_fact_version,
+        source.ingested_at AS source_ingested_at,
+        source.payload_hash
+    FROM identify_live_current_versions AS source
+    WHERE source.event_kind = 'identify'
+
+NODE current_identify_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        identify_id,
+        source_system,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        identified_at,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        source_version
+    FROM identify_live_rows
+
+NODE current_identify_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        identify_id,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        identified_at,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        source_version,
+        ifNull(identify_id, '') AS __tb_state_key
+    FROM current_identify_rows

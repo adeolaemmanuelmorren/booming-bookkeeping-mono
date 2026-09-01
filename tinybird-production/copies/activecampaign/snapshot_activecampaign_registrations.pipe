@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Publish a complete ActiveCampaign registration snapshot. Replace mode is
+    required because deletes and new primary tags can remove prior fallback rows.
+
+NODE build_activecampaign_registration_snapshot
+SQL >
+    SELECT * FROM activecampaign_registration_build
+
+TYPE COPY
+TARGET_DATASOURCE activecampaign_registrations_current
+COPY_MODE replace

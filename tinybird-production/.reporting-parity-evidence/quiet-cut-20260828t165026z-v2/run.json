@@ -1,0 +1,90 @@
+{
+  "contract_version": 1,
+  "contract_sha256": "1ff87430d108668df558e669c5d66ba6170f02a197c6eaa5509974b465e76ecd",
+  "generation": "quiet-cut-20260828t165026z-v2",
+  "snapshot_at": "2026-08-28T16:50:26.828Z",
+  "quiet_cut_confirmed": true,
+  "target": "cloud",
+  "branch": null,
+  "diagnostics": "hashed-rows",
+  "started_at": "2026-08-28T17:15:19.726Z",
+  "completed_at": "2026-08-28T17:18:04.414Z",
+  "status": "failed",
+  "stopped_after_layer": 1,
+  "outputs": [
+    {
+      "name": "mart_ad_cost_by_landing_page_daily",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:15:19.726Z",
+      "completed_at": "2026-08-28T17:15:33.041Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_ad_performance",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:15:33.041Z",
+      "completed_at": "2026-08-28T17:15:42.869Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_ad_performance_hourly",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:15:42.869Z",
+      "completed_at": "2026-08-28T17:16:00.467Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_form_submissions_client_side",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:16:00.467Z",
+      "completed_at": "2026-08-28T17:16:20.320Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_form_submissions_server_side",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:16:20.320Z",
+      "completed_at": "2026-08-28T17:16:44.863Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_manual_attribution_profile_search_candidates",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:16:44.863Z",
+      "completed_at": "2026-08-28T17:17:37.868Z",
+      "error": "Command failed: tb --cloud --output json sql --rows-limit 266 \n    SELECT\n      toString(fingerprint % 256) AS bucket,\n      toString(count()) AS row_count,\n      toString(sum(toUInt128(fingerprint))) AS fingerprint_sum,\n      toString(groupBitXor(fingerprint)) AS fingerprint_xor,\n      toString(sum(n_0)) AS n_0,\n      toString(sum(n_1)) AS n_1,\n      toString(sum(n_2)) AS n_2,\n      toString(sum(n_3)) AS n_3,\n      toString(sum(n_4)) AS n_4,\n      toString(sum(n_5)) AS n_5,\n      toString(sum(n_6)) AS n_6,\n      toString(sum(n_7)) AS n_7,\n      toString(sum(n_8)) AS n_8,\n      toString(sum(n_9)) AS n_9,\n      toString(sum(n_10)) AS n_10,\n      toString(sum(n_11)) AS n_11\n    FROM (\n      SELECT\n        farmFingerprint64(concat(\n          if(\n            `candidate_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`candidate_id`)))), ':', toString(assumeNotNull(`candidate_id`)))\n          ),\n          if(\n            `source_system` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`source_system`)))), ':', toString(assumeNotNull(`source_system`)))\n          ),\n          if(\n            `source_record_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`source_record_id`)))), ':', toString(assumeNotNull(`source_record_id`)))\n          ),\n          if(\n            `profile_id` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`profile_id`)))), ':', toString(assumeNotNull(`profile_id`)))\n          ),\n          if(\n            `is_selectable` IS NULL,\n            'N;',\n            concat('V', toString(length(if(assumeNotNull(`is_selectable`), '1', '0'))), ':', if(assumeNotNull(`is_selectable`), '1', '0'))\n          ),\n          if(\n            `event_time` IS NULL,\n            'N;',\n            concat('V', toString(length(formatDateTime(toTimeZone(assumeNotNull(`event_time`), 'UTC'), '%Y-%m-%dT%H:%i:%S.%fZ'))), ':', formatDateTime(toTimeZone(assumeNotNull(`event_time`), 'UTC'), '%Y-%m-%dT%H:%i:%S.%fZ'))\n          ),\n          if(\n            `first_name` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`first_name`)))), ':', toString(assumeNotNull(`first_name`)))\n          ),\n          if(\n            `last_name` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`last_name`)))), ':', toString(assumeNotNull(`last_name`)))\n          ),\n          if(\n            `full_name` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`full_name`)))), ':', toString(assumeNotNull(`full_name`)))\n          ),\n          if(\n            `email` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`email`)))), ':', toString(assumeNotNull(`email`)))\n          ),\n          if(\n            `phone` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`phone`)))), ':', toString(assumeNotNull(`phone`)))\n          ),\n          if(\n            `search_text` IS NULL,\n            'N;',\n            concat('V', toString(length(toString(assumeNotNull(`search_text`)))), ':', toString(assumeNotNull(`search_text`)))\n          )\n        )) AS fingerprint,\n        toUInt64(`candidate_id` IS NULL) AS n_0,\n        toUInt64(`source_system` IS NULL) AS n_1,\n        toUInt64(`source_record_id` IS NULL) AS n_2,\n        toUInt64(`profile_id` IS NULL) AS n_3,\n        toUInt64(`is_selectable` IS NULL) AS n_4,\n        toUInt64(`event_time` IS NULL) AS n_5,\n        toUInt64(`first_name` IS NULL) AS n_6,\n        toUInt64(`last_name` IS NULL) AS n_7,\n        toUInt64(`full_name` IS NULL) AS n_8,\n        toUInt64(`email` IS NULL) AS n_9,\n        toUInt64(`phone` IS NULL) AS n_10,\n        toUInt64(`search_text` IS NULL) AS n_11\n      FROM `mart_manual_attribution_profile_search_candidates`\n    )\n    GROUP BY bucket\n    ORDER BY \n[TRUNCATED]"
+    },
+    {
+      "name": "mart_meta_delivery_daily",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:17:37.869Z",
+      "completed_at": "2026-08-28T17:17:54.626Z",
+      "error": "bigquery is not defined"
+    },
+    {
+      "name": "mart_payments",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:17:54.626Z",
+      "completed_at": "2026-08-28T17:17:59.650Z",
+      "error": "Command did not return a complete JSON value"
+    },
+    {
+      "name": "mart_touchpoints_all",
+      "layer": 1,
+      "status": "error",
+      "started_at": "2026-08-28T17:17:59.651Z",
+      "completed_at": "2026-08-28T17:18:04.414Z",
+      "error": "Command did not return a complete JSON value"
+    }
+  ],
+  "duration_ms": 164688,
+  "evidence_file": "/Users/adeola/Boom Bookkeeping/tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-v2/run.json"
+}

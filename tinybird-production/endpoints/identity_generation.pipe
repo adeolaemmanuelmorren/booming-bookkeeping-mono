@@ -1,0 +1,66 @@
+DESCRIPTION >
+    Active identity generation metadata and current mapping, profile, and fact counts.
+
+NODE active_identity_generation_rows
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        batch_version AS batch_version,
+        batch_id AS batch_id,
+        committed_at AS committed_at,
+        producer_id AS producer_id,
+        checkpoint_sequence AS checkpoint_sequence,
+        input_event_count AS input_event_count,
+        input_hash AS input_hash
+    FROM current_identity_state
+    WHERE state_kind = 'activation_audit'
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        )
+        = 1
+
+NODE current_identity_mapping_count
+SQL >
+    SELECT tenant_id AS tenant_id, count() AS mapping_count
+    FROM current_identity_mappings
+    GROUP BY tenant_id
+
+NODE current_identity_profile_count
+SQL >
+    SELECT tenant_id AS tenant_id, count() AS profile_count
+    FROM current_identity_profiles
+    GROUP BY tenant_id
+
+NODE current_identity_fact_count
+SQL >
+    SELECT tenant_id AS tenant_id, count() AS fact_count FROM current_identity_facts GROUP BY tenant_id
+
+NODE identity_generation_endpoint
+SQL >
+    %
+    SELECT
+        generation.tenant_id AS tenant_id,
+        generation.batch_version AS batch_version,
+        generation.batch_id AS batch_id,
+        generation.committed_at AS committed_at,
+        multiIf(
+            generation.producer_id = 'identity_shadow_rebuild',
+            'shadow_rebuild',
+            startsWith(generation.producer_id, 'bigquery_identity_seed'),
+            'bigquery_seed',
+            'incremental_compaction'
+        ) AS generation_kind,
+        generation.checkpoint_sequence AS rebuild_iteration_count,
+        generation.input_event_count AS input_event_count,
+        generation.input_hash AS input_hash,
+        coalesce(mappings.mapping_count, toUInt64(0)) AS mapping_count,
+        coalesce(profiles.profile_count, toUInt64(0)) AS profile_count,
+        coalesce(facts.fact_count, toUInt64(0)) AS fact_count
+    FROM active_identity_generation_rows AS generation
+    LEFT JOIN current_identity_mapping_count AS mappings ON generation.tenant_id = mappings.tenant_id
+    LEFT JOIN current_identity_profile_count AS profiles ON generation.tenant_id = profiles.tenant_id
+    LEFT JOIN current_identity_fact_count AS facts ON generation.tenant_id = facts.tenant_id
+    WHERE generation.tenant_id = {{ String(p_tenant_id, 'boom') }}
+
+TYPE ENDPOINT

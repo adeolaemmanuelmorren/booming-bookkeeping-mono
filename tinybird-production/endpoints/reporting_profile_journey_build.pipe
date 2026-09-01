@@ -1,0 +1,74 @@
+DESCRIPTION >
+    Builds finished journey rows for explicitly requested stored identity anchors
+    and/or conversions. The Worker persists the response; reports never execute
+    this window pipeline.
+
+NODE requested_profile_journey_rows
+SQL >
+    %
+    SELECT
+        conversion_rows.* EXCEPT (campaign_name, adset_name, ad_name),
+        toDecimal128(toString(conversion_rows.revenue_server_side), 9)
+            AS revenue_server_side_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(conversion_rows.revenue_server_side), 9)
+                * toDecimal128(toString(conversion_rows.first_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_first_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(conversion_rows.revenue_server_side), 9)
+                * toDecimal128(toString(conversion_rows.last_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_last_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(conversion_rows.revenue_server_side), 9)
+                * toDecimal128(toString(conversion_rows.multi_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_multi_touch_decimal,
+        multiIf(
+            conversion_rows.touchpoint_id IS NULL,
+            'unattributed',
+            conversion_rows.source = 'meta'
+                AND conversion_rows.medium IN ('paid', 'cpc', 'ppc', 'paid_social'),
+            'meta / paid',
+            conversion_rows.source = 'meta'
+                AND conversion_rows.medium IN ('referral', 'social', 'organic'),
+            'meta / organic',
+            match(lowerUTF8(conversion_rows.source), '(^|\\.)(facebook\\.com|instagram\\.com)$'),
+            'meta / organic',
+            conversion_rows.source = 'google'
+                AND conversion_rows.medium IN ('referral', 'organic'),
+            'google / organic',
+            match(lowerUTF8(conversion_rows.source), '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$')
+                OR startsWith(lowerUTF8(conversion_rows.source), 'com.google.'),
+            'google / organic',
+            conversion_rows.source = 'bing'
+                AND conversion_rows.medium IN ('referral', 'organic'),
+            'bing / organic',
+            match(lowerUTF8(conversion_rows.source), '(^|\\.)(bing\\.com)$'),
+            'bing / organic',
+            conversion_rows.source = 'youtube'
+                AND conversion_rows.medium IN ('referral', 'organic'),
+            'youtube / organic',
+            match(lowerUTF8(conversion_rows.source), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+            'youtube / organic',
+            conversion_rows.source = 'trustpilot'
+                AND conversion_rows.medium IN ('company_profile', 'referral'),
+            'trustpilot / referral',
+            match(lowerUTF8(conversion_rows.source), '(^|\\.)(trustpilot\\.com)$')
+                OR lowerUTF8(conversion_rows.source) = 'trustpilot',
+            'trustpilot / referral',
+            concat(conversion_rows.source, ' / ', conversion_rows.medium)
+        ) AS touchpoint_channel_label
+    FROM reporting_profile_journey_window_build AS conversion_rows
+
+TYPE ENDPOINT

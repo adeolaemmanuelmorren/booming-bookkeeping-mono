@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "lib": ["es2024"],
+    "module": "es2022",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "es2024",
+    "types": ["./worker-configuration.d.ts", "node"]
+  },
+  "include": ["worker-configuration.d.ts", "src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["test/**/*.worker.spec.ts", "test/env.d.ts"]
+}

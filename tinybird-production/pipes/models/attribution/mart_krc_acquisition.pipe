@@ -1,0 +1,402 @@
+DESCRIPTION >
+    Latest applicable KRC registration per profile with the complete ordered Meta paid-click
+    path, first-touch and last-touch acquisition, Immediate VIP, and first qualifying
+    mentorship-purchase outcomes. Buyers use the latest registration at or before their first
+    qualifying purchase; non-buyers use their latest registration.
+
+NODE krc_registrations
+SQL >
+    SELECT
+        form_submission_id AS registration_id,
+        profile_id,
+        submitted_at AS registration_timestamp,
+        toDate(assumeNotNull(submitted_at), 'America/Los_Angeles') AS registration_date
+    FROM mart_form_submissions_server_side
+    WHERE registration_type = 'krc' AND profile_id IS NOT NULL AND submitted_at IS NOT NULL
+
+NODE earliest_krc_registration_by_profile
+SQL >
+    SELECT profile_id, min(registration_timestamp) AS registration_timestamp
+    FROM krc_registrations
+    GROUP BY profile_id
+
+NODE first_qualifying_mentorship_payment_by_profile
+SQL >
+    SELECT
+        payments.profile_id,
+        payments.payment_id,
+        payments.payment_time,
+        payments.net_amount,
+        toUInt8(1) AS has_first_5k_payment
+    FROM mart_payments AS payments
+    INNER JOIN
+        earliest_krc_registration_by_profile AS registrations
+        ON registrations.profile_id = payments.profile_id
+        AND payments.payment_time >= registrations.registration_timestamp
+    WHERE
+        payments.payment_category = 'mentorship'
+        AND payments.is_repeat_payment = 0
+        AND payments.net_amount > 900
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY payments.profile_id
+            ORDER BY payments.payment_time ASC NULLS FIRST, payments.payment_id ASC NULLS FIRST
+        )
+        = 1
+
+NODE selected_krc_registrations
+SQL >
+    SELECT registrations.*
+    FROM krc_registrations AS registrations
+    LEFT JOIN
+        first_qualifying_mentorship_payment_by_profile AS purchases
+        ON purchases.profile_id = registrations.profile_id
+    WHERE
+        coalesce(purchases.has_first_5k_payment, 0) = 0
+        OR registrations.registration_timestamp <= purchases.payment_time
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY registrations.profile_id
+            ORDER BY
+                registrations.registration_timestamp DESC NULLS LAST,
+                registrations.registration_id DESC NULLS LAST
+        )
+        = 1
+
+NODE latest_krc_meta_campaigns
+SQL >
+    SELECT toString(id) AS campaign_id, nullIf(trim(name), '') AS campaign_name
+    FROM raw_facebook_ads_campaign_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY updated_time DESC, _fivetran_synced DESC) = 1
+
+NODE latest_krc_meta_adsets
+SQL >
+    SELECT toString(id) AS adset_id, nullIf(trim(name), '') AS adset_name
+    FROM raw_facebook_ads_ad_set_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY updated_time DESC, _fivetran_synced DESC) = 1
+
+NODE latest_krc_meta_ads
+SQL >
+    SELECT
+        toString(id) AS ad_id,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_set_id) AS adset_id,
+        nullIf(trim(name), '') AS ad_name
+    FROM raw_facebook_ads_ad_history
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY updated_time DESC, _fivetran_synced DESC) = 1
+
+NODE current_krc_meta_daily_ad_rows
+SQL >
+    SELECT *
+    FROM raw_facebook_ads_basic_ad
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (PARTITION BY date, account_id, ad_id ORDER BY _fivetran_synced DESC) = 1
+
+NODE krc_meta_daily_ad_names
+SQL >
+    SELECT
+        delivery.date AS delivery_date,
+        coalesce(ads.campaign_id, toString(delivery.campaign_id)) AS campaign_id,
+        ads.adset_id AS adset_id,
+        toString(delivery.ad_id) AS ad_id,
+        campaigns.campaign_name AS campaign_name,
+        coalesce(adsets.adset_name, nullIf(trim(delivery.adset_name), '')) AS adset_name,
+        coalesce(ads.ad_name, nullIf(trim(delivery.ad_name), '')) AS ad_name
+    FROM current_krc_meta_daily_ad_rows AS delivery
+    LEFT JOIN latest_krc_meta_ads AS ads ON toString(delivery.ad_id) = ads.ad_id
+    LEFT JOIN latest_krc_meta_adsets AS adsets ON ads.adset_id = adsets.adset_id
+    LEFT JOIN
+        latest_krc_meta_campaigns AS campaigns
+        ON coalesce(ads.campaign_id, toString(delivery.campaign_id)) = campaigns.campaign_id
+
+NODE latest_krc_meta_ad_names
+SQL >
+    SELECT
+        campaign_id,
+        adset_id,
+        ad_id,
+        argMaxIf(campaign_name, delivery_date, campaign_name IS NOT NULL) AS campaign_name,
+        argMaxIf(adset_name, delivery_date, adset_name IS NOT NULL) AS adset_name,
+        argMaxIf(ad_name, delivery_date, ad_name IS NOT NULL) AS ad_name
+    FROM krc_meta_daily_ad_names
+    GROUP BY campaign_id, adset_id, ad_id
+
+NODE krc_meta_paid_clicks
+SQL >
+    SELECT
+        touchpoints.touchpoint_id AS touchpoint_id,
+        touchpoints.profile_id AS profile_id,
+        assumeNotNull(touchpoints.touchpoint_time) AS click_timestamp,
+        CAST(
+            toStartOfHour(assumeNotNull(touchpoints.touchpoint_time), 'America/Los_Angeles'),
+            'DateTime64(6)'
+        ) AS click_hour,
+        toDate(assumeNotNull(touchpoints.touchpoint_time), 'America/Los_Angeles') AS click_date,
+        CAST(touchpoints.campaign_id, 'Nullable(String)') AS campaign_id,
+        CAST(touchpoints.adset_id, 'Nullable(String)') AS adset_id,
+        CAST(touchpoints.ad_id, 'Nullable(String)') AS ad_id,
+        coalesce(names.campaign_name, touchpoints.utm_campaign, 'Unknown campaign') AS campaign_name,
+        coalesce(names.adset_name, 'Unknown ad set') AS adset_name,
+        coalesce(names.ad_name, touchpoints.utm_content, 'Unknown ad') AS ad_name,
+        toUInt8(1) AS is_paid_click
+    FROM mart_touchpoints_all AS touchpoints
+    LEFT JOIN
+        latest_krc_meta_ad_names AS names
+        ON isNotDistinctFrom(names.campaign_id, touchpoints.campaign_id)
+        AND isNotDistinctFrom(names.adset_id, touchpoints.adset_id)
+        AND isNotDistinctFrom(names.ad_id, touchpoints.ad_id)
+    WHERE
+        touchpoints.profile_id IS NOT NULL
+        AND touchpoints.touchpoint_time IS NOT NULL
+        AND lowerUTF8(
+            coalesce(
+                nullIf(trim(touchpoints.utm_source), ''),
+                nullIf(trim(touchpoints.channel_source), ''),
+                ''
+            )
+        )
+        = 'meta'
+        AND lowerUTF8(
+            coalesce(
+                nullIf(trim(touchpoints.utm_medium), ''),
+                nullIf(trim(touchpoints.channel_medium), ''),
+                ''
+            )
+        )
+        = 'paid'
+
+NODE pre_registration_krc_paid_clicks
+SQL >
+    SELECT
+        registrations.registration_id,
+        toUInt8(coalesce(clicks.is_paid_click, 0)) AS is_paid_click,
+        CAST(
+            tuple(
+                assumeNotNull(clicks.touchpoint_id),
+                assumeNotNull(clicks.click_timestamp),
+                assumeNotNull(clicks.click_hour),
+                assumeNotNull(clicks.click_date),
+                clicks.campaign_id,
+                clicks.adset_id,
+                clicks.ad_id,
+                coalesce(clicks.campaign_name, ''),
+                coalesce(clicks.adset_name, ''),
+                coalesce(clicks.ad_name, '')
+            ),
+            'Tuple(touchpoint_id String, click_timestamp DateTime64(6), click_hour DateTime64(6), click_date Date, campaign_id Nullable(String), adset_id Nullable(String), ad_id Nullable(String), campaign_name String, adset_name String, ad_name String)'
+        ) AS paid_click
+    FROM selected_krc_registrations AS registrations
+    LEFT JOIN
+        krc_meta_paid_clicks AS clicks
+        ON clicks.profile_id = registrations.profile_id
+        AND clicks.click_timestamp < registrations.registration_timestamp
+
+NODE krc_paid_click_paths
+SQL >
+    SELECT
+        registration_id,
+        countIf(is_paid_click = 1) AS pre_registration_paid_click_count,
+        arraySort(
+            click -> tuple(tupleElement(click, 2), tupleElement(click, 1)),
+            groupArrayIf(paid_click, is_paid_click = 1)
+        ) AS pre_registration_paid_click_path,
+        toUInt8(countIf(is_paid_click = 1) > 0) AS has_paid_clicks
+    FROM pre_registration_krc_paid_clicks
+    GROUP BY registration_id
+
+NODE krc_paid_click_rollups
+SQL >
+    SELECT
+        registration_id,
+        pre_registration_paid_click_count,
+        pre_registration_paid_click_path,
+        arrayElement(pre_registration_paid_click_path, 1) AS first_touch,
+        arrayElement(pre_registration_paid_click_path, -1) AS last_touch,
+        has_paid_clicks
+    FROM krc_paid_click_paths
+
+NODE first_immediate_vip_payment_by_registration
+SQL >
+    SELECT
+        registrations.registration_id,
+        payments.payment_id,
+        payments.payment_time,
+        payments.net_amount,
+        toUInt8(1) AS has_immediate_vip_payment
+    FROM selected_krc_registrations AS registrations
+    INNER JOIN
+        mart_payments AS payments
+        ON payments.profile_id = registrations.profile_id
+        AND payments.payment_time >= registrations.registration_timestamp
+        AND toDate(assumeNotNull(payments.payment_time), 'America/Los_Angeles')
+        = registrations.registration_date
+    WHERE
+        payments.product_rule IN ('keyboard_rich_challenge_vip', 'structured_basic_vip')
+        AND payments.is_repeat_payment = 0
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY registrations.registration_id
+            ORDER BY payments.payment_time ASC NULLS FIRST, payments.payment_id ASC NULLS FIRST
+        )
+        = 1
+
+NODE mart_krc_acquisition_rows
+SQL >
+    SELECT
+        registrations.registration_id AS registration_id,
+        registrations.profile_id AS profile_id,
+        registrations.registration_timestamp AS registration_timestamp,
+        registrations.registration_date AS registration_date,
+        toUInt64(
+            coalesce(clicks.pre_registration_paid_click_count, 0)
+        ) AS pre_registration_paid_click_count,
+        clicks.pre_registration_paid_click_path AS pre_registration_paid_click_path,
+        toUInt8(coalesce(clicks.pre_registration_paid_click_count, 0) = 1) AS is_solo_touch,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'touchpoint_id'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_touchpoint_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'click_timestamp'), 'Nullable(DateTime64(6))'),
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS first_touch_click_timestamp,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'click_hour'), 'Nullable(DateTime64(6))'),
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS first_touch_click_hour,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'click_date'), 'Nullable(Date)'),
+            CAST(NULL, 'Nullable(Date)')
+        ) AS first_touch_click_date,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.first_touch, 'campaign_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_campaign_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.first_touch, 'adset_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_adset_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.first_touch, 'ad_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_ad_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'campaign_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_campaign_name,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'adset_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_adset_name,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.first_touch, 'ad_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_touch_ad_name,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'touchpoint_id'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_touchpoint_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'click_timestamp'), 'Nullable(DateTime64(6))'),
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS last_touch_click_timestamp,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'click_hour'), 'Nullable(DateTime64(6))'),
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS last_touch_click_hour,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'click_date'), 'Nullable(Date)'),
+            CAST(NULL, 'Nullable(Date)')
+        ) AS last_touch_click_date,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.last_touch, 'campaign_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_campaign_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.last_touch, 'adset_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_adset_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            tupleElement(clicks.last_touch, 'ad_id'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_ad_id,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'campaign_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_campaign_name,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'adset_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_adset_name,
+        if(
+            coalesce(clicks.has_paid_clicks, 0) = 1,
+            CAST(tupleElement(clicks.last_touch, 'ad_name'), 'Nullable(String)'),
+            CAST(NULL, 'Nullable(String)')
+        ) AS last_touch_ad_name,
+        if(
+            coalesce(immediate.has_immediate_vip_payment, 0) = 1,
+            immediate.payment_id,
+            CAST(NULL, 'Nullable(String)')
+        ) AS immediate_vip_payment_id,
+        if(
+            coalesce(immediate.has_immediate_vip_payment, 0) = 1,
+            immediate.payment_time,
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS immediate_vip_payment_timestamp,
+        if(
+            coalesce(immediate.has_immediate_vip_payment, 0) = 1,
+            immediate.net_amount,
+            CAST(NULL, 'Nullable(Decimal(38, 9))')
+        ) AS immediate_vip_revenue,
+        toUInt8(
+            coalesce(immediate.has_immediate_vip_payment, 0) = 1 AND immediate.payment_id IS NOT NULL
+        ) AS is_immediate_vip,
+        if(
+            coalesce(five_k.has_first_5k_payment, 0) = 1,
+            five_k.payment_id,
+            CAST(NULL, 'Nullable(String)')
+        ) AS first_5k_payment_id,
+        if(
+            coalesce(five_k.has_first_5k_payment, 0) = 1,
+            five_k.payment_time,
+            CAST(NULL, 'Nullable(DateTime64(6))')
+        ) AS first_5k_payment_timestamp,
+        if(
+            coalesce(five_k.has_first_5k_payment, 0) = 1,
+            five_k.net_amount,
+            CAST(NULL, 'Nullable(Decimal(38, 9))')
+        ) AS first_5k_revenue,
+        toUInt8(
+            coalesce(five_k.has_first_5k_payment, 0) = 1 AND five_k.payment_id IS NOT NULL
+        ) AS is_5k_purchaser
+    FROM selected_krc_registrations AS registrations
+    INNER JOIN
+        krc_paid_click_rollups AS clicks ON clicks.registration_id = registrations.registration_id
+    LEFT JOIN
+        first_immediate_vip_payment_by_registration AS immediate
+        ON immediate.registration_id = registrations.registration_id
+    LEFT JOIN
+        first_qualifying_mentorship_payment_by_profile AS five_k
+        ON five_k.profile_id = registrations.profile_id

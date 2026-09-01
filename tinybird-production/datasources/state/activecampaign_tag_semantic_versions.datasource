@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Historical ActiveCampaign tag semantics used to distinguish real identity changes
+    from Fivetran sync-timestamp churn. One row is retained per tag and source version.
+
+SCHEMA >
+    `tag_id` String `json:$.tag_id`,
+    `tag_name` Nullable(String) `json:$.tag_name`,
+    `source_version` DateTime64(6) `json:$.source_version`,
+    `is_deleted` UInt8 `json:$.is_deleted`,
+    `semantic_hash` FixedString(64) `json:$.semantic_hash`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY "tag_id, source_version"

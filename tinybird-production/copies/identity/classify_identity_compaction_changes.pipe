@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Append accepted changed facts for one frozen identity batch.
+
+NODE append_classified_identity_compaction_changes
+SQL >
+    SELECT * FROM identity_compaction_changes_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_changes_stage
+COPY_MODE append

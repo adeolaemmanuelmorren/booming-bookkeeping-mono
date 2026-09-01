@@ -1,0 +1,132 @@
+DESCRIPTION >
+    Build Boom source records searchable when manually linking an unattributed payment to a profile.
+
+NODE profile_search_phone_digits
+SQL >
+    SELECT
+        source.tenant_id AS tenant_id,
+        source.source_system AS source_system,
+        source.source_record_id AS source_record_id,
+        source.event_time AS event_time,
+        source.first_name AS first_name,
+        source.last_name AS last_name,
+        source.email AS email,
+        source.phone AS phone,
+        replaceRegexpAll(trimBoth(ifNull(source.phone, '')), '[^0-9]', '') AS phone_digits
+    FROM manual_attribution_profile_sources AS source
+
+NODE profile_search_national_phones
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM profile_search_phone_digits
+
+NODE normalized_profile_search_identifiers
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(
+                national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS normalized_phone
+    FROM profile_search_national_phones
+
+NODE resolved_profile_search_candidates
+SQL >
+    SELECT
+        source.tenant_id AS tenant_id,
+        source.source_system AS source_system,
+        source.source_record_id AS source_record_id,
+        source.event_time AS event_time,
+        source.first_name AS first_name,
+        source.last_name AS last_name,
+        source.email AS email,
+        source.phone AS phone,
+        nullIf(identity_mapping.profile_id, '') AS profile_id
+    FROM normalized_profile_search_identifiers AS source
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = source.tenant_id
+        AND identity_mapping.identifier_key = coalesce(
+            if(source.email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', source.email)),
+            if(
+                source.normalized_phone IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('phone:', source.normalized_phone)
+            )
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.source_system, source.source_record_id
+            ORDER BY
+                nullIf(identity_mapping.profile_id, '') ASC NULLS FIRST
+        )
+        = 1
+
+NODE profile_search_candidate_rows
+SQL >
+    SELECT
+        if(
+            source_record_id IS NULL,
+            CAST(NULL AS Nullable(String)),
+            hex(MD5(concat(source_system, '|', assumeNotNull(source_record_id))))
+        ) AS candidate_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        profile_id AS profile_id,
+        toUInt8(profile_id IS NOT NULL) AS is_selectable,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        nullIf(trimBoth(concat(ifNull(first_name, ''), ' ', ifNull(last_name, ''))), '') AS full_name,
+        email AS email,
+        phone AS phone,
+        nullIf(
+            trimBoth(
+                replaceRegexpAll(
+                    lowerUTF8(
+                        concat(
+                            ifNull(first_name, ''),
+                            ' ',
+                            ifNull(last_name, ''),
+                            ' ',
+                            ifNull(email, ''),
+                            ' ',
+                            ifNull(phone, '')
+                        )
+                    ),
+                    '\\s+',
+                    ' '
+                )
+            ),
+            ''
+        ) AS search_text
+    FROM resolved_profile_search_candidates

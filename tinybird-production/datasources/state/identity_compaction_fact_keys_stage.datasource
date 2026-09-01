@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Retry-safe retained fact keys selected for one identity compaction batch.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `stage_kind` LowCardinality(String) `json:$.stage_kind`,
+    `stage_key` String `json:$.stage_key`,
+    `staged_at` DateTime64(6) `json:$.staged_at`,
+    `row_hash` FixedString(64) `json:$.row_hash`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `fact_key` String `json:$.fact_key`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, stage_kind, stage_key, staged_at, row_hash

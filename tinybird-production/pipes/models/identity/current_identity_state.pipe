@@ -1,0 +1,61 @@
+DESCRIPTION >
+    Current identity state from the immutable flat snapshot overlaid with the small
+    explicitly activated delta journal.
+
+NODE current_identity_state_rows
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.state_kind, delta.state_kind) AS state_kind,
+        if(delta.state_key = '', base.state_key, delta.state_key) AS state_key,
+        if(delta.state_key = '', base.batch_version, delta.batch_version) AS batch_version,
+        if(delta.state_key = '', base.batch_id, delta.batch_id) AS batch_id,
+        if(delta.state_key = '', base.committed_at, delta.committed_at) AS committed_at,
+        if(delta.state_key = '', base.row_hash, delta.row_hash) AS row_hash,
+        if(delta.state_key = '', base.identifier_type, delta.identifier_type) AS identifier_type,
+        if(delta.state_key = '', base.identifier_value, delta.identifier_value) AS identifier_value,
+        if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
+        if(delta.state_key = '', base.profile_id, delta.profile_id) AS profile_id,
+        if(delta.state_key = '', base.profile_key, delta.profile_key) AS profile_key,
+        if(
+            delta.state_key = '', base.winner_identifier_key, delta.winner_identifier_key
+        ) AS winner_identifier_key,
+        if(
+            delta.state_key = '', base.member_identifier_keys, delta.member_identifier_keys
+        ) AS member_identifier_keys,
+        if(delta.state_key = '', base.anonymous_ids, delta.anonymous_ids) AS anonymous_ids,
+        if(delta.state_key = '', base.user_ids, delta.user_ids) AS user_ids,
+        if(delta.state_key = '', base.emails, delta.emails) AS emails,
+        if(delta.state_key = '', base.phones, delta.phones) AS phones,
+        if(
+            delta.state_key = '', base.historical_profile_ids, delta.historical_profile_ids
+        ) AS historical_profile_ids,
+        if(delta.state_key = '', base.first_name, delta.first_name) AS first_name,
+        if(delta.state_key = '', base.last_name, delta.last_name) AS last_name,
+        if(delta.state_key = '', base.first_seen_at, delta.first_seen_at) AS first_seen_at,
+        if(delta.state_key = '', base.last_seen_at, delta.last_seen_at) AS last_seen_at,
+        if(delta.state_key = '', base.fact_kind, delta.fact_kind) AS fact_kind,
+        if(delta.state_key = '', base.fact_key, delta.fact_key) AS fact_key,
+        if(
+            delta.state_key = '', base.source_fact_version, delta.source_fact_version
+        ) AS source_fact_version,
+        if(delta.state_key = '', base.fact_deleted, delta.fact_deleted) AS fact_deleted,
+        if(delta.state_key = '', base.fact_observed_at, delta.fact_observed_at) AS fact_observed_at,
+        if(delta.state_key = '', base.fact_payload_hash, delta.fact_payload_hash) AS fact_payload_hash,
+        if(delta.state_key = '', base.fact_payload, delta.fact_payload) AS fact_payload,
+        if(delta.state_key = '', base.evidence_keys, delta.evidence_keys) AS evidence_keys,
+        if(delta.state_key = '', base.producer_id, delta.producer_id) AS producer_id,
+        if(
+            delta.state_key = '', base.checkpoint_sequence, delta.checkpoint_sequence
+        ) AS checkpoint_sequence,
+        if(delta.state_key = '', base.prior_profile_ids, delta.prior_profile_ids) AS prior_profile_ids,
+        if(delta.state_key = '', base.dirty_profile_ids, delta.dirty_profile_ids) AS dirty_profile_ids,
+        if(delta.state_key = '', base.input_event_count, delta.input_event_count) AS input_event_count,
+        if(delta.state_key = '', base.input_hash, delta.input_hash) AS input_hash
+    FROM identity_state_base AS base
+    FULL OUTER JOIN
+        (SELECT * FROM current_identity_delta_state WHERE state_kind != 'evidence') AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.state_kind = delta.state_kind
+        AND base.state_key = delta.state_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0

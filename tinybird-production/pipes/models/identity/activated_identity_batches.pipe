@@ -1,0 +1,72 @@
+DESCRIPTION >
+    One explicit activation marker per tenant and batch version. Delta readers must
+    join tenant, version, and batch ID to these rows before exposing journal data.
+
+NODE identity_base_activation_batches
+SQL >
+    SELECT
+        tenant_id,
+        batch_version,
+        batch_id,
+        committed_at,
+        row_hash,
+        producer_id,
+        checkpoint_sequence,
+        toDateTime64(0, 6) AS checkpoint_ingested_at,
+        CAST(
+            '0000000000000000000000000000000000000000000000000000000000000000', 'FixedString(64)'
+        ) AS checkpoint_event_id,
+        input_event_count,
+        input_hash,
+        toUInt64(0) AS output_row_count,
+        CAST(repeat('0', 64) AS FixedString(64)) AS output_hash
+    FROM identity_state_seed_enriched
+    WHERE state_kind = 'activation_audit' AND is_deleted = 0
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC, batch_id DESC
+        )
+        = 1
+
+NODE identity_delta_activation_candidates
+SQL >
+    SELECT
+        journal.tenant_id AS tenant_id,
+        journal.batch_version AS batch_version,
+        journal.batch_id AS batch_id,
+        journal.committed_at AS committed_at,
+        journal.row_hash AS row_hash,
+        journal.producer_id AS producer_id,
+        journal.checkpoint_sequence AS checkpoint_sequence,
+        journal.checkpoint_ingested_at AS checkpoint_ingested_at,
+        journal.checkpoint_event_id AS checkpoint_event_id,
+        journal.input_event_count AS input_event_count,
+        journal.input_hash AS input_hash,
+        journal.output_row_count AS output_row_count,
+        journal.output_hash AS output_hash
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN identity_base_activation_batches AS base ON journal.tenant_id = base.tenant_id
+    WHERE
+        journal.state_kind = 'activation_audit'
+        AND journal.is_deleted = 0
+        AND journal.batch_version > base.batch_version
+
+NODE exact_identity_delta_activation_batches
+SQL >
+    SELECT *
+    FROM identity_delta_activation_candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, batch_version
+            ORDER BY committed_at DESC, row_hash DESC, batch_id DESC
+        )
+        = 1
+
+NODE activated_identity_batch_rows
+SQL >
+    SELECT *
+    FROM identity_base_activation_batches
+    UNION ALL
+    SELECT *
+    FROM exact_identity_delta_activation_batches

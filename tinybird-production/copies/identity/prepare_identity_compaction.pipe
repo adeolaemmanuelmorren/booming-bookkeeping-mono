@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Append one retry-safe prepared identity batch. The coordinator runs this before
+    affected-scope expansion.
+
+NODE append_prepared_identity_compaction
+SQL >
+    SELECT * FROM identity_compaction_prepare_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_changes_stage
+COPY_MODE append

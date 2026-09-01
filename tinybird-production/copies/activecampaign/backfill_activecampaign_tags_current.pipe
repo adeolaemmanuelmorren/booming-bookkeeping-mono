@@ -1,0 +1,18 @@
+DESCRIPTION >
+    One-time seed of all ActiveCampaign tag versions imported before the live
+    materialization was deployed. Replays are safe because the target collapses
+    identical tag/version rows with ReplacingMergeTree.
+
+NODE backfill_activecampaign_tag_versions
+SQL >
+    SELECT
+        ifNull(id, '') AS tag_id,
+        tags AS tag_name,
+        c_date AS tag_created_at,
+        ifNull(_fivetran_synced, toDateTime64(0, 6)) AS source_version,
+        toUInt8(coalesce(_fivetran_deleted, false)) AS is_deleted
+    FROM raw_activecampaign_tags
+
+TYPE COPY
+TARGET_DATASOURCE activecampaign_tags_current
+COPY_MODE append

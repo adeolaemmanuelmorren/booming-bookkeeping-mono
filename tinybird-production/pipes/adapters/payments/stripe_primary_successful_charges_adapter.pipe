@@ -1,0 +1,58 @@
+DESCRIPTION >
+    Latest successful charges from the primary Stripe account. Catalog, discount,
+    identity, and occurrence adapters share this charge-grain resource.
+
+NODE latest_primary_stripe_charges
+SQL >
+    SELECT
+        id AS payment_id,
+        created AS payment_time,
+        lowerUTF8(currency) AS currency,
+        amount AS amount_cents,
+        amount_refunded AS amount_refunded_cents,
+        paid,
+        status,
+        customer_id,
+        invoice_id,
+        payment_intent_id,
+        payment_method_id,
+        receipt_email,
+        receipt_url,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        billing_detail_address_line_1,
+        billing_detail_address_city,
+        billing_detail_address_state,
+        billing_detail_address_postal_code,
+        billing_detail_address_country,
+        shipping_address_line_1,
+        shipping_address_city,
+        shipping_address_state,
+        shipping_address_postal_code,
+        shipping_address_country,
+        description AS charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        nullIf(
+            replaceRegexpAll(
+                JSONExtractString(ifNull(metadata, '{}'), 'products'), '^[[:space:]]+|[[:space:]]+$', ''
+            ),
+            ''
+        ) AS metadata_products,
+        nullIf(
+            replaceRegexpAll(
+                JSONExtractString(ifNull(metadata, '{}'), 'phone'), '^[[:space:]]+|[[:space:]]+$', ''
+            ),
+            ''
+        ) AS metadata_phone,
+        livemode,
+        _fivetran_synced
+    FROM raw_stripe_charge
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE successful_primary_stripe_charges
+SQL >
+    SELECT * EXCEPT (paid, status)
+    FROM latest_primary_stripe_charges
+    WHERE paid = true AND status = 'succeeded'

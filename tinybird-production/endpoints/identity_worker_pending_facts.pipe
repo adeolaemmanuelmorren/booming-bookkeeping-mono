@@ -1,0 +1,37 @@
+DESCRIPTION >
+    The next deterministic identity cursor window for the coordinator Worker.
+
+NODE pending_identity_worker_facts
+SQL >
+    %
+    SELECT
+        event_id,
+        producer_id,
+        observed_at,
+        ingested_at,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_deleted,
+        fact_payload_hash,
+        fact_payload,
+        evidence_keys
+    FROM identity_events_cursor
+    WHERE
+        tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND (ingested_at, toString(event_id)) > (
+            parseDateTime64BestEffort(
+                {{ String(p_cursor_ingested_at, '1970-01-01 00:00:00.000000') }},
+                6
+            ),
+            {{
+                String(
+                    p_cursor_event_id,
+                    '0000000000000000000000000000000000000000000000000000000000000000',
+                )
+            }}
+        )
+    ORDER BY ingested_at, event_id
+    LIMIT {{ UInt64(p_batch_limit, 1500) }}
+
+TYPE ENDPOINT

@@ -1,0 +1,27 @@
+DESCRIPTION >
+    One-time baseline for ActiveCampaign tag semantics already imported before the
+    semantic-version materialization was deployed.
+
+NODE seed_activecampaign_tag_semantic_versions
+SQL >
+    SELECT
+        ifNull(id, '') AS tag_id,
+        tags AS tag_name,
+        ifNull(_fivetran_synced, toDateTime64(0, 6)) AS source_version,
+        toUInt8(coalesce(_fivetran_deleted, false)) AS is_deleted,
+        lower(
+            hex(
+                SHA256(
+                    concat(
+                        ifNull(tags, ''),
+                        '\n',
+                        toString(toUInt8(coalesce(_fivetran_deleted, false)))
+                    )
+                )
+            )
+        ) AS semantic_hash
+    FROM raw_activecampaign_tags
+
+TYPE COPY
+TARGET_DATASOURCE activecampaign_tag_semantic_versions
+COPY_MODE append

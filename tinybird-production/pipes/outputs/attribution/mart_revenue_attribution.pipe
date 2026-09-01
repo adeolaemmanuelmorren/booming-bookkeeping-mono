@@ -1,0 +1,6 @@
+DESCRIPTION >
+    Live payment revenue attribution from current incremental journeys.
+
+NODE current_revenue_attribution_rows
+SQL >
+    SELECT * FROM mart_revenue_attribution_build

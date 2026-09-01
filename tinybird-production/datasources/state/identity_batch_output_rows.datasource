@@ -1,0 +1,15 @@
+DESCRIPTION >
+    Narrow retry-safe index of rows written by one Worker identity batch. Manifest
+    validation reads this batch-keyed index instead of scanning the serving journal.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `state_kind` LowCardinality(String) `json:$.state_kind`,
+    `lookup_key` String `json:$.lookup_key`,
+    `sub_key` String `json:$.sub_key`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, state_kind, lookup_key, sub_key, row_hash

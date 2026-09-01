@@ -1,0 +1,322 @@
+DESCRIPTION >
+    Classified Kajabi Stripe payments. The output matches the Kajabi provider branch
+    of Dataform's common successful-payment contract.
+
+NODE latest_kajabi_stripe_charges
+SQL >
+    SELECT
+        id AS payment_id,
+        created AS payment_time,
+        lowerUTF8(currency) AS currency,
+        amount AS amount_cents,
+        amount_refunded AS amount_refunded_cents,
+        paid,
+        status,
+        customer_id,
+        invoice_id,
+        payment_intent_id,
+        payment_method_id,
+        receipt_email,
+        receipt_url,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        billing_detail_address_line_1,
+        billing_detail_address_city,
+        billing_detail_address_state,
+        billing_detail_address_postal_code,
+        billing_detail_address_country,
+        description AS charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        livemode
+    FROM raw_stripe_kajabi_charge
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE successful_kajabi_stripe_charges
+SQL >
+    SELECT * EXCEPT (paid, status)
+    FROM latest_kajabi_stripe_charges
+    WHERE paid = true AND status = 'succeeded'
+
+NODE latest_kajabi_stripe_customers
+SQL >
+    SELECT
+        id AS customer_id,
+        nullIf(lowerUTF8(trim(email)), '') AS email,
+        nullIf(trim(name), '') AS name,
+        nullIf(trim(phone), '') AS phone
+    FROM raw_stripe_kajabi_customer
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_kajabi_stripe_intents
+SQL >
+    SELECT
+        id AS payment_intent_id,
+        nullIf(lowerUTF8(trim(receipt_email)), '') AS receipt_email,
+        nullIf(trim(description), '') AS description
+    FROM raw_stripe_kajabi_payment_intent
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_kajabi_stripe_invoices
+SQL >
+    SELECT
+        id AS invoice_id, subscription_id, billing_reason, nullIf(trim(description), '') AS description
+    FROM raw_stripe_kajabi_invoice
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_kajabi_stripe_invoice_lines
+SQL >
+    SELECT
+        coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) AS line_item_id,
+        invoice_id,
+        subscription_id,
+        price_id,
+        plan_id,
+        nullIf(trim(description), '') AS line_item_description,
+        amount AS amount_cents,
+        toDecimal128(amount, 9) / 100 AS amount,
+        quantity,
+        period_start
+    FROM raw_stripe_kajabi_invoice_line_item
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), ''))
+            ORDER BY _fivetran_synced DESC
+        )
+        = 1
+
+NODE kajabi_stripe_invoice_line_rollups
+SQL >
+    SELECT
+        invoice_id,
+        argMin(
+            tuple(
+                line_item_id,
+                subscription_id,
+                price_id,
+                plan_id,
+                line_item_description,
+                amount,
+                quantity
+            ),
+            tuple(
+                if(amount_cents IS NULL, 1, 0), - ifNull(amount_cents, toInt64(0)),
+                ifNull(line_item_id, '')
+            )
+        ) AS best_line,
+        if(
+            countIf(line_item_description IS NOT NULL) = 0,
+            CAST(NULL AS Nullable(String)),
+            arrayStringConcat(
+                arrayMap(
+                    item -> tupleElement(item, 3),
+                    arraySort(
+                        item -> tuple(tupleElement(item, 1), tupleElement(item, 2)),
+                        groupArrayIf(
+                            tuple(
+                                ifNull(period_start, toDateTime64(0, 6)),
+                                ifNull(line_item_id, ''),
+                                assumeNotNull(line_item_description)
+                            ),
+                            line_item_description IS NOT NULL
+                        )
+                    )
+                ),
+                ', '
+            )
+        ) AS complete_line_description
+    FROM latest_kajabi_stripe_invoice_lines
+    GROUP BY invoice_id
+
+NODE enriched_kajabi_stripe_payments
+SQL >
+    SELECT
+        charge.payment_id AS payment_id,
+        charge.payment_time AS payment_time,
+        toDate(charge.payment_time, 'America/Los_Angeles') AS payment_date,
+        charge.customer_id AS customer_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(charge.billing_detail_email)), ''),
+            nullIf(lowerUTF8(trim(charge.receipt_email)), ''),
+            customer.email,
+            intent.receipt_email
+        ) AS payment_email,
+        coalesce(nullIf(trim(charge.billing_detail_name), ''), customer.name) AS payment_name,
+        coalesce(nullIf(trim(charge.billing_detail_phone), ''), customer.phone) AS payment_phone,
+        nullIf(trim(charge.billing_detail_address_line_1), '') AS billing_address_line_1,
+        nullIf(trim(charge.billing_detail_address_city), '') AS billing_address_city,
+        nullIf(trim(charge.billing_detail_address_state), '') AS billing_address_region,
+        nullIf(trim(charge.billing_detail_address_postal_code), '') AS billing_address_zip,
+        nullIf(trim(charge.billing_detail_address_country), '') AS billing_address_country,
+        charge.currency AS currency,
+        toDecimal128(charge.amount_cents, 9) / 100 AS amount_paid,
+        toDecimal128(charge.amount_refunded_cents, 9) / 100 AS refund_amount,
+        toDecimal128(charge.amount_cents - charge.amount_refunded_cents, 9) / 100 AS net_amount,
+        charge.amount_refunded_cents > 0 AS has_refund,
+        charge.payment_intent_id AS payment_intent_id,
+        charge.payment_method_id AS payment_method_id,
+        charge.invoice_id AS invoice_id,
+        coalesce(invoice.subscription_id, tupleElement(line.best_line, 2)) AS subscription_id,
+        invoice.billing_reason AS invoice_billing_reason,
+        tupleElement(line.best_line, 1) AS line_item_id,
+        tupleElement(line.best_line, 3) AS price_id,
+        tupleElement(line.best_line, 4) AS plan_id,
+        tupleElement(line.best_line, 5) AS line_item_description,
+        line.complete_line_description AS complete_line_description,
+        tupleElement(line.best_line, 7) AS quantity,
+        tupleElement(line.best_line, 6) AS line_amount,
+        charge.charge_description AS charge_description,
+        charge.calculated_statement_descriptor AS calculated_statement_descriptor,
+        charge.statement_descriptor AS statement_descriptor,
+        intent.description AS payment_intent_description,
+        invoice.description AS invoice_description,
+        charge.receipt_url AS receipt_url,
+        charge.livemode AS livemode
+    FROM successful_kajabi_stripe_charges AS charge
+    LEFT JOIN latest_kajabi_stripe_customers AS customer ON customer.customer_id = charge.customer_id
+    LEFT JOIN
+        latest_kajabi_stripe_intents AS intent ON intent.payment_intent_id = charge.payment_intent_id
+    LEFT JOIN latest_kajabi_stripe_invoices AS invoice ON invoice.invoice_id = charge.invoice_id
+    LEFT JOIN kajabi_stripe_invoice_line_rollups AS line ON line.invoice_id = charge.invoice_id
+
+NODE classified_kajabi_stripe_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            plan_id = 'subscription_plan_2149288216'
+            OR match(
+                lowerUTF8(ifNull(line_item_description, '')), 'booming bookkeeping mentorship program'
+            ),
+            'kajabi_mentorship_monthly',
+            plan_id = 'subscription_plan_255477'
+            OR match(
+                lowerUTF8(ifNull(line_item_description, '')),
+                'booming bookkeeping business.*installment'
+            ),
+            'kajabi_business_installment_legacy',
+            line_item_description IS NOT NULL,
+            'kajabi_invoice_line',
+            'unclassified'
+        ) AS product_rule
+    FROM enriched_kajabi_stripe_payments
+
+NODE named_kajabi_stripe_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            product_rule = 'kajabi_mentorship_monthly',
+            'subscription_plan_2149288216',
+            product_rule = 'kajabi_business_installment_legacy',
+            'subscription_plan_255477',
+            coalesce(plan_id, price_id)
+        ) AS product_id,
+        multiIf(
+            product_rule = 'kajabi_mentorship_monthly',
+            'Booming Bookkeeping Mentorship Program',
+            product_rule = 'kajabi_business_installment_legacy',
+            'Booming Bookkeeping Business (Installment Plan)',
+            product_rule = 'kajabi_invoice_line',
+            line_item_description,
+            'unclassified'
+        ) AS product_name,
+        multiIf(
+            product_rule IN ('kajabi_mentorship_monthly', 'kajabi_business_installment_legacy'),
+            'kajabi_plan_or_invoice_line',
+            product_rule = 'kajabi_invoice_line',
+            'kajabi_invoice_line',
+            'unclassified'
+        ) AS product_classification_method,
+        product_rule != 'unclassified' AS is_product_classified
+    FROM classified_kajabi_stripe_payments
+
+NODE sequenced_kajabi_stripe_payments
+SQL >
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY
+                if(
+                    subscription_id IS NULL,
+                    concat('payment:', payment_id),
+                    concat('subscription:', subscription_id)
+                )
+            ORDER BY payment_time, payment_id
+        ) AS sequence_number
+    FROM named_kajabi_stripe_payments
+
+NODE current_kajabi_stripe_payment_rows
+SQL >
+    SELECT
+        'stripe_kajabi' AS payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        billing_address_line_1,
+        billing_address_city,
+        billing_address_region,
+        billing_address_zip,
+        billing_address_country,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        CAST(NULL AS Nullable(String)) AS product_variant,
+        price_id,
+        plan_id,
+        product_rule,
+        product_classification_method,
+        is_product_classified,
+        false AS is_bbb_mentorship_installment,
+        if(
+            subscription_id IS NULL, CAST(NULL AS Nullable(Int64)), toInt64(sequence_number)
+        ) AS payment_sequence_number,
+        multiIf(
+            subscription_id IS NULL,
+            'one_time',
+            invoice_billing_reason = 'subscription_create',
+            'initial',
+            'renewal'
+        ) AS payment_occurrence_type,
+        toUInt8(
+            subscription_id IS NOT NULL
+            AND coalesce(invoice_billing_reason != 'subscription_create', true)
+        ) AS is_repeat_payment,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        invoice_billing_reason,
+        CAST(NULL AS Nullable(String)) AS checkout_mode,
+        false AS has_discount,
+        toDecimal128(0, 9) AS discount_amount,
+        CAST([], 'Array(String)') AS discount_ids,
+        CAST([], 'Array(String)') AS coupon_ids,
+        CAST([], 'Array(String)') AS coupon_names,
+        CAST([], 'Array(String)') AS promotion_code_ids,
+        CAST([], 'Array(String)') AS promotion_codes,
+        CAST(NULL AS Nullable(Decimal(38, 9))) AS coupon_amount_off,
+        CAST(NULL AS Nullable(Float64)) AS coupon_percent_off,
+        charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        payment_intent_description,
+        invoice_description,
+        CAST(NULL AS Nullable(String)) AS book_product_text,
+        receipt_url,
+        livemode,
+        coalesce(
+            nullIf(trim(product_name), ''), nullIf(trim(complete_line_description), '')
+        ) AS product_complete_name
+    FROM sequenced_kajabi_stripe_payments

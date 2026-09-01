@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Resolve and append the full prior profiles selected for one identity batch.
+
+NODE append_frozen_identity_compaction_touched_profiles
+SQL >
+    SELECT * FROM identity_compaction_touched_profiles_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_compaction_scope_stage
+COPY_MODE append

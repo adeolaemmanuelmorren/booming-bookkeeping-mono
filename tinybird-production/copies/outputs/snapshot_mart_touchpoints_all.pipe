@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Atomically replace resolved touchpoints after sessions or identity state changes.
+
+NODE build_touchpoint_snapshot
+SQL >
+    SELECT * FROM mart_touchpoints_all_build
+
+TYPE COPY
+TARGET_DATASOURCE mart_touchpoints_all_current
+COPY_MODE replace

@@ -1,0 +1,186 @@
+DESCRIPTION >
+    Current atomically committed journey payload rows before mutable dimensions
+    are joined. Aggregates use this layer so they join ad names after grouping.
+
+NODE latest_journey_commit_versions
+SQL >
+    SELECT
+        commit_rows.tenant_id AS tenant_id,
+        commit_rows.conversion_id AS conversion_id,
+        argMax(
+            commit_rows.batch_version,
+            tuple(
+                commit_rows.batch_version,
+                commit_rows.committed_at,
+                commit_rows.batch_id
+            )
+        ) AS active_batch_version,
+        argMax(
+            commit_rows.batch_id,
+            tuple(
+                commit_rows.batch_version,
+                commit_rows.committed_at,
+                commit_rows.batch_id
+            )
+        ) AS active_batch_id,
+        argMax(
+            commit_rows.is_deleted,
+            tuple(
+                commit_rows.batch_version,
+                commit_rows.committed_at,
+                commit_rows.batch_id
+            )
+        ) AS active_is_deleted
+    FROM reporting_journey_commits AS commit_rows
+    GROUP BY commit_rows.tenant_id, commit_rows.conversion_id
+
+NODE current_committed_journey_rows
+SQL >
+    SELECT versions.*
+    FROM reporting_journey_versions AS versions
+    INNER JOIN latest_journey_commit_versions AS commits
+        ON versions.tenant_id = commits.tenant_id
+        AND versions.conversion_id = commits.conversion_id
+        AND versions.batch_version = commits.active_batch_version
+        AND versions.batch_id = commits.active_batch_id
+    WHERE commits.active_is_deleted = 0
+
+NODE current_seed_journey_rows
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        toUInt64(0) AS batch_version,
+        'journey_seed' AS batch_id,
+        toDateTime64('1970-01-01 00:00:00', 6) AS committed_at,
+        coalesce(seed.touchpoint_id, concat('offline:', seed.conversion_id))
+            AS journey_row_key,
+        seed.conversion_id AS conversion_id,
+        seed.profile_id AS profile_id,
+        seed.conversion_time AS conversion_time,
+        seed.conversion_source AS conversion_source,
+        seed.conversion_type AS conversion_type,
+        seed.form_submissions_server_side AS form_submissions_server_side,
+        seed.krc_registrations_server_side AS krc_registrations_server_side,
+        seed.form_submissions_client_side AS form_submissions_client_side,
+        seed.order_completed_server_side AS order_completed_server_side,
+        seed.order_completed_client_side AS order_completed_client_side,
+        seed.payments_server_side AS payments_server_side,
+        seed.payments_client_side AS payments_client_side,
+        seed.revenue_server_side AS revenue_server_side,
+        toDecimal128(toString(seed.revenue_server_side), 9)
+            AS revenue_server_side_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(seed.revenue_server_side), 9)
+                * toDecimal128(toString(seed.first_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_first_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(seed.revenue_server_side), 9)
+                * toDecimal128(toString(seed.last_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_last_touch_decimal,
+        toDecimal128(
+            round(
+                toDecimal128(toString(seed.revenue_server_side), 9)
+                * toDecimal128(toString(seed.multi_touch_weight), 9),
+                9
+            ),
+            9
+        ) AS revenue_multi_touch_decimal,
+        seed.revenue_client_side AS revenue_client_side,
+        seed.customers_server_side AS customers_server_side,
+        seed.bbb_buyers_server_side AS bbb_buyers_server_side,
+        seed.bbb_revenue_server_side AS bbb_revenue_server_side,
+        seed.payments_vip_server_side AS payments_vip_server_side,
+        seed.payments_book_server_side AS payments_book_server_side,
+        seed.payments_mentorship_server_side AS payments_mentorship_server_side,
+        seed.payments_kajabi_server_side AS payments_kajabi_server_side,
+        seed.payments_catalog_server_side AS payments_catalog_server_side,
+        seed.payments_unknown_server_side AS payments_unknown_server_side,
+        seed.revenue_vip_server_side AS revenue_vip_server_side,
+        seed.revenue_book_server_side AS revenue_book_server_side,
+        seed.revenue_mentorship_server_side AS revenue_mentorship_server_side,
+        seed.revenue_kajabi_server_side AS revenue_kajabi_server_side,
+        seed.revenue_catalog_server_side AS revenue_catalog_server_side,
+        seed.revenue_unknown_server_side AS revenue_unknown_server_side,
+        seed.touchpoint_id AS touchpoint_id,
+        seed.session_id AS session_id,
+        seed.session_start_timestamp AS session_start_timestamp,
+        seed.landing_page_host AS landing_page_host,
+        seed.landing_page_path AS landing_page_path,
+        seed.source AS source,
+        seed.medium AS medium,
+        nullIf(seed.source, 'offline') AS ad_source_key,
+        multiIf(
+            seed.touchpoint_id IS NULL,
+            'unattributed',
+            seed.source = 'meta' AND seed.medium IN ('paid', 'cpc', 'ppc', 'paid_social'),
+            'meta / paid',
+            seed.source = 'meta' AND seed.medium IN ('referral', 'social', 'organic'),
+            'meta / organic',
+            match(lowerUTF8(seed.source), '(^|\\.)(facebook\\.com|instagram\\.com)$'),
+            'meta / organic',
+            seed.source = 'google' AND seed.medium IN ('referral', 'organic'),
+            'google / organic',
+            match(lowerUTF8(seed.source), '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$')
+                OR startsWith(lowerUTF8(seed.source), 'com.google.'),
+            'google / organic',
+            seed.source = 'bing' AND seed.medium IN ('referral', 'organic'),
+            'bing / organic',
+            match(lowerUTF8(seed.source), '(^|\\.)(bing\\.com)$'),
+            'bing / organic',
+            seed.source = 'youtube' AND seed.medium IN ('referral', 'organic'),
+            'youtube / organic',
+            match(lowerUTF8(seed.source), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+            'youtube / organic',
+            seed.source = 'trustpilot' AND seed.medium IN ('company_profile', 'referral'),
+            'trustpilot / referral',
+            match(lowerUTF8(seed.source), '(^|\\.)(trustpilot\\.com)$')
+                OR lowerUTF8(seed.source) = 'trustpilot',
+            'trustpilot / referral',
+            concat(seed.source, ' / ', seed.medium)
+        ) AS touchpoint_channel_label,
+        seed.utm_campaign AS utm_campaign,
+        seed.utm_content AS utm_content,
+        seed.utm_term AS utm_term,
+        seed.campaign_id AS campaign_id,
+        seed.adset_id AS adset_id,
+        seed.ad_id AS ad_id,
+        seed.is_direct_touch AS is_direct_touch,
+        seed.is_paid_ad_touch AS is_paid_ad_touch,
+        seed.total_touchpoints AS total_touchpoints,
+        seed.touchpoint_number AS touchpoint_number,
+        seed.is_excluded_direct_touch AS is_excluded_direct_touch,
+        seed.non_direct_touchpoints AS non_direct_touchpoints,
+        seed.non_direct_touchpoint_number AS non_direct_touchpoint_number,
+        seed.attribution_touchpoints AS attribution_touchpoints,
+        seed.attribution_touchpoint_number AS attribution_touchpoint_number,
+        seed.first_touch_is_direct AS first_touch_is_direct,
+        seed.excluded_direct_touchpoints AS excluded_direct_touchpoints,
+        seed.paid_ad_touchpoints AS paid_ad_touchpoints,
+        seed.paid_ad_touchpoint_number AS paid_ad_touchpoint_number,
+        seed.journey_direct_status AS journey_direct_status,
+        seed.multi_touch_weight AS multi_touch_weight,
+        seed.first_touch_weight AS first_touch_weight,
+        seed.last_touch_weight AS last_touch_weight,
+        seed.paid_multi_touch_weight AS paid_multi_touch_weight,
+        seed.paid_first_touch_weight AS paid_first_touch_weight,
+        seed.paid_last_touch_weight AS paid_last_touch_weight
+    FROM reporting_journey_seed_current AS seed
+    LEFT ANTI JOIN latest_journey_commit_versions AS commits
+        ON commits.tenant_id = 'boom'
+        AND commits.conversion_id = seed.conversion_id
+
+NODE current_journey_base_rows
+SQL >
+    SELECT *
+    FROM current_seed_journey_rows
+    UNION ALL
+    SELECT *
+    FROM current_committed_journey_rows

@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Combined typed export for Stripe subscription history and the five Kajabi
+    checkout/catalog tables that are not part of the 49 physical raw mirrors.
+
+TOKEN "boom_bigquery_tinybird_sync" APPEND
+
+SCHEMA >
+    `record_type` String `json:$.record_type`,
+    `payment_source` String `json:$.payment_source`,
+    `record_id` Nullable(String) `json:$.record_id`,
+    `subscription_id` Nullable(String) `json:$.subscription_id`,
+    `subscription_created_at` Nullable(DateTime64(6)) `json:$.subscription_created_at`,
+    `subscription_started_at` Nullable(DateTime64(6)) `json:$.subscription_started_at`,
+    `start_date` Nullable(DateTime64(6)) `json:$.start_date`,
+    `checkout_session_id` Nullable(String) `json:$.checkout_session_id`,
+    `checkout_line_item_id` Nullable(String) `json:$.checkout_line_item_id`,
+    `payment_intent_id` Nullable(String) `json:$.payment_intent_id`,
+    `price_id` Nullable(String) `json:$.price_id`,
+    `plan_id` Nullable(String) `json:$.plan_id`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `line_item_description` Nullable(String) `json:$.line_item_description`,
+    `product_name` Nullable(String) `json:$.product_name`,
+    `quantity` Nullable(Int64) `json:$.quantity`,
+    `amount_total_cents` Nullable(Float64) `json:$.amount_total_cents`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_record_id` String `json:$.__tb_sort_record_id` DEFAULT ifNull(record_id, ''),
+    `__tb_sort_synced` DateTime64(6) `json:$.__tb_sort_synced` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY record_type, payment_source, __tb_sort_record_id, __tb_sort_synced
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/stripe_combined/auxiliary/**/*.parquet
+IMPORT_SCHEDULE @on-demand
+IMPORT_FORMAT parquet

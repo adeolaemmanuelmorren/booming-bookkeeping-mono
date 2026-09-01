@@ -1,0 +1,74 @@
+DESCRIPTION >
+    Current fact heads from the flat identity snapshot plus activated delta rows.
+
+NODE current_fact_rows
+SQL >
+    SELECT
+        if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
+        if(delta.state_key = '', base.fact_kind, delta.fact_kind) AS fact_kind,
+        if(delta.state_key = '', base.fact_key, delta.fact_key) AS fact_key,
+        if(
+            delta.state_key = '', base.source_fact_version, delta.source_fact_version
+        ) AS source_fact_version,
+        if(delta.state_key = '', base.fact_deleted, delta.fact_deleted) AS fact_deleted,
+        if(delta.state_key = '', base.fact_observed_at, delta.fact_observed_at) AS fact_observed_at,
+        if(delta.state_key = '', base.fact_payload_hash, delta.fact_payload_hash) AS fact_payload_hash,
+        if(delta.state_key = '', base.fact_payload, delta.fact_payload) AS fact_payload,
+        if(delta.state_key = '', base.evidence_keys, delta.evidence_keys) AS evidence_keys,
+        if(delta.state_key = '', base.producer_id, delta.producer_id) AS producer_id,
+        if(delta.state_key = '', base.batch_version, delta.batch_version) AS batch_version,
+        if(delta.state_key = '', base.committed_at, delta.committed_at) AS committed_at
+    FROM
+        (
+            SELECT
+                tenant_id,
+                state_key,
+                fact_kind,
+                fact_key,
+                source_fact_version,
+                fact_deleted,
+                fact_observed_at,
+                fact_payload_hash,
+                fact_payload,
+                evidence_keys,
+                producer_id,
+                batch_version,
+                committed_at
+            FROM identity_state_seed_enriched
+            WHERE state_kind = 'fact'
+        ) AS base
+    FULL OUTER JOIN
+        (
+            SELECT
+                journal.tenant_id AS tenant_id,
+                journal.state_key AS state_key,
+                journal.is_deleted AS is_deleted,
+                journal.fact_kind AS fact_kind,
+                journal.fact_key AS fact_key,
+                journal.source_fact_version AS source_fact_version,
+                journal.fact_deleted AS fact_deleted,
+                journal.fact_observed_at AS fact_observed_at,
+                journal.fact_payload_hash AS fact_payload_hash,
+                journal.fact_payload AS fact_payload,
+                journal.evidence_keys AS evidence_keys,
+                journal.producer_id AS producer_id,
+                journal.batch_version AS batch_version,
+                journal.committed_at AS committed_at
+            FROM identity_state_delta_versions AS journal
+            INNER JOIN
+                activated_identity_batches AS activated
+                ON journal.tenant_id = activated.tenant_id
+                AND journal.batch_version = activated.batch_version
+                AND journal.batch_id = activated.batch_id
+            WHERE journal.state_kind = 'fact'
+            QUALIFY
+                row_number() OVER (
+                    PARTITION BY journal.tenant_id, journal.lookup_key, journal.sub_key
+                    ORDER BY
+                        journal.batch_version DESC, journal.committed_at DESC, journal.row_hash DESC
+                )
+                = 1
+        ) AS delta
+        ON base.tenant_id = delta.tenant_id
+        AND base.state_key = delta.state_key
+    WHERE delta.state_key = '' OR delta.is_deleted = 0

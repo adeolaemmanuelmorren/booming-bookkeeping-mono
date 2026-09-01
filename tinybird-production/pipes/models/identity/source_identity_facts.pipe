@@ -1,0 +1,403 @@
+DESCRIPTION >
+    One producer's current identity fact contract across Jitsu, ActiveCampaign, and
+    both Stripe accounts. Rendering only the requested producer keeps each on-demand
+    enqueue query bounded. Click IDs remain excluded to preserve Dataform semantics.
+
+NODE selected_identity_fact_candidates
+SQL >
+    %
+    {% if defined(p_identity_producer) and p_identity_producer == 'source_identity:segment_identify' %}
+        SELECT
+            tenant_id,
+            'segment_identify' AS source_system,
+            identify_id AS source_record_id,
+            identified_at AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            email,
+            phone,
+            CAST(NULL AS Nullable(String)) AS first_name,
+            CAST(NULL AS Nullable(String)) AS last_name
+        FROM jitsu_identifies
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:segment_identify'
+            AND source_version >= parseDateTime64BestEffort(
+                {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
+            )
+    {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:segment_form' %}
+        SELECT
+            tenant_id,
+            'segment_form' AS source_system,
+            form_submission_id AS source_record_id,
+            submitted_at AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            email,
+            phone,
+            first_name,
+            CAST(NULL AS Nullable(String)) AS last_name
+        FROM jitsu_form_submissions
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:segment_form'
+            AND source_version >= parseDateTime64BestEffort(
+                {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
+            )
+    {% elif defined(
+        p_identity_producer
+    ) and p_identity_producer == 'source_identity:segment_order_completed' %}
+        SELECT
+            tenant_id,
+            'segment_order_completed' AS source_system,
+            event_row_id AS source_record_id,
+            completed_at AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            email,
+            phone,
+            nullIf(arrayElement(splitByChar(' ', ifNull(customer_name, '')), 1), '') AS first_name,
+            nullIf(
+                arrayElement(arrayReverse(splitByChar(' ', ifNull(customer_name, ''))), 1), ''
+            ) AS last_name
+        FROM jitsu_order_completed
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:segment_order_completed'
+            AND source_version >= parseDateTime64BestEffort(
+                {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
+            )
+    {% elif defined(
+        p_identity_producer
+    ) and p_identity_producer == 'source_identity:segment_page_view' %}
+        SELECT
+            tenant_id,
+            'segment_page_view' AS source_system,
+            page_view_id AS source_record_id,
+            page_view_timestamp AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            CAST(NULL AS Nullable(String)) AS email,
+            CAST(NULL AS Nullable(String)) AS phone,
+            CAST(NULL AS Nullable(String)) AS first_name,
+            CAST(NULL AS Nullable(String)) AS last_name
+        FROM jitsu_page_views
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:segment_page_view'
+            AND source_version >= parseDateTime64BestEffort(
+                {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
+            )
+    {% elif defined(
+        p_identity_producer
+    ) and p_identity_producer == 'source_identity:segment_attribution' %}
+        SELECT
+            tenant_id,
+            'segment_attribution' AS source_system,
+            attribution_event_id AS source_record_id,
+            attribution_event_time AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            user_id AS email,
+            CAST(NULL AS Nullable(String)) AS phone,
+            CAST(NULL AS Nullable(String)) AS first_name,
+            CAST(NULL AS Nullable(String)) AS last_name
+        FROM jitsu_attribution_params
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:segment_attribution'
+            AND source_version >= parseDateTime64BestEffort(
+                {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
+            )
+    {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:activecampaign' %}
+        SELECT
+            'boom' AS tenant_id,
+            'activecampaign' AS source_system,
+            form_submission_id AS source_record_id,
+            observed_at,
+            source_version,
+            toUInt8(ifNull(fact_deleted, 1)) AS fact_deleted,
+            CAST(NULL AS Nullable(String)) AS anonymous_id,
+            email AS user_id,
+            email,
+            phone,
+            first_name,
+            last_name
+        FROM activecampaign_identity_facts_adapter
+        WHERE
+            {{ String(p_identity_producer, '') }} = 'source_identity:activecampaign'
+            AND source_version
+            >= parseDateTime64BestEffort({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6)
+            {% if defined(p_source_ingested_to) %}
+                AND source_version
+                    < parseDateTime64BestEffort({{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6)
+            {% end %}
+    {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:stripe' %}
+        SELECT
+            'boom' AS tenant_id,
+            payment_source AS source_system,
+            payment_id AS source_record_id,
+            observed_at,
+            source_version,
+            toUInt8(ifNull(fact_deleted, 1)) AS fact_deleted,
+            CAST(NULL AS Nullable(String)) AS anonymous_id,
+            payment_email AS user_id,
+            payment_email AS email,
+            payment_phone AS phone,
+            nullIf(arrayElement(splitByChar(' ', ifNull(payment_name, '')), 1), '') AS first_name,
+            nullIf(
+                arrayElement(arrayReverse(splitByChar(' ', ifNull(payment_name, ''))), 1), ''
+            ) AS last_name
+        FROM stripe_identity_facts_adapter
+        WHERE
+            payment_source = 'stripe'
+            AND {{ String(p_identity_producer, '') }} = 'source_identity:stripe'
+            AND source_version
+            >= parseDateTime64BestEffort({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6)
+    {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:stripe_kajabi' %}
+        SELECT
+            'boom' AS tenant_id,
+            payment_source AS source_system,
+            payment_id AS source_record_id,
+            observed_at,
+            source_version,
+            toUInt8(ifNull(fact_deleted, 1)) AS fact_deleted,
+            CAST(NULL AS Nullable(String)) AS anonymous_id,
+            payment_email AS user_id,
+            payment_email AS email,
+            payment_phone AS phone,
+            nullIf(arrayElement(splitByChar(' ', ifNull(payment_name, '')), 1), '') AS first_name,
+            nullIf(
+                arrayElement(arrayReverse(splitByChar(' ', ifNull(payment_name, ''))), 1), ''
+            ) AS last_name
+        FROM stripe_identity_facts_adapter
+        WHERE
+            payment_source = 'stripe_kajabi'
+            AND {{ String(p_identity_producer, '') }} = 'source_identity:stripe_kajabi'
+            AND source_version
+            >= parseDateTime64BestEffort({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6)
+    {% else %}
+        SELECT
+            tenant_id,
+            'segment_identify' AS source_system,
+            identify_id AS source_record_id,
+            identified_at AS observed_at,
+            source_version,
+            toUInt8(0) AS fact_deleted,
+            anonymous_id,
+            user_id,
+            email,
+            phone,
+            CAST(NULL AS Nullable(String)) AS first_name,
+            CAST(NULL AS Nullable(String)) AS last_name
+        FROM jitsu_identifies
+        WHERE 0
+    {% end %}
+
+NODE identity_fact_phone_digits
+SQL >
+    SELECT *, replaceRegexpAll(trim(ifNull(phone, '')), '[^0-9]', '') AS phone_digits
+    FROM selected_identity_fact_candidates
+    WHERE tenant_id = 'boom' AND source_record_id IS NOT NULL AND trim(source_record_id) != ''
+
+NODE identity_fact_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM identity_fact_phone_digits
+
+NODE normalized_identity_fact_values
+SQL >
+    SELECT
+        *,
+        nullIf(trim(ifNull(anonymous_id, '')), '') AS normalized_anonymous_id,
+        nullIf(lowerUTF8(trim(ifNull(user_id, ''))), '') AS normalized_user_id,
+        nullIf(lowerUTF8(trim(ifNull(email, ''))), '') AS normalized_email,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(
+                national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS normalized_phone
+    FROM identity_fact_national_phones
+
+NODE canonical_identity_fact_values
+SQL >
+    SELECT
+        *,
+        if(
+            normalized_email IS NULL,
+            CAST(NULL AS Nullable(String)),
+            if(
+                arrayElement(splitByChar('@', assumeNotNull(normalized_email)), 2)
+                IN ('gmail.com', 'googlemail.com'),
+                concat(
+                    replaceAll(
+                        replaceRegexpOne(
+                            arrayElement(splitByChar('@', assumeNotNull(normalized_email)), 1),
+                            '[+].*$',
+                            ''
+                        ),
+                        '.',
+                        ''
+                    ),
+                    '@gmail.com'
+                ),
+                normalized_email
+            )
+        ) AS canonical_email,
+        coalesce(observed_at, toDateTime64(0, 6)) AS normalized_observed_at,
+        coalesce(source_version, observed_at, toDateTime64(0, 6)) AS normalized_source_version
+    FROM normalized_identity_fact_values
+
+NODE identity_fact_payload_values
+SQL >
+    SELECT
+        *,
+        toUInt64(
+            greatest(toUnixTimestamp64Micro(normalized_source_version), toInt64(0))
+        ) AS normalized_source_fact_version,
+        concat(
+            toString(length(source_system)),
+            ':',
+            source_system,
+            toString(length(assumeNotNull(source_record_id))),
+            ':',
+            assumeNotNull(source_record_id),
+            toString(length(toString(toUnixTimestamp64Micro(normalized_observed_at)))),
+            ':',
+            toString(toUnixTimestamp64Micro(normalized_observed_at)),
+            toString(length(toString(fact_deleted))),
+            ':',
+            toString(fact_deleted),
+            toString(length(ifNull(normalized_anonymous_id, ''))),
+            ':',
+            ifNull(normalized_anonymous_id, ''),
+            toString(length(ifNull(normalized_user_id, ''))),
+            ':',
+            ifNull(normalized_user_id, ''),
+            toString(length(ifNull(normalized_email, ''))),
+            ':',
+            ifNull(normalized_email, ''),
+            toString(length(ifNull(normalized_phone, ''))),
+            ':',
+            ifNull(normalized_phone, ''),
+            toString(length(ifNull(first_name, ''))),
+            ':',
+            ifNull(first_name, ''),
+            toString(length(ifNull(last_name, ''))),
+            ':',
+            ifNull(last_name, '')
+        ) AS canonical_payload,
+        concat(
+            toString(length(source_system)),
+            ':',
+            source_system,
+            ':',
+            toString(length(assumeNotNull(source_record_id))),
+            ':',
+            assumeNotNull(source_record_id)
+        ) AS fact_key,
+        arraySort(
+            arrayFilter(
+                identifier_key -> identifier_key != '',
+                [
+                    if(
+                        normalized_anonymous_id IS NULL,
+                        '',
+                        concat('anonymous_id:', assumeNotNull(normalized_anonymous_id))
+                    ),
+                    if(
+                        normalized_user_id IS NULL,
+                        '',
+                        concat('user_id:', assumeNotNull(normalized_user_id))
+                    ),
+                    if(normalized_email IS NULL, '', concat('email:', assumeNotNull(normalized_email))),
+                    if(
+                        canonical_email IS NULL,
+                        '',
+                        concat('canonical_email:', assumeNotNull(canonical_email))
+                    ),
+                    if(normalized_phone IS NULL, '', concat('phone:', assumeNotNull(normalized_phone)))
+                ]
+            )
+        ) AS evidence_keys
+    FROM canonical_identity_fact_values
+
+NODE current_source_identity_facts
+SQL >
+    SELECT
+        tenant_id,
+        CAST(
+            lower(
+                hex(
+                    SHA256(
+                        concat(
+                            fact_key,
+                            ':',
+                            toString(normalized_source_fact_version),
+                            ':',
+                            toString(fact_deleted),
+                            ':',
+                            lower(hex(SHA256(canonical_payload)))
+                        )
+                    )
+                )
+            ) AS FixedString(64)
+        ) AS event_id,
+        concat('source_identity:', source_system) AS producer_id,
+        'identity_observation' AS event_kind,
+        normalized_observed_at AS observed_at,
+        now64(6) AS ingested_at,
+        ifNull(normalized_anonymous_id, '') AS anonymous_id,
+        ifNull(normalized_user_id, '') AS user_id,
+        ifNull(normalized_email, '') AS email,
+        ifNull(normalized_phone, '') AS phone,
+        ifNull(first_name, '') AS first_name,
+        ifNull(last_name, '') AS last_name,
+        'identity_observation' AS fact_kind,
+        fact_key,
+        normalized_source_fact_version AS source_fact_version,
+        fact_deleted,
+        CAST(lower(hex(SHA256(canonical_payload))) AS FixedString(64)) AS fact_payload_hash,
+        toJSONString(
+            map(
+                'source_system',
+                source_system,
+                'source_record_id',
+                source_record_id,
+                'fact_deleted',
+                toString(fact_deleted),
+                'anonymous_id',
+                ifNull(normalized_anonymous_id, ''),
+                'user_id',
+                ifNull(normalized_user_id, ''),
+                'email',
+                ifNull(normalized_email, ''),
+                'phone',
+                ifNull(normalized_phone, ''),
+                'first_name',
+                ifNull(first_name, ''),
+                'last_name',
+                ifNull(last_name, '')
+            )
+        ) AS fact_payload,
+        evidence_keys
+    FROM identity_fact_payload_values

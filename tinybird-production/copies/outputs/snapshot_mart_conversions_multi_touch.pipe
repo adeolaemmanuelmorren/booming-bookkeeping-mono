@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Atomically replace the daily multi-touch conversion rollup after its journey refresh.
+
+NODE build_multi_touch_conversion_snapshot
+SQL >
+    SELECT
+        rollup_rows.*,
+        ifNull(rollup_rows.campaign_id, '') AS __tb_sort_campaign_id,
+        ifNull(rollup_rows.adset_id, '') AS __tb_sort_adset_id,
+        ifNull(rollup_rows.ad_id, '') AS __tb_sort_ad_id
+    FROM mart_conversions_multi_touch_build AS rollup_rows
+
+TYPE COPY
+TARGET_DATASOURCE mart_conversions_multi_touch_current
+COPY_MODE replace
+

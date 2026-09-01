@@ -1,0 +1,571 @@
+DESCRIPTION >
+    Browser-compatible Stripe product arrays. Product evidence follows the same
+    invoice-line, checkout-line, metadata, and description precedence as the
+    purchase-confirmation proxy and the authoritative Dataform model.
+
+NODE current_primary_browser_charges
+SQL >
+    SELECT id AS payment_id, paid, status, metadata, nullIf(trim(description), '') AS charge_description
+    FROM raw_stripe_charge
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_primary_browser_charges
+SQL >
+    SELECT payment_id, metadata, charge_description
+    FROM current_primary_browser_charges
+    WHERE paid = true AND status = 'succeeded'
+
+NODE current_kajabi_browser_charges
+SQL >
+    SELECT id AS payment_id, paid, status, metadata, nullIf(trim(description), '') AS charge_description
+    FROM raw_stripe_kajabi_charge
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE latest_kajabi_browser_charges
+SQL >
+    SELECT payment_id, metadata, charge_description
+    FROM current_kajabi_browser_charges
+    WHERE paid = true AND status = 'succeeded'
+
+NODE browser_payment_sources
+SQL >
+    SELECT
+        payments.payment_source AS browser_payment_source,
+        assumeNotNull(payments.payment_id) AS browser_payment_id,
+        payments.invoice_id,
+        payments.payment_intent_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(ifNull(charges.metadata, '{}'), 'products')), ''),
+            nullIf(
+                extract(
+                    ifNull(charges.charge_description, ''),
+                    '(?i)(?:^|\\|[[:space:]]*)products?:[[:space:]]*(.*)'
+                ),
+                ''
+            )
+        ) AS product_text
+    FROM all_stripe_payments_adapter AS payments
+    INNER JOIN latest_primary_browser_charges AS charges ON charges.payment_id = payments.payment_id
+    WHERE payments.payment_source = 'stripe' AND payments.payment_id IS NOT NULL
+    UNION ALL
+    SELECT
+        payments.payment_source AS browser_payment_source,
+        assumeNotNull(payments.payment_id) AS browser_payment_id,
+        payments.invoice_id,
+        payments.payment_intent_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(ifNull(charges.metadata, '{}'), 'products')), ''),
+            nullIf(
+                extract(
+                    ifNull(charges.charge_description, ''),
+                    '(?i)(?:^|\\|[[:space:]]*)products?:[[:space:]]*(.*)'
+                ),
+                ''
+            )
+        ) AS product_text
+    FROM all_stripe_payments_adapter AS payments
+    INNER JOIN latest_kajabi_browser_charges AS charges ON charges.payment_id = payments.payment_id
+    WHERE payments.payment_source = 'stripe_kajabi' AND payments.payment_id IS NOT NULL
+
+NODE current_primary_browser_invoice_lines
+SQL >
+    SELECT
+        coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) AS line_item_id,
+        invoice_id,
+        price_id,
+        plan_id,
+        nullIf(trim(description), '') AS line_item_description,
+        quantity,
+        amount AS amount_cents
+    FROM raw_stripe_invoice_line_item
+    WHERE coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), ''))
+            ORDER BY _fivetran_synced DESC
+        )
+        = 1
+
+NODE current_primary_browser_checkout_sessions
+SQL >
+    SELECT id AS checkout_session_id, payment_intent_id
+    FROM raw_stripe_checkout_session
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE current_primary_browser_checkout_lines
+SQL >
+    SELECT
+        id AS checkout_line_item_id,
+        checkout_session_id,
+        price_id,
+        nullIf(trim(description), '') AS line_item_description,
+        quantity,
+        amount_total AS amount_total_cents
+    FROM raw_stripe_checkout_session_line_item
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE current_primary_browser_prices
+SQL >
+    SELECT id AS price_id, product_id
+    FROM raw_stripe_price
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE current_primary_browser_plans
+SQL >
+    SELECT id AS plan_id, product_id
+    FROM raw_stripe_plan
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE current_primary_browser_products
+SQL >
+    SELECT id AS product_id, nullIf(trim(name), '') AS product_name
+    FROM raw_stripe_product
+    WHERE id IS NOT NULL
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC) = 1
+
+NODE current_kajabi_browser_invoice_lines
+SQL >
+    SELECT
+        coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) AS line_item_id,
+        invoice_id,
+        price_id,
+        plan_id,
+        nullIf(trim(description), '') AS line_item_description,
+        quantity,
+        amount AS amount_cents
+    FROM raw_stripe_kajabi_invoice_line_item
+    WHERE coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), ''))
+            ORDER BY _fivetran_synced DESC
+        )
+        = 1
+
+NODE current_kajabi_browser_auxiliary
+SQL >
+    SELECT *
+    FROM raw_stripe_auxiliary
+    WHERE payment_source = 'stripe_kajabi' AND record_type != 'subscription_history'
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY record_type, payment_source, record_id ORDER BY _fivetran_synced DESC
+        )
+        = 1
+
+NODE current_kajabi_browser_checkout_sessions
+SQL >
+    SELECT checkout_session_id, payment_intent_id
+    FROM current_kajabi_browser_auxiliary
+    WHERE record_type = 'checkout_session'
+
+NODE current_kajabi_browser_checkout_lines
+SQL >
+    SELECT
+        checkout_line_item_id,
+        checkout_session_id,
+        price_id,
+        nullIf(trim(line_item_description), '') AS line_item_description,
+        quantity,
+        amount_total_cents
+    FROM current_kajabi_browser_auxiliary
+    WHERE record_type = 'checkout_session_line_item'
+
+NODE current_kajabi_browser_prices
+SQL >
+    SELECT price_id, product_id FROM current_kajabi_browser_auxiliary WHERE record_type = 'price'
+
+NODE current_kajabi_browser_plans
+SQL >
+    SELECT plan_id, product_id FROM current_kajabi_browser_auxiliary WHERE record_type = 'plan'
+
+NODE current_kajabi_browser_products
+SQL >
+    SELECT product_id, nullIf(trim(product_name), '') AS product_name
+    FROM current_kajabi_browser_auxiliary
+    WHERE record_type = 'product'
+
+NODE browser_line_candidates
+SQL >
+    SELECT
+        payments.browser_payment_source AS browser_payment_source,
+        payments.browser_payment_id AS browser_payment_id,
+        'invoice_line' AS line_source,
+        lines.line_item_id,
+        coalesce(products.product_name, lines.line_item_description) AS raw_product_name,
+        lines.quantity,
+        toFloat64(lines.amount_cents) AS line_amount_cents
+    FROM browser_payment_sources AS payments
+    INNER JOIN current_primary_browser_invoice_lines AS lines ON lines.invoice_id = payments.invoice_id
+    LEFT JOIN current_primary_browser_prices AS prices ON prices.price_id = lines.price_id
+    LEFT JOIN current_primary_browser_plans AS plans ON plans.plan_id = lines.plan_id
+    LEFT JOIN
+        current_primary_browser_products AS products
+        ON products.product_id = coalesce(prices.product_id, plans.product_id)
+    WHERE payments.browser_payment_source = 'stripe'
+    UNION ALL
+    SELECT
+        payments.browser_payment_source,
+        payments.browser_payment_id,
+        'checkout_line' AS line_source,
+        lines.checkout_line_item_id AS line_item_id,
+        coalesce(products.product_name, lines.line_item_description) AS raw_product_name,
+        lines.quantity,
+        toFloat64(lines.amount_total_cents) AS line_amount_cents
+    FROM browser_payment_sources AS payments
+    INNER JOIN
+        current_primary_browser_checkout_sessions AS sessions
+        ON sessions.payment_intent_id = payments.payment_intent_id
+    INNER JOIN
+        current_primary_browser_checkout_lines AS lines
+        ON lines.checkout_session_id = sessions.checkout_session_id
+    LEFT JOIN current_primary_browser_prices AS prices ON prices.price_id = lines.price_id
+    LEFT JOIN current_primary_browser_products AS products ON products.product_id = prices.product_id
+    WHERE payments.browser_payment_source = 'stripe'
+    UNION ALL
+    SELECT
+        payments.browser_payment_source,
+        payments.browser_payment_id,
+        'invoice_line' AS line_source,
+        lines.line_item_id,
+        coalesce(products.product_name, lines.line_item_description) AS raw_product_name,
+        lines.quantity,
+        toFloat64(lines.amount_cents) AS line_amount_cents
+    FROM browser_payment_sources AS payments
+    INNER JOIN current_kajabi_browser_invoice_lines AS lines ON lines.invoice_id = payments.invoice_id
+    LEFT JOIN current_kajabi_browser_prices AS prices ON prices.price_id = lines.price_id
+    LEFT JOIN current_kajabi_browser_plans AS plans ON plans.plan_id = lines.plan_id
+    LEFT JOIN
+        current_kajabi_browser_products AS products
+        ON products.product_id = coalesce(prices.product_id, plans.product_id)
+    WHERE payments.browser_payment_source = 'stripe_kajabi'
+    UNION ALL
+    SELECT
+        payments.browser_payment_source,
+        payments.browser_payment_id,
+        'checkout_line' AS line_source,
+        lines.checkout_line_item_id AS line_item_id,
+        coalesce(products.product_name, lines.line_item_description) AS raw_product_name,
+        lines.quantity,
+        toFloat64(lines.amount_total_cents) AS line_amount_cents
+    FROM browser_payment_sources AS payments
+    INNER JOIN
+        current_kajabi_browser_checkout_sessions AS sessions
+        ON sessions.payment_intent_id = payments.payment_intent_id
+    INNER JOIN
+        current_kajabi_browser_checkout_lines AS lines
+        ON lines.checkout_session_id = sessions.checkout_session_id
+    LEFT JOIN current_kajabi_browser_prices AS prices ON prices.price_id = lines.price_id
+    LEFT JOIN current_kajabi_browser_products AS products ON products.product_id = prices.product_id
+    WHERE payments.browser_payment_source = 'stripe_kajabi'
+
+NODE browser_line_counts
+SQL >
+    SELECT browser_payment_source, browser_payment_id, line_source, count() AS line_count
+    FROM browser_line_candidates
+    GROUP BY browser_payment_source, browser_payment_id, line_source
+
+NODE browser_line_product_signals
+SQL >
+    SELECT
+        *,
+        if(
+            match(
+                ifNull(raw_product_name, ''),
+                '(?i)(?:^|\\|[[:space:]]*)product:[[:space:]]*booming bookkeeping mentorship program'
+            ),
+            extract(
+                ifNull(raw_product_name, ''),
+                '(?i)(?:^|\\|[[:space:]]*)product:[[:space:]]*(booming bookkeeping mentorship program.*)$'
+            ),
+            ifNull(raw_product_name, '')
+        ) AS line_product_signal
+    FROM browser_line_candidates
+
+NODE browser_decoded_line_products
+SQL >
+    SELECT
+        *,
+        replaceAll(
+            replaceAll(
+                replaceAll(
+                    replaceAll(
+                        replaceAll(replaceAll(line_product_signal, '&amp;', '&'), '&quot;', char(34)),
+                        '&#39;',
+                        char(39)
+                    ),
+                    '&apos;',
+                    char(39)
+                ),
+                '&nbsp;',
+                ' '
+            ),
+            '&#44;',
+            ','
+        ) AS decoded_line_product
+    FROM browser_line_product_signals
+
+NODE browser_named_line_candidates
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        line_source,
+        line_item_id,
+        quantity,
+        line_amount_cents,
+        nullIf(
+            trim(
+                replaceRegexpAll(
+                    replaceRegexpAll(
+                        replaceRegexpAll(
+                            replaceRegexpAll(
+                                decoded_line_product, '(?i)^trial period for[[:space:]]+', ''
+                            ),
+                            '(?i)^[[:space:]]*[0-9]+[[:space:]]*[×x][[:space:]]*',
+                            ''
+                        ),
+                        '(?i)[[:space:]]*\\(at[[:space:]]+\\$[^)]*\\)[[:space:]]*$',
+                        ''
+                    ),
+                    '[[:space:]]+',
+                    ' '
+                )
+            ),
+            ''
+        ) AS browser_product_name
+    FROM browser_decoded_line_products
+
+NODE browser_positive_line_candidates
+SQL >
+    SELECT
+        *,
+        lowerUTF8(browser_product_name) AS browser_content_id,
+        countIf(line_amount_cents > 0) OVER (
+            PARTITION BY browser_payment_source, browser_payment_id, line_source
+        )
+        > 0 AS has_positive_line
+    FROM browser_named_line_candidates
+    WHERE browser_product_name IS NOT NULL
+
+NODE browser_selected_line_candidates
+SQL >
+    SELECT *
+    FROM browser_positive_line_candidates
+    WHERE has_positive_line = false OR line_amount_cents > 0
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY browser_payment_source, browser_payment_id, line_source, browser_content_id
+            ORDER BY line_item_id ASC NULLS FIRST
+        )
+        = 1
+
+NODE browser_line_product_tuples
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        line_source,
+        arraySort(
+            item -> tupleElement(item, 1),
+            groupArray(tuple(line_item_id, browser_content_id, browser_product_name))
+        ) AS sorted_line_products
+    FROM browser_selected_line_candidates
+    GROUP BY browser_payment_source, browser_payment_id, line_source
+
+NODE browser_line_products
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        line_source,
+        arrayMap(item -> assumeNotNull(tupleElement(item, 2)), sorted_line_products) AS content_ids,
+        arrayMap(item -> assumeNotNull(tupleElement(item, 3)), sorted_line_products) AS product_names
+    FROM browser_line_product_tuples
+
+NODE browser_fallback_text
+SQL >
+    SELECT browser_payment_source, browser_payment_id, product_text FROM browser_payment_sources
+
+NODE browser_protected_fallback_text
+SQL >
+    SELECT
+        *,
+        replaceRegexpAll(
+            product_text, '([0-9]),([0-9])', '\\1__NUMERIC_COMMA__\\2'
+        ) AS protected_product_text
+    FROM browser_fallback_text
+    WHERE product_text IS NOT NULL
+
+NODE browser_fallback_parts
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        tupleElement(product_part, 1) AS product_offset,
+        replaceAll(tupleElement(product_part, 2), '__NUMERIC_COMMA__', ',') AS raw_fallback_product_name
+    FROM browser_protected_fallback_text ARRAY
+    JOIN
+        arrayZip(
+            arrayEnumerate(splitByChar(',', assumeNotNull(protected_product_text))),
+            splitByChar(',', assumeNotNull(protected_product_text))
+        ) AS product_part
+
+NODE browser_decoded_fallback_parts
+SQL >
+    SELECT
+        *,
+        replaceAll(
+            replaceAll(
+                replaceAll(
+                    replaceAll(
+                        replaceAll(
+                            replaceAll(raw_fallback_product_name, '&amp;', '&'), '&quot;', char(34)
+                        ),
+                        '&#39;',
+                        char(39)
+                    ),
+                    '&apos;',
+                    char(39)
+                ),
+                '&nbsp;',
+                ' '
+            ),
+            '&#44;',
+            ','
+        ) AS decoded_fallback_product
+    FROM browser_fallback_parts
+
+NODE browser_named_fallback_parts
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        product_offset,
+        nullIf(
+            trim(
+                replaceRegexpAll(
+                    replaceRegexpAll(
+                        replaceRegexpAll(
+                            replaceRegexpAll(
+                                decoded_fallback_product, '(?i)^trial period for[[:space:]]+', ''
+                            ),
+                            '(?i)^[[:space:]]*[0-9]+[[:space:]]*[×x][[:space:]]*',
+                            ''
+                        ),
+                        '(?i)[[:space:]]*\\(at[[:space:]]+\\$[^)]*\\)[[:space:]]*$',
+                        ''
+                    ),
+                    '[[:space:]]+',
+                    ' '
+                )
+            ),
+            ''
+        ) AS browser_product_name
+    FROM browser_decoded_fallback_parts
+
+NODE browser_selected_fallback_parts
+SQL >
+    SELECT *, lowerUTF8(browser_product_name) AS browser_content_id
+    FROM browser_named_fallback_parts
+    WHERE browser_product_name IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY browser_payment_source, browser_payment_id, browser_content_id
+            ORDER BY product_offset
+        )
+        = 1
+
+NODE browser_fallback_product_tuples
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        arraySort(
+            item -> tupleElement(item, 1),
+            groupArray(tuple(product_offset, browser_content_id, browser_product_name))
+        ) AS sorted_fallback_products
+    FROM browser_selected_fallback_parts
+    GROUP BY browser_payment_source, browser_payment_id
+
+NODE browser_fallback_products
+SQL >
+    SELECT
+        browser_payment_source,
+        browser_payment_id,
+        arrayMap(item -> assumeNotNull(tupleElement(item, 2)), sorted_fallback_products) AS content_ids,
+        arrayMap(
+            item -> assumeNotNull(tupleElement(item, 3)), sorted_fallback_products
+        ) AS product_names
+    FROM browser_fallback_product_tuples
+
+NODE browser_resolved_product_arrays
+SQL >
+    SELECT
+        payments.browser_payment_source AS browser_payment_source,
+        payments.browser_payment_id AS browser_payment_id,
+        multiIf(
+            coalesce(invoice_count.line_count, 0) > 0 AND length(invoice_products.content_ids) > 0,
+            'invoice_line',
+            coalesce(invoice_count.line_count, 0) = 0 AND length(checkout_products.content_ids) > 0,
+            'checkout_line',
+            length(fallback_products.content_ids) > 0,
+            'metadata_or_description',
+            'missing'
+        ) AS product_resolution_source,
+        multiIf(
+            coalesce(invoice_count.line_count, 0) > 0 AND length(invoice_products.content_ids) > 0,
+            invoice_products.content_ids,
+            coalesce(invoice_count.line_count, 0) = 0 AND length(checkout_products.content_ids) > 0,
+            checkout_products.content_ids,
+            length(fallback_products.content_ids) > 0,
+            fallback_products.content_ids,
+            CAST([], 'Array(String)')
+        ) AS content_ids,
+        multiIf(
+            coalesce(invoice_count.line_count, 0) > 0 AND length(invoice_products.product_names) > 0,
+            invoice_products.product_names,
+            coalesce(invoice_count.line_count, 0) = 0 AND length(checkout_products.product_names) > 0,
+            checkout_products.product_names,
+            length(fallback_products.product_names) > 0,
+            fallback_products.product_names,
+            CAST([], 'Array(String)')
+        ) AS product_names
+    FROM browser_payment_sources AS payments
+    LEFT JOIN
+        browser_line_counts AS invoice_count
+        ON invoice_count.browser_payment_source = payments.browser_payment_source
+        AND invoice_count.browser_payment_id = payments.browser_payment_id
+        AND invoice_count.line_source = 'invoice_line'
+    LEFT JOIN
+        browser_line_products AS invoice_products
+        ON invoice_products.browser_payment_source = payments.browser_payment_source
+        AND invoice_products.browser_payment_id = payments.browser_payment_id
+        AND invoice_products.line_source = 'invoice_line'
+    LEFT JOIN
+        browser_line_products AS checkout_products
+        ON checkout_products.browser_payment_source = payments.browser_payment_source
+        AND checkout_products.browser_payment_id = payments.browser_payment_id
+        AND checkout_products.line_source = 'checkout_line'
+    LEFT JOIN
+        browser_fallback_products AS fallback_products
+        ON fallback_products.browser_payment_source = payments.browser_payment_source
+        AND fallback_products.browser_payment_id = payments.browser_payment_id
+
+NODE browser_product_resolution_rows
+SQL >
+    SELECT
+        browser_payment_source AS payment_source,
+        browser_payment_id AS payment_id,
+        product_resolution_source,
+        nullIf(arrayElement(content_ids, 1), '') AS product_id,
+        arrayStringConcat(product_names, ', ') AS product_name,
+        content_ids,
+        product_names
+    FROM browser_resolved_product_arrays

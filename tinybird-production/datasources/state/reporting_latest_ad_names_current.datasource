@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Small identity-independent display-name dimension used after journey ranking.
+
+SCHEMA >
+    `source` LowCardinality(String) `json:$.source`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `campaign_name` Nullable(String) `json:$.campaign_name`,
+    `adset_name` Nullable(String) `json:$.adset_name`,
+    `ad_name` Nullable(String) `json:$.ad_name`,
+    `__tb_sort_campaign_id` String `json:$.__tb_sort_campaign_id` DEFAULT ifNull(campaign_id, ''),
+    `__tb_sort_adset_id` String `json:$.__tb_sort_adset_id` DEFAULT ifNull(adset_id, ''),
+    `__tb_sort_ad_id` String `json:$.__tb_sort_ad_id` DEFAULT ifNull(ad_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY source, __tb_sort_campaign_id, __tb_sort_adset_id, __tb_sort_ad_id

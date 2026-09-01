@@ -1,0 +1,26 @@
+DESCRIPTION >
+    One row per successful Stripe payment with automatic and manual attribution status.
+
+NODE payment_attribution_status_rows
+SQL >
+    SELECT
+        payment_source AS payment_source,
+        payment_id AS payment_id,
+        payment_time AS payment_time,
+        payment_date AS payment_date,
+        amount_paid AS amount_paid,
+        refund_amount AS refund_amount,
+        net_amount AS net_amount,
+        payment_email AS payment_email,
+        payment_name AS payment_name,
+        payment_phone AS payment_phone,
+        customer_id AS customer_id,
+        product_name AS product_name,
+        product_rule AS product_rule,
+        automatic_profile_id AS automatic_profile_id,
+        manual_profile_id AS manual_profile_id,
+        profile_id AS profile_id,
+        attribution_method AS attribution_method,
+        toUInt8(profile_id IS NOT NULL) AS is_attributed,
+        toUInt8(profile_id IS NULL) AS is_unattributed
+    FROM mart_payments

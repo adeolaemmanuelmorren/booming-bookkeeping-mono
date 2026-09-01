@@ -1,0 +1,71 @@
+DESCRIPTION >
+    Validate one unactivated identity batch against the Worker's batch-keyed output
+    index. Retry duplicates with the same logical key and row hash count once.
+
+NODE requested_identity_compaction_manifest
+SQL >
+    %
+    SELECT *
+    FROM identity_state_delta_versions
+    WHERE
+        tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND state_kind = 'batch_manifest'
+        AND lookup_key = {{ String(p_batch_id, '') }}
+        AND batch_version = {{ UInt64(p_batch_version, 0) }}
+        AND batch_id = {{ String(p_batch_id, '') }}
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, batch_version, batch_id ORDER BY committed_at DESC, row_hash DESC
+        )
+        = 1
+
+NODE distinct_identity_compaction_output_rows
+SQL >
+    %
+    SELECT DISTINCT state_kind, lookup_key, sub_key, row_hash
+    FROM identity_batch_output_rows
+    WHERE
+        tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND batch_version = {{ UInt64(p_batch_version, 0) }}
+        AND batch_id = {{ String(p_batch_id, '') }}
+
+NODE actual_identity_compaction_output
+SQL >
+    SELECT
+        count() AS actual_output_row_count,
+        lower(
+            hex(
+                SHA256(
+                    arrayStringConcat(
+                        arraySort(
+                            groupArray(concat(state_kind, ':', lookup_key, ':', sub_key, ':', row_hash))
+                        ),
+                        '|'
+                    )
+                )
+            )
+        ) AS actual_output_hash
+    FROM distinct_identity_compaction_output_rows
+
+NODE validated_identity_compaction_manifest
+SQL >
+    SELECT
+        manifest.tenant_id AS tenant_id,
+        manifest.batch_version AS batch_version,
+        manifest.batch_id AS batch_id,
+        manifest.input_event_count AS input_event_count,
+        manifest.input_hash AS input_hash,
+        manifest.checkpoint_ingested_at AS checkpoint_ingested_at,
+        manifest.checkpoint_event_id AS checkpoint_event_id,
+        manifest.output_row_count AS expected_output_row_count,
+        manifest.output_hash AS expected_output_hash,
+        actual.actual_output_row_count AS actual_output_row_count,
+        actual.actual_output_hash AS actual_output_hash,
+        toUInt8(
+            manifest.output_row_count = actual.actual_output_row_count
+            AND manifest.output_hash = actual.actual_output_hash
+        ) AS is_valid
+    FROM requested_identity_compaction_manifest AS manifest
+    CROSS JOIN actual_identity_compaction_output AS actual
+
+TYPE ENDPOINT

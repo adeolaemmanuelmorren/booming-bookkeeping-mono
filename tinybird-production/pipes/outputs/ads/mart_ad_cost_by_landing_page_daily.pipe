@@ -1,0 +1,102 @@
+DESCRIPTION >
+    Google and Meta daily ad cost grouped by the platform-reported landing page.
+
+NODE landing_page_ad_source_rows
+SQL >
+    SELECT
+        toDate(time, 'America/Los_Angeles') AS date,
+        source,
+        formatted_source,
+        account_id,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        landing_page_url,
+        nullIf(lowerUTF8(domain(ifNull(landing_page_url, ''))), '') AS landing_page_host,
+        coalesce(
+            nullIf(
+                extract(ifNull(landing_page_url, ''), '(?i)^[a-z][a-z0-9+.-]*://[^/]+(/[^?#]*)'), ''
+            ),
+            '/'
+        ) AS landing_page_path,
+        impressions AS impression_value,
+        unique_inline_link_clicks AS unique_click_value,
+        spend AS spend_value
+    FROM daily_ad_performance_adapter
+
+NODE normalized_landing_page_ad_rows
+SQL >
+    SELECT
+        *,
+        toUInt8(nullIf(trimBoth(ifNull(landing_page_url, '')), '') IS NOT NULL) AS has_landing_page_url,
+        replaceRegexpOne(
+            lowerUTF8(coalesce(nullIf(trimBoth(ifNull(landing_page_host, '')), ''), 'unknown')),
+            '^www\\.',
+            ''
+        ) AS landing_page_host_normalized,
+        coalesce(
+            nullIf(trimBoth(ifNull(landing_page_path, '')), ''), '/'
+        ) AS landing_page_path_normalized
+    FROM landing_page_ad_source_rows
+    WHERE date <= toDate(now(), 'America/Los_Angeles')
+
+NODE landing_page_ad_cost_aggregates
+SQL >
+    SELECT
+        date,
+        source,
+        formatted_source,
+        account_id,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        landing_page_url,
+        has_landing_page_url,
+        coalesce(nullIf(trimBoth(ifNull(landing_page_host, '')), ''), 'unknown') AS landing_page_host,
+        landing_page_host_normalized,
+        landing_page_path_normalized AS landing_page_path,
+        concat(landing_page_host_normalized, landing_page_path_normalized) AS landing_page_normalized,
+        sum(impression_value) AS total_impressions,
+        sum(unique_click_value) AS total_unique_clicks,
+        sum(spend_value) AS total_spend
+    FROM normalized_landing_page_ad_rows
+    GROUP BY
+        date,
+        source,
+        formatted_source,
+        account_id,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        landing_page_url,
+        has_landing_page_url,
+        landing_page_host,
+        landing_page_host_normalized,
+        landing_page_path_normalized
+
+NODE landing_page_ad_cost_rows
+SQL >
+    SELECT
+        date,
+        source,
+        formatted_source,
+        account_id,
+        campaign_id,
+        campaign_name,
+        adset_id,
+        adset_name,
+        landing_page_url,
+        has_landing_page_url,
+        landing_page_host,
+        landing_page_host_normalized,
+        landing_page_path,
+        landing_page_normalized,
+        total_impressions AS impressions,
+        total_unique_clicks AS unique_clicks,
+        total_unique_clicks AS unique_inline_link_clicks,
+        total_spend AS spend,
+        'USD' AS currency
+    FROM landing_page_ad_cost_aggregates

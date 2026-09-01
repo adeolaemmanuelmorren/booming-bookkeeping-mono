@@ -1,0 +1,39 @@
+DESCRIPTION >
+    First qualifying checkout-page view per session and offer.
+
+NODE checkout_started_candidates
+SQL >
+    SELECT
+        lower(
+            hex(MD5(concat(assumeNotNull(session_id), '|', ifNull(first_page_path, ''))))
+        ) AS checkout_started_id,
+        session_id,
+        profile_id,
+        anonymous_id,
+        user_id,
+        session_start_timestamp AS checkout_started_at,
+        first_page_url AS checkout_url,
+        first_page_path AS checkout_path,
+        nullIf(extract(ifNull(first_page_path, ''), '(?i)/offers/([^/]+)/checkout'), '') AS offer_id,
+        channel_source,
+        channel_medium,
+        campaign_id,
+        adset_id,
+        ad_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid
+    FROM mart_touchpoints_all
+    WHERE match(lowerUTF8(ifNull(first_page_path, '')), '/checkout|/order|/offers/[^/]+/checkout')
+
+NODE checkout_started_rows
+SQL >
+    SELECT *
+    FROM checkout_started_candidates
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY session_id, coalesce(offer_id, checkout_path) ORDER BY checkout_started_at ASC
+        )
+        = 1

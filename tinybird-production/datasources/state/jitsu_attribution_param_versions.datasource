@@ -1,0 +1,46 @@
+DESCRIPTION >
+    Append-only canonical attribution-param versions. The reader
+    resolves source precedence, revisions, and deletion tombstones at query time.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_system` LowCardinality(String) `json:$.source_system`,
+    `source_priority` UInt8 `json:$.source_priority`,
+    `source_deleted` UInt8 `json:$.source_deleted`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `source_ingested_at` DateTime64(6) `json:$.source_ingested_at`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`,
+    `attribution_event_id` Nullable(String) `json:$.attribution_event_id`,
+    `event_name` Nullable(String) `json:$.event_name`,
+    `attribution_event_time` Nullable(DateTime64(6)) `json:$.attribution_event_time`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `page_url` Nullable(String) `json:$.page_url`,
+    `page_path` Nullable(String) `json:$.page_path`,
+    `ip_address` Nullable(String) `json:$.ip_address`,
+    `user_agent` Nullable(String) `json:$.user_agent`,
+    `utm_medium` Nullable(String) `json:$.utm_medium`,
+    `utm_campaign` Nullable(String) `json:$.utm_campaign`,
+    `utm_content` Nullable(String) `json:$.utm_content`,
+    `utm_term` Nullable(String) `json:$.utm_term`,
+    `utm_id` Nullable(String) `json:$.utm_id`,
+    `gclid` Nullable(String) `json:$.gclid`,
+    `gbraid` Nullable(String) `json:$.gbraid`,
+    `wbraid` Nullable(String) `json:$.wbraid`,
+    `fbclid` Nullable(String) `json:$.fbclid`,
+    `ttclid` Nullable(String) `json:$.ttclid`,
+    `li_fat_id` Nullable(String) `json:$.li_fat_id`,
+    `rdt_cid` Nullable(String) `json:$.rdt_cid`,
+    `twclid` Nullable(String) `json:$.twclid`,
+    `fbc` Nullable(String) `json:$.fbc`,
+    `fbp` Nullable(String) `json:$.fbp`,
+    `ttp` Nullable(String) `json:$.ttp`,
+    `uetsid` Nullable(String) `json:$.uetsid`,
+    `uetvid` Nullable(String) `json:$.uetvid`,
+    `source_partition_time` Nullable(DateTime64(6)) `json:$.source_partition_time`,
+    `utm_source` Nullable(String) `json:$.utm_source`,
+    `source_version` Nullable(DateTime64(6)) `json:$.source_version`,
+    `__tb_state_key` String `json:$.__tb_state_key` DEFAULT ifNull(attribution_event_id, '')
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, __tb_state_key, source_priority, source_fact_version, source_ingested_at, payload_hash

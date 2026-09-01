@@ -1,0 +1,148 @@
+DESCRIPTION >
+    Append one producer's source facts that differ from the flat seed plus activated
+    delta heads. Candidate keys filter both state layers before latest-row selection.
+
+NODE candidate_source_identity_facts
+SQL >
+    %
+    SELECT * FROM source_identity_facts WHERE producer_id = {{ String(p_identity_producer, '') }}
+
+NODE candidate_identity_fact_keys
+SQL >
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        concat('fact:', fact_key) AS state_key
+    FROM candidate_source_identity_facts
+    GROUP BY tenant_id, fact_kind, fact_key
+
+NODE candidate_activated_identity_fact_versions
+SQL >
+    SELECT
+        seed.tenant_id AS tenant_id,
+        seed.fact_kind AS fact_kind,
+        seed.fact_key AS fact_key,
+        seed.fact_deleted AS fact_deleted,
+        seed.fact_payload_hash AS fact_payload_hash,
+        seed.producer_id AS producer_id,
+        seed.is_deleted AS is_deleted,
+        seed.batch_version AS batch_version,
+        seed.committed_at AS committed_at,
+        seed.row_hash AS row_hash
+    FROM identity_state_seed_enriched AS seed
+    WHERE
+        seed.state_kind = 'fact'
+        AND (seed.tenant_id, seed.state_key)
+        IN (SELECT tenant_id, state_key FROM candidate_identity_fact_keys)
+    UNION ALL
+    SELECT
+        journal.tenant_id AS tenant_id,
+        journal.fact_kind AS fact_kind,
+        journal.fact_key AS fact_key,
+        journal.fact_deleted AS fact_deleted,
+        journal.fact_payload_hash AS fact_payload_hash,
+        journal.producer_id AS producer_id,
+        journal.is_deleted AS is_deleted,
+        journal.batch_version AS batch_version,
+        journal.committed_at AS committed_at,
+        journal.row_hash AS row_hash
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN
+        activated_identity_batches AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+    WHERE
+        journal.state_kind = 'fact'
+        AND (journal.tenant_id, journal.lookup_key)
+        IN (SELECT tenant_id, fact_key FROM candidate_identity_fact_keys)
+
+NODE latest_candidate_identity_fact_versions
+SQL >
+    SELECT *
+    FROM candidate_activated_identity_fact_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, fact_kind, fact_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        )
+        = 1
+
+NODE stable_candidate_identity_facts
+SQL >
+    %
+    SELECT tenant_id, fact_kind, fact_key, fact_deleted, fact_payload_hash
+    FROM latest_candidate_identity_fact_versions
+    WHERE
+        is_deleted = 0
+        AND (
+            producer_id = {{ String(p_identity_producer, '') }}
+            OR producer_id = replaceOne(
+                {{ String(p_identity_producer, '') }}, 'source_identity:', 'bigquery_identity_seed:'
+            )
+        )
+
+NODE latest_candidate_queued_identity_events
+SQL >
+    %
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        argMax(event_id, tuple(source_fact_version, ingested_at, event_id)) AS event_id
+    FROM identity_events_cursor
+    WHERE
+        tenant_id = 'boom'
+        AND producer_id = {{ String(p_identity_producer, '') }}
+        AND (tenant_id, fact_kind, fact_key)
+        IN (SELECT tenant_id, fact_kind, fact_key FROM candidate_identity_fact_keys)
+    GROUP BY tenant_id, fact_kind, fact_key
+
+NODE new_identity_change_events
+SQL >
+    SELECT
+        source.tenant_id AS tenant_id,
+        source.event_id AS event_id,
+        source.producer_id AS producer_id,
+        source.event_kind AS event_kind,
+        source.observed_at AS observed_at,
+        source.ingested_at AS ingested_at,
+        source.anonymous_id AS anonymous_id,
+        source.user_id AS user_id,
+        source.email AS email,
+        source.phone AS phone,
+        source.first_name AS first_name,
+        source.last_name AS last_name,
+        source.fact_kind AS fact_kind,
+        source.fact_key AS fact_key,
+        source.source_fact_version AS source_fact_version,
+        source.fact_deleted AS fact_deleted,
+        source.fact_payload_hash AS fact_payload_hash,
+        source.fact_payload AS fact_payload,
+        source.evidence_keys AS evidence_keys
+    FROM candidate_source_identity_facts AS source
+    LEFT JOIN
+        stable_candidate_identity_facts AS stable
+        ON source.tenant_id = stable.tenant_id
+        AND source.fact_kind = stable.fact_kind
+        AND source.fact_key = stable.fact_key
+    LEFT JOIN
+        latest_candidate_queued_identity_events AS queued
+        ON source.tenant_id = queued.tenant_id
+        AND source.fact_kind = queued.fact_kind
+        AND source.fact_key = queued.fact_key
+    WHERE
+        (
+            queued.fact_key = ''
+            AND (
+                stable.fact_key = ''
+                OR stable.fact_deleted != source.fact_deleted
+                OR stable.fact_payload_hash != source.fact_payload_hash
+            )
+        )
+        OR (queued.fact_key != '' AND queued.event_id != source.event_id)
+
+TYPE COPY
+TARGET_DATASOURCE identity_events_cursor
+COPY_MODE append

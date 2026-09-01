@@ -1,0 +1,42 @@
+DESCRIPTION >
+    Source-driven refresh of identity-neutral website session touchpoints.
+
+NODE build_current_touchpoint_facts
+SQL >
+    SELECT
+        facts.* EXCEPT (tenant_id),
+        nullIf(
+            if(
+                identity_delta.state_key = '',
+                identity_base.profile_id,
+                if(identity_delta.is_deleted = 0, identity_delta.profile_id, '')
+            ),
+            ''
+        ) AS identity_base_profile_id
+    FROM website_session_touchpoints AS facts
+    LEFT ANY JOIN
+        (
+            SELECT tenant_id, fact_id, profile_id
+            FROM reporting_identity_fact_seed
+            WHERE tenant_id = 'boom' AND fact_kind = 'touchpoint'
+        ) AS identity_base
+        ON identity_base.tenant_id = facts.tenant_id
+        AND identity_base.fact_id = facts.touchpoint_id
+    LEFT ANY JOIN reporting_latest_identity_mapping_delta AS identity_delta
+        ON identity_delta.tenant_id = facts.tenant_id
+        AND identity_delta.identifier_key = coalesce(
+            if(
+                facts.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', facts.anonymous_id)
+            ),
+            if(
+                facts.user_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('user_id:', lowerUTF8(facts.user_id))
+            )
+        )
+
+TYPE COPY
+TARGET_DATASOURCE mart_touchpoints_all_facts_v2_current
+COPY_MODE replace

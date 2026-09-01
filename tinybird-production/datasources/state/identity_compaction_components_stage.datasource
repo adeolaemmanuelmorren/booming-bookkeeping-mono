@@ -1,0 +1,26 @@
+DESCRIPTION >
+    Retry-safe affected component members for one identity compaction batch. The
+    final Copy reads this physical boundary instead of expanding the graph again.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `stage_kind` LowCardinality(String) `json:$.stage_kind`,
+    `stage_key` String `json:$.stage_key`,
+    `staged_at` DateTime64(6) `json:$.staged_at`,
+    `stage_hash` FixedString(64) `json:$.stage_hash`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `component_label` UInt64 `json:$.component_label`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `name_observed_at` DateTime64(6) `json:$.name_observed_at`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, stage_kind, stage_key, staged_at, stage_hash

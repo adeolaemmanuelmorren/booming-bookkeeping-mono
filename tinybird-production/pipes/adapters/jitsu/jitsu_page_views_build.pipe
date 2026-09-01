@@ -1,0 +1,1038 @@
+DESCRIPTION >
+    Builds the current page-view contract from historical and live Jitsu inputs.
+    The stable jitsu_page_views resource reads its physical version state.
+
+NODE page_live_ranked_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY source.source_fact_version DESC, source.ingested_at DESC, source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    WHERE source.tenant_id = 'boom'
+
+NODE page_live_current_versions
+SQL >
+    SELECT * FROM page_live_ranked_versions WHERE logical_version_rank = 1
+
+NODE page_boom_domain_rows
+SQL >
+    %
+    SELECT
+        'boom' AS tenant_id,
+        'boom_domains' AS source_system,
+        toUInt8(1) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        nullIf(trim(source.id), '') AS page_view_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            source.timestamp, source.sent_at, source.received_at, source.loaded_at
+        ) AS page_view_timestamp,
+        nullIf(trim(source.url), '') AS event_url,
+        nullIf(trim(coalesce(source.url, source.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(source.path, source.context_page_path)), '') AS page_path,
+        nullIf(trim(coalesce(source.title, source.context_page_title)), '') AS page_title,
+        nullIf(trim(coalesce(source.referrer, source.context_page_referrer)), '') AS page_referrer,
+        nullIf(trim(source.context_ip), '') AS ip_address,
+        nullIf(trim(source.context_user_agent), '') AS user_agent,
+        nullIf(trim(source.context_user_agent_data_platform), '') AS device_platform,
+        source.context_user_agent_data_mobile AS device_is_mobile,
+        nullIf(trim(source.context_edge_city), '') AS geo_city,
+        nullIf(trim(source.context_edge_region), '') AS geo_region,
+        nullIf(trim(source.context_edge_region_code), '') AS geo_region_code,
+        nullIf(trim(source.context_edge_country), '') AS geo_country,
+        nullIf(trim(source.context_edge_timezone), '') AS geo_timezone,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_source), ''),
+            nullIf(trim(source.context_campaign_utm_source), ''),
+            nullIf(trim(source.context_campaign_source), '')
+        ) AS context_utm_source,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_medium), ''),
+            nullIf(trim(source.context_campaign_utm_medium), ''),
+            nullIf(trim(source.context_campaign_medium), '')
+        ) AS context_utm_medium,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_campaign), ''),
+            nullIf(trim(source.context_campaign_utm_campaign), ''),
+            nullIf(trim(source.context_campaign_name), '')
+        ) AS context_utm_campaign,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_content), ''),
+            nullIf(trim(source.context_campaign_utm_content), ''),
+            nullIf(trim(source.context_campaign_content), '')
+        ) AS context_utm_content,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_term), ''),
+            nullIf(trim(source.context_campaign_utm_term), ''),
+            nullIf(trim(source.context_campaign_term), '')
+        ) AS context_utm_term,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_id), ''),
+            nullIf(trim(source.context_campaign_utm_id), ''),
+            nullIf(trim(source.context_campaign_id), '')
+        ) AS context_utm_id,
+        nullIf(trim(source.context_attribution_gclid), '') AS stored_gclid,
+        nullIf(trim(source.context_attribution_gbraid), '') AS stored_gbraid,
+        nullIf(trim(source.context_attribution_wbraid), '') AS stored_wbraid,
+        nullIf(trim(source.context_attribution_fbclid), '') AS stored_fbclid,
+        nullIf(trim(source.context_attribution_ttclid), '') AS stored_ttclid,
+        nullIf(trim(source.context_attribution_li_fat_id), '') AS stored_li_fat_id,
+        nullIf(trim(source.context_attribution_rdt_cid), '') AS stored_rdt_cid,
+        nullIf(trim(source.context_attribution_twclid), '') AS stored_twclid,
+        nullIf(trim(source.context_attribution_fbc), '') AS fbc,
+        nullIf(trim(source.context_attribution_fbp), '') AS fbp,
+        nullIf(trim(source.context_attribution_ttp), '') AS ttp,
+        nullIf(trim(source.context_attribution_uetsid), '') AS uetsid,
+        nullIf(trim(source.context_attribution_uetvid), '') AS uetvid,
+        CAST(NULL AS Nullable(String)) AS typed_campaign_id,
+        CAST(NULL AS Nullable(String)) AS typed_adset_id,
+        CAST(NULL AS Nullable(String)) AS typed_ad_id,
+        source.source_partition_time AS source_partition_time,
+        coalesce(
+            source.loaded_at, source.received_at, source.sent_at, source.timestamp
+        ) AS source_version
+    FROM raw_boom_domains_pages AS source LEFT ANTI
+    JOIN page_live_current_versions AS live ON live.tenant_id = 'boom' AND live.message_id = source.id
+    WHERE
+        {{ String(p_source_system, '') }} IN ('', 'boom_domains')
+        AND coalesce(source.loaded_at, source.received_at, source.sent_at, source.timestamp)
+        >= toDateTime64({{ String(p_start, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND coalesce(source.loaded_at, source.received_at, source.sent_at, source.timestamp)
+        < toDateTime64({{ String(p_end, '2100-01-01 00:00:00') }}, 6, 'UTC')
+
+NODE page_jitsu_history_rows
+SQL >
+    %
+    SELECT
+        'boom' AS tenant_id,
+        'jitsu_data' AS source_system,
+        toUInt8(2) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        nullIf(trim(source.message_id), '') AS page_view_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(source.timestamp, source.sent_at, source.received_at) AS page_view_timestamp,
+        nullIf(trim(source.url), '') AS event_url,
+        nullIf(trim(coalesce(source.url, source.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(source.path, source.context_page_path)), '') AS page_path,
+        nullIf(trim(coalesce(source.title, source.context_page_title)), '') AS page_title,
+        nullIf(trim(coalesce(source.referrer, source.context_page_referrer)), '') AS page_referrer,
+        nullIf(trim(source.context_ip), '') AS ip_address,
+        nullIf(trim(source.context_user_agent), '') AS user_agent,
+        CAST(NULL AS Nullable(String)) AS device_platform,
+        CAST(NULL AS Nullable(Bool)) AS device_is_mobile,
+        nullIf(trim(source.context_geo_city_name), '') AS geo_city,
+        nullIf(trim(source.context_geo_region_name), '') AS geo_region,
+        nullIf(trim(source.context_geo_region_code), '') AS geo_region_code,
+        nullIf(trim(source.context_geo_country_code), '') AS geo_country,
+        nullIf(trim(source.context_geo_location_timezone), '') AS geo_timezone,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_source), ''),
+            nullIf(trim(source.context_campaign_source), '')
+        ) AS context_utm_source,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_medium), ''),
+            nullIf(trim(source.context_campaign_medium), '')
+        ) AS context_utm_medium,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_campaign), ''),
+            nullIf(trim(source.context_campaign_name), '')
+        ) AS context_utm_campaign,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_content), ''),
+            nullIf(trim(source.context_campaign_content), '')
+        ) AS context_utm_content,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_term), ''),
+            nullIf(trim(source.context_campaign_term), '')
+        ) AS context_utm_term,
+        coalesce(
+            nullIf(trim(source.context_attribution_utm_id), ''),
+            nullIf(trim(source.context_campaign_id), '')
+        ) AS context_utm_id,
+        nullIf(trim(source.context_attribution_gclid), '') AS stored_gclid,
+        nullIf(trim(source.context_attribution_gbraid), '') AS stored_gbraid,
+        nullIf(trim(source.context_attribution_wbraid), '') AS stored_wbraid,
+        nullIf(trim(source.context_attribution_fbclid), '') AS stored_fbclid,
+        nullIf(trim(source.context_attribution_ttclid), '') AS stored_ttclid,
+        nullIf(trim(source.context_attribution_li_fat_id), '') AS stored_li_fat_id,
+        nullIf(trim(source.context_attribution_rdt_cid), '') AS stored_rdt_cid,
+        nullIf(trim(source.context_attribution_twclid), '') AS stored_twclid,
+        nullIf(trim(source.context_attribution_fbc), '') AS fbc,
+        nullIf(trim(source.context_attribution_fbp), '') AS fbp,
+        nullIf(trim(source.context_attribution_ttp), '') AS ttp,
+        nullIf(trim(source.context_attribution_uetsid), '') AS uetsid,
+        nullIf(trim(source.context_attribution_uetvid), '') AS uetvid,
+        CAST(NULL AS Nullable(String)) AS typed_campaign_id,
+        CAST(NULL AS Nullable(String)) AS typed_adset_id,
+        CAST(NULL AS Nullable(String)) AS typed_ad_id,
+        toStartOfDay(source.timestamp) AS source_partition_time,
+        coalesce(source.received_at, source.sent_at, source.timestamp) AS source_version
+    FROM raw_jitsu_data_pages AS source LEFT ANTI
+    JOIN
+        page_live_current_versions AS live
+        ON live.tenant_id = 'boom'
+        AND live.message_id = source.message_id
+    WHERE
+        {{ String(p_source_system, '') }} IN ('', 'jitsu_data')
+        AND coalesce(source.received_at, source.sent_at, source.timestamp)
+        >= toDateTime64({{ String(p_start, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND coalesce(source.received_at, source.sent_at, source.timestamp)
+        < toDateTime64({{ String(p_end, '2100-01-01 00:00:00') }}, 6, 'UTC')
+
+NODE page_live_rows
+SQL >
+    SELECT
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.source_deleted,
+        nullIf(trim(source.message_id), '') AS page_view_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        source.observed_at AS page_view_timestamp,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'url')), '')
+        ) AS event_url,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_url')), '')
+        ) AS page_url,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_path')), '')
+        ) AS page_path,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'title')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'title')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'title')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_title')), '')
+        ) AS page_title,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'referrer')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'referrer')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'referrer')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_referrer')), '')
+        ) AS page_referrer,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'ip')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_ip')), '')
+        ) AS ip_address,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'userAgent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'user_agent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent')), '')
+        ) AS user_agent,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'userAgentData', 'platform')), ''
+            ),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'user_agent_data', 'platform')),
+                ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent_data_platform')), '')
+        ) AS device_platform,
+        multiIf(
+            JSONHas(source.fact_payload, 'context', 'userAgentData', 'mobile'),
+            CAST(
+                JSONExtractBool(source.fact_payload, 'context', 'userAgentData', 'mobile') AS Nullable(
+                    Bool
+                )
+            ),
+            JSONHas(source.fact_payload, 'context', 'user_agent_data', 'mobile'),
+            CAST(
+                JSONExtractBool(
+                    source.fact_payload, 'context', 'user_agent_data', 'mobile'
+                ) AS Nullable(Bool)
+            ),
+            JSONHas(source.fact_payload, 'context_user_agent_data_mobile'),
+            CAST(
+                JSONExtractBool(source.fact_payload, 'context_user_agent_data_mobile') AS Nullable(Bool)
+            ),
+            CAST(NULL AS Nullable(Bool))
+        ) AS device_is_mobile,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'cityName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_city_name')), '')
+        ) AS geo_city,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'regionName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_region_name')), '')
+        ) AS geo_region,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'regionCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'regionCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_region_code')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_region_code')), '')
+        ) AS geo_region_code,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'countryCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_country_code')), '')
+        ) AS geo_country,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'timezone')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'location', 'timezone')),
+                ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_timezone')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_location_timezone')), '')
+        ) AS geo_timezone,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_source')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_source')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_source')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_source')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'source')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_source')), '')
+        ) AS context_utm_source,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_medium')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_medium')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_medium')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_medium')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'medium')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_medium')), '')
+        ) AS context_utm_medium,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_campaign')),
+                ''
+            ),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_campaign')), ''
+            ),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_campaign')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_campaign')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'name')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_name')), '')
+        ) AS context_utm_campaign,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_content')),
+                ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_content')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_content')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_content')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'content')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_content')), '')
+        ) AS context_utm_content,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_term')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_term')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_term')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_term')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'term')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_term')), '')
+        ) AS context_utm_term,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'utm_id')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_utm_id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'utm_id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_utm_id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_id')), '')
+        ) AS context_utm_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gclid')), '')
+        ) AS stored_gclid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gbraid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gbraid')), '')
+        ) AS stored_gbraid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'wbraid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_wbraid')), '')
+        ) AS stored_wbraid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbclid')), '')
+        ) AS stored_fbclid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'ttclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_ttclid')), '')
+        ) AS stored_ttclid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'li_fat_id')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_li_fat_id')), '')
+        ) AS stored_li_fat_id,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'rdt_cid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_rdt_cid')), '')
+        ) AS stored_rdt_cid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'twclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_twclid')), '')
+        ) AS stored_twclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbc')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbc')), '')
+        ) AS fbc,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_fbp')), '')
+        ) AS fbp,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'ttp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_ttp')), '')
+        ) AS ttp,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetsid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_uetsid')), '')
+        ) AS uetsid,
+        coalesce(
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetvid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_uetvid')), '')
+        ) AS uetvid,
+        CAST(NULL AS Nullable(String)) AS typed_campaign_id,
+        CAST(NULL AS Nullable(String)) AS typed_adset_id,
+        CAST(NULL AS Nullable(String)) AS typed_ad_id,
+        toStartOfDay(source.observed_at) AS source_partition_time,
+        source.ingested_at AS source_version
+    FROM page_live_current_versions AS source
+    WHERE source.event_kind = 'page_view'
+
+NODE page_all_current_source_rows
+SQL >
+    SELECT *
+    FROM page_boom_domain_rows
+    UNION ALL
+    SELECT *
+    FROM page_jitsu_history_rows
+    UNION ALL
+    SELECT *
+    FROM page_live_rows
+
+NODE page_ranked_source_rows
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.page_view_id
+            ORDER BY source.source_priority DESC, source.source_version DESC
+        ) AS source_rank
+    FROM page_all_current_source_rows AS source
+
+NODE page_current_source_rows
+SQL >
+    SELECT * FROM page_ranked_source_rows WHERE source_rank = 1 AND source_deleted = 0
+
+NODE page_url_parameters
+SQL >
+    SELECT
+        source.*,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_source=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_source,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_medium=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_medium,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_campaign=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_campaign,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_content=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_content,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_term=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_term,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)utm_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_utm_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)gclid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_gclid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)gbraid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_gbraid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)wbraid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_wbraid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)ttclid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_ttclid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)li_fat_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_li_fat_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)rdt_cid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_rdt_cid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)twclid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS event_twclid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)gc_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS google_campaign_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)h_ga_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS google_ad_group_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)h_ad_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS h_ad_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)h_keyword_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS google_keyword_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)h_keyword=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS google_keyword,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.event_url, '')), 2),
+                    '(?i)(?:^|&)fbc_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS meta_adset_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)utm_source=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_utm_source,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)utm_medium=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_utm_medium,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)utm_campaign=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_utm_campaign,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)utm_content=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_utm_content,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)utm_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_utm_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)fbclid=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_fbclid,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)h_ad_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_h_ad_id,
+        nullIf(
+            trim(
+                extract(
+                    arrayElement(splitByChar('?', ifNull(source.page_url, '')), 2),
+                    '(?i)(?:^|&)fbc_id=([^&=]*)'
+                )
+            ),
+            ''
+        ) AS url_meta_adset_id
+    FROM page_current_source_rows AS source
+
+NODE page_projected_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        page_view_id,
+        anonymous_id,
+        user_id,
+        page_view_timestamp,
+        page_url,
+        page_path,
+        page_title,
+        page_referrer,
+        ip_address,
+        user_agent,
+        device_platform,
+        device_is_mobile,
+        geo_city,
+        geo_region,
+        geo_region_code,
+        geo_country,
+        geo_timezone,
+        url_utm_source,
+        url_utm_medium,
+        coalesce(context_utm_campaign, event_utm_campaign) AS utm_campaign,
+        url_utm_campaign,
+        coalesce(context_utm_content, event_utm_content) AS utm_content,
+        url_utm_content,
+        coalesce(context_utm_term, event_utm_term) AS utm_term,
+        coalesce(context_utm_id, event_utm_id) AS utm_id,
+        url_utm_id,
+        coalesce(stored_gclid, event_gclid) AS gclid,
+        coalesce(stored_gbraid, event_gbraid) AS gbraid,
+        coalesce(stored_wbraid, event_wbraid) AS wbraid,
+        stored_fbclid,
+        url_fbclid,
+        coalesce(url_fbclid, stored_fbclid) AS fbclid,
+        coalesce(stored_ttclid, event_ttclid) AS ttclid,
+        coalesce(stored_li_fat_id, event_li_fat_id) AS li_fat_id,
+        coalesce(stored_rdt_cid, event_rdt_cid) AS rdt_cid,
+        coalesce(stored_twclid, event_twclid) AS twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        google_campaign_id,
+        google_ad_group_id,
+        h_ad_id,
+        url_h_ad_id,
+        google_keyword_id,
+        google_keyword,
+        meta_adset_id,
+        url_meta_adset_id,
+        source_partition_time,
+        coalesce(context_utm_source, event_utm_source) AS raw_utm_source,
+        coalesce(context_utm_medium, event_utm_medium) AS raw_utm_medium,
+        typed_campaign_id,
+        typed_adset_id,
+        typed_ad_id,
+        source_version
+    FROM page_url_parameters
+
+NODE page_normalized_rows
+SQL >
+    SELECT
+        source.*,
+        nullIf(lowerUTF8(domain(ifNull(source.page_url, ''))), '') AS page_host,
+        nullIf(lowerUTF8(domain(ifNull(source.page_referrer, ''))), '') AS page_referrer_host,
+        multiIf(
+            source.fbclid IS NOT NULL
+            OR (
+                lowerUTF8(ifNull(source.raw_utm_source, ''))
+                IN ('fb', 'ig', 'facebook', 'instagram', 'meta', 'an', 'th', 'msg')
+                AND source.utm_campaign IS NOT NULL
+            ),
+            'meta',
+            source.gclid IS NOT NULL OR source.gbraid IS NOT NULL OR source.wbraid IS NOT NULL,
+            'google',
+            source.ttclid IS NOT NULL,
+            'tiktok',
+            match(
+                lowerUTF8(ifNull(source.raw_utm_source, '')), '(^|\\.)(facebook\\.com|instagram\\.com)$'
+            ),
+            'meta',
+            match(
+                lowerUTF8(ifNull(source.raw_utm_source, '')),
+                '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$'
+            )
+            OR startsWith(lowerUTF8(ifNull(source.raw_utm_source, '')), 'com.google.'),
+            'google',
+            match(lowerUTF8(ifNull(source.raw_utm_source, '')), '(^|\\.)(bing\\.com)$'),
+            'bing',
+            match(lowerUTF8(ifNull(source.raw_utm_source, '')), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+            'youtube',
+            match(lowerUTF8(ifNull(source.raw_utm_source, '')), '(^|\\.)(trustpilot\\.com)$')
+            OR lowerUTF8(ifNull(source.raw_utm_source, '')) = 'trustpilot',
+            'trustpilot',
+            lowerUTF8(ifNull(source.raw_utm_source, ''))
+            IN ('fb', 'ig', 'facebook', 'instagram', 'meta', 'an', 'th', 'msg'),
+            'meta',
+            lowerUTF8(ifNull(source.raw_utm_source, '')) IN ('google', 'adwords'),
+            'google',
+            lowerUTF8(ifNull(source.raw_utm_source, '')) IN ('tiktok', 'tt'),
+            'tiktok',
+            nullIf(lowerUTF8(trim(source.raw_utm_source)), '')
+        ) AS utm_source
+    FROM page_projected_rows AS source
+
+NODE page_classified_rows
+SQL >
+    SELECT
+        source.*,
+        toUInt8(
+            source.utm_source = 'meta'
+            AND coalesce(source.url_utm_campaign, source.url_utm_id) IS NOT NULL
+            AND coalesce(source.url_utm_content, source.url_h_ad_id) IS NOT NULL
+            AND (
+                lowerUTF8(ifNull(source.url_utm_medium, '')) IN ('paid', 'paid_social', 'cpc', 'ppc')
+                OR source.url_fbclid IS NOT NULL
+            )
+        ) AS is_identified_meta_ad_click,
+        multiIf(
+            source.url_fbclid IS NOT NULL,
+            'url',
+            source.stored_fbclid IS NOT NULL,
+            'stored_attribution',
+            'none'
+        ) AS fbclid_observation_type
+    FROM page_normalized_rows AS source
+
+NODE current_page_view_rows
+SQL >
+    SELECT
+        tenant_id,
+        page_view_id,
+        source_system,
+        anonymous_id,
+        user_id,
+        page_view_timestamp,
+        page_url,
+        page_path,
+        page_title,
+        page_referrer,
+        ip_address,
+        user_agent,
+        device_platform,
+        device_is_mobile,
+        geo_city,
+        geo_region,
+        geo_region_code,
+        geo_country,
+        geo_timezone,
+        url_utm_source,
+        url_utm_medium,
+        utm_campaign,
+        url_utm_campaign,
+        utm_content,
+        url_utm_content,
+        utm_term,
+        utm_id,
+        url_utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        stored_fbclid,
+        url_fbclid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        google_campaign_id,
+        google_ad_group_id,
+        url_h_ad_id,
+        google_keyword_id,
+        google_keyword,
+        meta_adset_id,
+        url_meta_adset_id,
+        source_partition_time,
+        page_host,
+        page_referrer_host,
+        utm_source,
+        is_identified_meta_ad_click,
+        fbclid_observation_type,
+        multiIf(
+            is_identified_meta_ad_click = 1,
+            'paid',
+            utm_source = 'meta',
+            'social',
+            nullIf(lowerUTF8(trim(raw_utm_medium)), '')
+        ) AS utm_medium,
+        concat(ifNull(page_path, ''), ifNull(page_host, '')) AS page_path_host,
+        if(utm_source = 'google', h_ad_id, CAST(NULL AS Nullable(String))) AS google_ad_id,
+        multiIf(
+            utm_source = 'meta',
+            coalesce(utm_campaign, utm_id),
+            utm_source = 'google',
+            google_campaign_id,
+            CAST(NULL AS Nullable(String))
+        ) AS campaign_id,
+        multiIf(
+            utm_source = 'meta',
+            coalesce(utm_term, meta_adset_id),
+            utm_source = 'google',
+            google_ad_group_id,
+            CAST(NULL AS Nullable(String))
+        ) AS adset_id,
+        multiIf(
+            utm_source = 'meta',
+            coalesce(utm_content, h_ad_id),
+            utm_source = 'google',
+            h_ad_id,
+            CAST(NULL AS Nullable(String))
+        ) AS ad_id,
+        multiIf(
+            gclid IS NOT NULL,
+            gclid,
+            gbraid IS NOT NULL,
+            gbraid,
+            wbraid IS NOT NULL,
+            wbraid,
+            fbclid IS NOT NULL,
+            fbclid,
+            ttclid IS NOT NULL,
+            ttclid,
+            li_fat_id IS NOT NULL,
+            li_fat_id,
+            rdt_cid IS NOT NULL,
+            rdt_cid,
+            twclid IS NOT NULL,
+            twclid,
+            CAST(NULL AS Nullable(String))
+        ) AS click_id,
+        multiIf(
+            gclid IS NOT NULL,
+            'gclid',
+            gbraid IS NOT NULL,
+            'gbraid',
+            wbraid IS NOT NULL,
+            'wbraid',
+            fbclid IS NOT NULL,
+            'fbclid',
+            ttclid IS NOT NULL,
+            'ttclid',
+            li_fat_id IS NOT NULL,
+            'li_fat_id',
+            rdt_cid IS NOT NULL,
+            'rdt_cid',
+            twclid IS NOT NULL,
+            'twclid',
+            CAST(NULL AS Nullable(String))
+        ) AS click_id_type,
+        coalesce(
+            utm_source,
+            multiIf(
+                page_referrer_host IS NULL,
+                'direct',
+                match(
+                    lowerUTF8(page_referrer_host),
+                    '(^|\\.)(boomingbookkeeping\\.com|boomingbookkeeper\\.com|thebookkeepingchallenge\\.com|keyboardrichchallenge\\.com|keyboardrich\\.com)$'
+                ),
+                'direct',
+                match(lowerUTF8(page_referrer_host), '(^|\\.)(facebook\\.com|instagram\\.com)$'),
+                'meta',
+                match(lowerUTF8(page_referrer_host), '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$')
+                OR startsWith(lowerUTF8(page_referrer_host), 'com.google.'),
+                'google',
+                match(lowerUTF8(page_referrer_host), '(^|\\.)(bing\\.com)$'),
+                'bing',
+                match(lowerUTF8(page_referrer_host), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+                'youtube',
+                match(lowerUTF8(page_referrer_host), '(^|\\.)(trustpilot\\.com)$'),
+                'trustpilot',
+                page_referrer_host
+            )
+        ) AS channel_source,
+        multiIf(
+            is_identified_meta_ad_click = 1,
+            'paid',
+            utm_source = 'meta',
+            'social',
+            lowerUTF8(ifNull(raw_utm_medium, '')) IN ('paid', 'paid_social', 'cpc', 'ppc'),
+            'cpc',
+            utm_source IN ('google', 'bing', 'youtube')
+            AND lowerUTF8(ifNull(raw_utm_medium, '')) IN ('organic', 'referral', 'social'),
+            'organic',
+            utm_source IN ('google', 'tiktok'),
+            'cpc',
+            utm_source = 'trustpilot' AND lowerUTF8(ifNull(raw_utm_medium, '')) = 'company_profile',
+            'referral',
+            raw_utm_medium IS NOT NULL,
+            lowerUTF8(raw_utm_medium),
+            page_referrer_host IS NULL,
+            'none',
+            match(
+                lowerUTF8(page_referrer_host),
+                '(^|\\.)(boomingbookkeeping\\.com|boomingbookkeeper\\.com|thebookkeepingchallenge\\.com|keyboardrichchallenge\\.com|keyboardrich\\.com)$'
+            ),
+            'none',
+            match(lowerUTF8(page_referrer_host), '(^|\\.)(facebook\\.com|instagram\\.com)$'),
+            'organic',
+            match(lowerUTF8(page_referrer_host), '(^|\\.)(google\\.com|google\\.[a-z]{2,3})$')
+            OR startsWith(lowerUTF8(page_referrer_host), 'com.google.'),
+            'organic',
+            match(lowerUTF8(page_referrer_host), '(^|\\.)(bing\\.com)$'),
+            'organic',
+            match(lowerUTF8(page_referrer_host), '(^|\\.)(youtube\\.com|youtu\\.be)$'),
+            'organic',
+            'referral'
+        ) AS channel_medium,
+        source_version
+    FROM page_classified_rows

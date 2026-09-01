@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Append-only component labels for the current shadow rebuild. Each propagation pass writes
+    a complete next iteration, leaving the activated identity generation untouched.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `rebuild_id` FixedString(64) `json:$.rebuild_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `iteration` UInt16 `json:$.iteration`,
+    `identifier_key` String `json:$.identifier_key`,
+    `component_label` String `json:$.component_label`,
+    `calculated_at` DateTime64(6) `json:$.calculated_at`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, rebuild_id, identifier_key, iteration, calculated_at, row_hash

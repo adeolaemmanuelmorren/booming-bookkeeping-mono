@@ -1,0 +1,49 @@
+DESCRIPTION >
+    Materializes new Jitsu Events API attribution-param versions
+    into their append-only canonical state.
+
+NODE materialized_attribution_param_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        attribution_event_id,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        utm_source,
+        source_version,
+        __tb_state_key
+    FROM jitsu_attribution_params_live_build
+
+TYPE MATERIALIZED
+DATASOURCE jitsu_attribution_param_versions

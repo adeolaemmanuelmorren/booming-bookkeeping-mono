@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Replace-mode physical boundary for browser-compatible Stripe product arrays.
+
+SCHEMA >
+    `payment_source` String `json:$.payment_source`,
+    `payment_id` String `json:$.payment_id`,
+    `product_resolution_source` String `json:$.product_resolution_source`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `product_name` String `json:$.product_name`,
+    `content_ids` Array(String) `json:$.content_ids[:]`,
+    `product_names` Array(String) `json:$.product_names[:]`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY payment_source, payment_id

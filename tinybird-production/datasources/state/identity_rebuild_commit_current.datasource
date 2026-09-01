@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Frozen commit metadata for one converged shadow generation. Heavy row stages reuse this
+    physical gate; final activation independently rechecks the live source and active batch.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `rebuild_id` FixedString(64) `json:$.rebuild_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `input_event_count` UInt64 `json:$.input_event_count`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `checkpoint_sequence` UInt64 `json:$.checkpoint_sequence`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, rebuild_id

@@ -1,0 +1,264 @@
+DESCRIPTION >
+    Canonical attribution-param versions derived from the single
+    Jitsu Events API origin. Tombstones remain in the version contract.
+
+NODE attribution_live_ranked_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY source.source_fact_version DESC, source.ingested_at DESC, source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    WHERE source.tenant_id = 'boom'
+
+NODE attribution_live_current_versions
+SQL >
+    SELECT * FROM attribution_live_ranked_versions WHERE logical_version_rank = 1
+
+NODE attribution_live_rows
+SQL >
+    SELECT
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.source_deleted,
+        nullIf(trim(source.message_id), '') AS attribution_event_id,
+        nullIf(trim(JSONExtractString(source.fact_payload, 'event')), '') AS event_name,
+        source.observed_at AS attribution_event_time,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'url')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_url')), '')
+        ) AS page_url,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'page', 'path')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_page_path')), '')
+        ) AS page_path,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'ip')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_ip')), '')
+        ) AS ip_address,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'userAgent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent')), '')
+        ) AS user_agent,
+        coalesce(
+            nullIf(trim(source.utm_source), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'source')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_source')), '')
+        ) AS raw_utm_source,
+        coalesce(
+            nullIf(trim(source.utm_medium), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'medium')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_medium')), '')
+        ) AS utm_medium,
+        coalesce(
+            nullIf(trim(source.utm_campaign), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'name')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_name')), '')
+        ) AS utm_campaign,
+        coalesce(
+            nullIf(trim(source.utm_content), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'content')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_content')), '')
+        ) AS utm_content,
+        coalesce(
+            nullIf(trim(source.utm_term), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'term')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_term')), '')
+        ) AS utm_term,
+        coalesce(
+            nullIf(trim(source.utm_id), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'campaign', 'id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_campaign_id')), '')
+        ) AS utm_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'gclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'gclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gclid')), '')
+        ) AS gclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'gbraid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'gbraid')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'gbraid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_gbraid')), '')
+        ) AS gbraid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'wbraid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'wbraid')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'wbraid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_wbraid')), '')
+        ) AS wbraid,
+        nullIf(trim(source.fbclid), '') AS fbclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'ttclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'ttclid')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'ttclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_ttclid')), '')
+        ) AS ttclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'li_fat_id')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'li_fat_id')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'li_fat_id')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_li_fat_id')), '')
+        ) AS li_fat_id,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'rdt_cid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'rdt_cid')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'rdt_cid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_rdt_cid')), '')
+        ) AS rdt_cid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'twclid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'twclid')), ''),
+            nullIf(
+                trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'twclid')), ''
+            ),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_attribution_twclid')), '')
+        ) AS twclid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'fbc')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'fbc')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbc')), '')
+        ) AS fbc,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'fbp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'fbp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'fbp')), '')
+        ) AS fbp,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'ttp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'ttp')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'ttp')), '')
+        ) AS ttp,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'uetsid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'uetsid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetsid')), '')
+        ) AS uetsid,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'uetvid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'properties', 'uetvid')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'attribution', 'uetvid')), '')
+        ) AS uetvid,
+        toStartOfDay(source.observed_at) AS source_partition_time,
+        source.ingested_at AS source_version,
+        source.source_fact_version,
+        source.ingested_at AS source_ingested_at,
+        source.payload_hash
+    FROM attribution_live_current_versions AS source
+    WHERE source.event_kind = 'attribution'
+
+NODE current_attribution_param_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        attribution_event_id,
+        source_system,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        multiIf(
+            fbclid IS NOT NULL,
+            'meta',
+            gclid IS NOT NULL OR gbraid IS NOT NULL OR wbraid IS NOT NULL,
+            'google',
+            ttclid IS NOT NULL,
+            'tiktok',
+            lowerUTF8(raw_utm_source)
+            IN ('fb', 'ig', 'facebook', 'instagram', 'meta', 'an', 'th', 'msg'),
+            'meta',
+            lowerUTF8(raw_utm_source) IN ('google', 'adwords'),
+            'google',
+            lowerUTF8(raw_utm_source) IN ('tiktok', 'tt'),
+            'tiktok',
+            nullIf(lowerUTF8(trim(raw_utm_source)), '')
+        ) AS utm_source,
+        source_version
+    FROM attribution_live_rows
+
+NODE current_attribution_param_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        attribution_event_id,
+        event_name,
+        attribution_event_time,
+        anonymous_id,
+        user_id,
+        page_url,
+        page_path,
+        ip_address,
+        user_agent,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        utm_id,
+        gclid,
+        gbraid,
+        wbraid,
+        fbclid,
+        ttclid,
+        li_fat_id,
+        rdt_cid,
+        twclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        source_partition_time,
+        utm_source,
+        source_version,
+        ifNull(attribution_event_id, '') AS __tb_state_key
+    FROM current_attribution_param_rows

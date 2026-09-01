@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Frozen union-find result for one identity batch. This physical boundary keeps
+    the compaction query small and makes graph evaluation independently testable.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `event_id` FixedString(64) `json:$.event_id`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `prior_profile_id` String `json:$.prior_profile_id`,
+    `meta_node` String `json:$.meta_node`,
+    `component_label` UInt64 `json:$.component_label`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, component_label, identifier_key, event_id

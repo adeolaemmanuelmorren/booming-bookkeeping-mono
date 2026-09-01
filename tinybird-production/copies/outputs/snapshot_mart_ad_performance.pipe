@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Atomically replace the unified daily ad-performance mart after raw marketing imports finish.
+
+NODE build_daily_ad_performance_snapshot
+SQL >
+    SELECT
+        ad_rows.*,
+        ifNull(ad_rows.campaign_id, '') AS __tb_sort_campaign_id,
+        ifNull(ad_rows.adset_id, '') AS __tb_sort_adset_id
+    FROM mart_ad_performance_build AS ad_rows
+
+TYPE COPY
+TARGET_DATASOURCE mart_ad_performance_current
+COPY_MODE replace

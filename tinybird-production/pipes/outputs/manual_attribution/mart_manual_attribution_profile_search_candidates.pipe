@@ -1,0 +1,7 @@
+DESCRIPTION >
+    Current manual-attribution candidates with profile identity resolved at read time.
+
+NODE current_manual_attribution_profile_search_candidates
+SQL >
+    SELECT *
+    FROM mart_manual_attribution_profile_search_candidates_build

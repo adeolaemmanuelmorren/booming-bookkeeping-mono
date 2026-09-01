@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Atomically replace the resolved payment mart after an identity generation activates.
+
+NODE build_payment_mart_snapshot
+SQL >
+    SELECT source.*, ifNull(source.payment_id, '') AS __tb_sort_payment_id
+    FROM mart_payments_build AS source
+
+TYPE COPY
+TARGET_DATASOURCE mart_payments_current
+COPY_MODE replace

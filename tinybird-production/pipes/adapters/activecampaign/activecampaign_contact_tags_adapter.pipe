@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Latest ActiveCampaign contact-tag assignment state at one row per assignment.
+
+NODE current_activecampaign_contact_tags
+SQL >
+    SELECT
+        toString(contact_tag_id) AS contact_tag_id,
+        toString(contact_id) AS contact_id,
+        toString(tag_id) AS tag_id,
+        assigned_at,
+        source_version,
+        is_deleted = 1 AS is_deleted
+    FROM activecampaign_contact_tags_current FINAL

@@ -1,0 +1,14 @@
+DESCRIPTION >
+    One-time migration from the frozen touchpoint seed into identity-neutral storage.
+
+NODE build_touchpoint_fact_seed
+SQL >
+    %
+    SELECT * EXCEPT (profile_id, is_identified)
+    FROM mart_touchpoints_all_seed_current
+    WHERE touchpoint_id >= {{ String(p_start_touchpoint_id, '0') }}
+      AND touchpoint_id < {{ String(p_end_touchpoint_id, 'g') }}
+
+TYPE COPY
+TARGET_DATASOURCE mart_touchpoints_all_facts_current
+COPY_MODE append

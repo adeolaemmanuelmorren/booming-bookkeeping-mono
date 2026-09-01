@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Atomically replace browser-compatible Stripe product arrays after payment and
+    Stripe catalog inputs refresh.
+
+NODE build_stripe_browser_product_resolution_snapshot
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        product_resolution_source,
+        product_id,
+        product_name,
+        content_ids,
+        product_names
+    FROM int_stripe_browser_product_resolution_build
+
+TYPE COPY
+TARGET_DATASOURCE int_stripe_browser_product_resolution_current
+COPY_MODE replace

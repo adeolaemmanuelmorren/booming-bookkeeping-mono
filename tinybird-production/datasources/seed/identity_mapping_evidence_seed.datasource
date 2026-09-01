@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Identifier-level first and last observation timestamps from the same completed
+    BigQuery generation as the identity-state seed.
+
+SCHEMA >
+    `identifier_key` String `json:$.identifier_key`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY identifier_key
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/migration_seed/identity_mapping_evidence/snapshot_at=20260826230500/*.parquet
+IMPORT_SCHEDULE @on-demand
+IMPORT_FORMAT parquet

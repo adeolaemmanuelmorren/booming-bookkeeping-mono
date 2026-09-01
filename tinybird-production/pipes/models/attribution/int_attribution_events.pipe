@@ -1,0 +1,67 @@
+DESCRIPTION >
+    Timestamped attribution traits from resolved website touchpoints and dedicated
+    browser attribution events.
+
+NODE dedicated_attribution_events_with_profile
+SQL >
+    SELECT
+        attribution.attribution_event_id,
+        attribution.attribution_event_time,
+        identity_mapping.profile_id AS profile_id,
+        attribution.fbc,
+        attribution.fbp,
+        attribution.uetsid,
+        attribution.uetvid
+    FROM jitsu_attribution_params AS attribution
+    LEFT JOIN
+        reporting_current_identity_mappings_direct AS identity_mapping
+        ON identity_mapping.tenant_id = attribution.tenant_id
+        AND identity_mapping.identifier_key = coalesce(
+            if(
+                attribution.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', attribution.anonymous_id)
+            ),
+            if(
+                attribution.user_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('user_id:', lowerUTF8(attribution.user_id))
+            )
+        )
+    WHERE attribution.tenant_id = 'boom'
+
+NODE all_attribution_event_rows
+SQL >
+    SELECT
+        concat('touchpoint:', toString(touchpoint_id)) AS event_id,
+        'touchpoint' AS event_source,
+        assumeNotNull(touchpoint_time) AS event_time,
+        assumeNotNull(profile_id) AS profile_id,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        fbc,
+        fbp,
+        uetsid,
+        uetvid
+    FROM mart_touchpoints_all
+    WHERE profile_id IS NOT NULL AND touchpoint_time IS NOT NULL
+    UNION ALL
+    SELECT
+        concat('attribution:', toString(attribution_event_id)) AS event_id,
+        'dedicated_attribution_event' AS event_source,
+        assumeNotNull(attribution_event_time) AS event_time,
+        assumeNotNull(profile_id) AS profile_id,
+        CAST(NULL AS Nullable(String)) AS ip_address,
+        CAST(NULL AS Nullable(String)) AS user_agent,
+        CAST(NULL AS Nullable(String)) AS geo_city,
+        CAST(NULL AS Nullable(String)) AS geo_region,
+        CAST(NULL AS Nullable(String)) AS geo_country,
+        fbc,
+        fbp,
+        uetsid,
+        uetvid
+    FROM dedicated_attribution_events_with_profile
+    WHERE profile_id IS NOT NULL AND attribution_event_time IS NOT NULL

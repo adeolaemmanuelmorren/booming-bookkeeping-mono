@@ -1,0 +1,64 @@
+DESCRIPTION >
+    Atomically replace the 90-day repeatable Purchase conversion payload after its
+    payment, product, identity, and attribution inputs refresh.
+
+NODE build_repeatable_conversion_snapshot
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        profile_id,
+        anonymous_id,
+        event_id,
+        event_name,
+        conversion_ts,
+        email,
+        phone,
+        address,
+        profile_first_name,
+        profile_last_name,
+        product_case,
+        product_resolution_source,
+        product_id,
+        payment_occurrence_type,
+        is_repeat_payment,
+        content_ids,
+        fb_content_ids,
+        content_name,
+        content_type,
+        value,
+        currency,
+        num_items,
+        contents,
+        fb_contents,
+        click_ids,
+        pre_conversion_fbc,
+        pre_conversion_fbp,
+        compliant_email,
+        compliant_phone,
+        is_click,
+        pre_conversion_ip_address,
+        first_known_ip_address,
+        last_known_ip_address,
+        first_known_user_agent,
+        last_known_user_agent,
+        first_known_geo_city,
+        first_known_geo_region,
+        first_known_geo_country,
+        last_known_geo_city,
+        last_known_geo_region,
+        last_known_geo_country,
+        first_known_fbc,
+        first_known_fbp,
+        first_known_uetsid,
+        first_known_uetvid,
+        last_known_fbc,
+        last_known_fbp,
+        last_known_uetsid,
+        last_known_uetvid,
+        payload
+    FROM segretl_repeatable_conversions_build
+
+TYPE COPY
+TARGET_DATASOURCE segretl_repeatable_conversions_current
+COPY_MODE replace

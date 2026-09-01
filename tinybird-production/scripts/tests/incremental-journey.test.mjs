@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+const projectRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+
+test("journey payload rows are versioned and atomically activated per conversion", async () => {
+  const versions = await resource("datasources/state/reporting_journey_versions.datasource");
+  const commits = await resource("datasources/state/reporting_journey_commits.datasource");
+  const current = await resource(
+    "pipes/models/attribution/reporting_current_journey_base_rows.pipe",
+  );
+
+  assert.match(versions, /ENGINE ReplacingMergeTree/);
+  assert.match(versions, /journey_row_key/);
+  assert.match(commits, /ENGINE ReplacingMergeTree/);
+  assert.match(commits, /ENGINE_SORTING_KEY tenant_id, conversion_id/);
+  assert.match(commits, /ENGINE_VER batch_version/);
+  assert.match(commits, /journey_row_count/);
+  assert.match(current, /FROM reporting_journey_commits/);
+  assert.match(current, /versions\.batch_version = commits\.active_batch_version/);
+  assert.match(current, /versions\.batch_id = commits\.active_batch_id/);
+  assert.match(current, /WHERE commits\.active_is_deleted = 0/);
+  assert.match(current, /FROM reporting_journey_seed_current AS seed/);
+  assert.match(current, /LEFT ANTI JOIN latest_journey_commit_versions/);
+  assert.match(current, /FROM current_seed_journey_rows[\s\S]*UNION ALL/);
+});
+
+test("only the Worker-facing endpoint executes journey windows", async () => {
+  const endpoint = await resource(
+    "pipes/models/attribution/reporting_profile_journey_window_build.pipe",
+  );
+  const storedReader = await resource(
+    "pipes/models/attribution/mart_conversions_with_touchpoints_build.pipe",
+  );
+  const multiTouch = await resource(
+    "pipes/models/attribution/mart_conversions_multi_touch_build.pipe",
+  );
+  const revenue = await resource(
+    "pipes/outputs/attribution/mart_revenue_attribution_build.pipe",
+  );
+
+  assert.match(endpoint, /TYPE ENDPOINT/);
+  assert.match(endpoint, /p_identifier_key/);
+  assert.match(endpoint, /p_identifier_keys/);
+  assert.match(endpoint, /p_conversion_ids/);
+  assert.match(endpoint, /FROM reporting_conversion_facts_v2_current/);
+  assert.match(endpoint, /FROM mart_touchpoints_all_facts_v3_current/);
+  assert.match(endpoint, /identity_anchor_key IN/);
+  assert.match(storedReader, /FROM reporting_current_journey_rows/);
+  assert.match(multiTouch, /FROM reporting_current_journey_base_rows/);
+  assert.match(multiTouch, /FROM reporting_latest_ad_names_current/);
+  assert.match(revenue, /FROM reporting_current_journey_rows/);
+  assert.doesNotMatch(storedReader, /reporting_profile_journey_window_build/);
+  assert.doesNotMatch(multiTouch, /reporting_profile_journey_window_build/);
+  assert.doesNotMatch(revenue, /reporting_profile_journey_window_build/);
+});
+
+test("journey point lookups keep bounded physical indexes", async () => {
+  const mappingSeed = await resource(
+    "datasources/seed/identity_mapping_serving_seed.datasource",
+  );
+  const mappingDelta = await resource(
+    "datasources/state/identity_mapping_delta_lookup.datasource",
+  );
+  const conversions = await resource(
+    "datasources/state/reporting_conversion_facts_v2_current.datasource",
+  );
+
+  assert.match(mappingSeed, /ENGINE_SETTINGS "index_granularity=128"/);
+  assert.match(mappingDelta, /ENGINE_SETTINGS "index_granularity=128"/);
+  assert.match(
+    conversions,
+    /INDEX conversion_id_bloom conversion_id TYPE bloom_filter\(0\.01\) GRANULARITY 1/,
+  );
+});
+
+test("expensive stable revenue and channel calculations happen before storage", async () => {
+  const endpoint = await resource("endpoints/reporting_profile_journey_build.pipe");
+  const revenue = await resource(
+    "pipes/outputs/attribution/mart_revenue_attribution_build.pipe",
+  );
+  const current = await resource("pipes/models/attribution/reporting_current_journey_rows.pipe");
+
+  assert.match(endpoint, /revenue_multi_touch_decimal/);
+  assert.match(endpoint, /touchpoint_channel_label/);
+  assert.match(revenue, /revenue_multi_touch_decimal/);
+  assert.match(revenue, /touchpoint_channel_label/);
+  assert.doesNotMatch(revenue, /match\(lowerUTF8/);
+  assert.match(current, /FROM reporting_latest_ad_names_current/);
+});
+
+test("the immutable journey snapshot is the seed instead of a historical recompute", async () => {
+  const current = await resource(
+    "pipes/models/attribution/reporting_current_journey_base_rows.pipe",
+  );
+
+  assert.match(current, /'journey_seed' AS batch_id/);
+  assert.match(current, /toUInt64\(0\) AS batch_version/);
+  assert.match(current, /LEFT ANTI JOIN latest_journey_commit_versions/);
+});
+
+async function resource(relativePath) {
+  return readFile(path.join(projectRoot, relativePath), "utf8");
+}

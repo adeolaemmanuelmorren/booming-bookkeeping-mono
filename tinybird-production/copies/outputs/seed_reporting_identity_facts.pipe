@@ -1,0 +1,25 @@
+DESCRIPTION >
+    One-time narrow identity base for facts present at the migration cut.
+
+NODE build_reporting_identity_fact_seed
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'touchpoint' AS fact_kind,
+        touchpoint_id AS fact_id,
+        profile_id
+    FROM mart_touchpoints_all_seed_current
+
+    UNION ALL
+
+    SELECT
+        'boom' AS tenant_id,
+        'conversion' AS fact_kind,
+        conversion_id AS fact_id,
+        any(profile_id) AS profile_id
+    FROM mart_conversions_with_touchpoints_current
+    GROUP BY conversion_id
+
+TYPE COPY
+TARGET_DATASOURCE reporting_identity_fact_seed
+COPY_MODE replace

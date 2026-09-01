@@ -1,0 +1,2 @@
+ts	phase	decision	why	evidence	result
+2026-08-30T00:59:05Z	identity-capacity	Raised the final batch limit to 1000 only after removing duplicate journal verification	The earlier 1000 trial had completed all journal writes and failed inside the removed reread; a clean paused boundary allowed a direct retest	Worker version 876da13f-b548-4a67-9147-77c1a9c180fc; active batch 1787935740016	Batch 1787935740016 wrote 5598 graph rows, passed the exact manifest, and activated; the optimized 1000-event drain continues without errors

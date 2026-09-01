@@ -1,0 +1,382 @@
+DESCRIPTION >
+    Resolve at most five normalized identifiers from the flat seed plus activated
+    delta state. Unactivated compaction output is intentionally invisible.
+
+NODE identity_resolver_input
+SQL >
+    %
+    SELECT
+        {{ String(p_tenant_id, 'boom') }} AS tenant_id,
+        nullIf(lowerUTF8(trim({{ String(p_profile_id, '') }})), '') AS requested_profile_id,
+        nullIf(trim({{ String(p_anonymous_id, '') }}), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim({{ String(p_user_id, '') }})), '') AS user_id,
+        nullIf(lowerUTF8(trim({{ String(p_email, '') }})), '') AS email,
+        replaceRegexpAll(trim({{ String(p_phone, '') }}), '[^0-9]', '') AS phone_digits
+
+NODE resolver_activated_identity_batches
+SQL >
+    %
+    SELECT * FROM activated_identity_batches WHERE tenant_id = {{ String(p_tenant_id, 'boom') }}
+
+NODE identity_resolver_national_phone
+SQL >
+    SELECT
+        input.*,
+        multiIf(
+            length(input.phone_digits) = 10,
+            input.phone_digits,
+            length(input.phone_digits) = 11 AND startsWith(input.phone_digits, '1'),
+            substring(input.phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM identity_resolver_input AS input
+
+NODE normalized_identity_resolver_input
+SQL >
+    SELECT
+        input.*,
+        if(
+            input.email IS NULL,
+            CAST(NULL AS Nullable(String)),
+            if(
+                arrayElement(splitByChar('@', assumeNotNull(input.email)), 2)
+                IN ('gmail.com', 'googlemail.com'),
+                concat(
+                    replaceAll(
+                        replaceRegexpOne(
+                            arrayElement(splitByChar('@', assumeNotNull(input.email)), 1), '[+].*$', ''
+                        ),
+                        '.',
+                        ''
+                    ),
+                    '@gmail.com'
+                ),
+                input.email
+            )
+        ) AS canonical_email,
+        if(
+            match(input.national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(input.national_phone, 4, 3) != '555'
+            AND NOT match(
+                input.national_phone,
+                '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+            )
+            AND NOT match(input.national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', input.national_phone),
+            CAST(NULL AS Nullable(String))
+        ) AS phone
+    FROM identity_resolver_national_phone AS input
+
+NODE requested_identity_identifier_candidates
+SQL >
+    SELECT
+        input.tenant_id AS tenant_id,
+        tupleElement(candidate, 1) AS requested_identifier_type,
+        tupleElement(candidate, 2) AS requested_identifier_value,
+        tupleElement(candidate, 3) AS matched_identifier_type,
+        tupleElement(candidate, 4) AS matched_identifier_value,
+        concat(tupleElement(candidate, 3), ':', tupleElement(candidate, 4)) AS identifier_key,
+        concat(
+            'mapping:',
+            toString(length(concat(tupleElement(candidate, 3), ':', tupleElement(candidate, 4)))),
+            ':',
+            concat(tupleElement(candidate, 3), ':', tupleElement(candidate, 4))
+        ) AS mapping_state_key,
+        tupleElement(candidate, 5) AS candidate_rank
+    FROM normalized_identity_resolver_input AS input ARRAY
+    JOIN
+        [
+            tuple(
+                'anonymous_id',
+                ifNull(input.anonymous_id, ''),
+                'anonymous_id',
+                ifNull(input.anonymous_id, ''),
+                toUInt8(1)
+            ),
+            tuple(
+                'user_id', ifNull(input.user_id, ''), 'user_id', ifNull(input.user_id, ''), toUInt8(1)
+            ),
+            tuple('email', ifNull(input.email, ''), 'email', ifNull(input.email, ''), toUInt8(1)),
+            tuple(
+                'email',
+                ifNull(input.email, ''),
+                'canonical_email',
+                ifNull(input.canonical_email, ''),
+                toUInt8(2)
+            ),
+            tuple('phone', ifNull(input.phone, ''), 'phone', ifNull(input.phone, ''), toUInt8(1))
+        ] AS candidate
+    WHERE tupleElement(candidate, 2) != '' AND tupleElement(candidate, 4) != ''
+
+NODE candidate_requested_mapping_versions
+SQL >
+    %
+    SELECT
+        seed.tenant_id AS tenant_id,
+        seed.identifier_key AS identifier_key,
+        seed.profile_id AS profile_id,
+        seed.is_deleted AS is_deleted,
+        seed.batch_version AS batch_version,
+        seed.committed_at AS committed_at,
+        seed.row_hash AS row_hash
+    FROM identity_state_seed_enriched AS seed
+    WHERE
+        seed.tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND seed.state_kind = 'mapping'
+        AND seed.state_key IN (SELECT mapping_state_key FROM requested_identity_identifier_candidates)
+    UNION ALL
+    SELECT
+        journal.tenant_id AS tenant_id,
+        journal.identifier_key AS identifier_key,
+        journal.profile_id AS profile_id,
+        journal.is_deleted AS is_deleted,
+        journal.batch_version AS batch_version,
+        journal.committed_at AS committed_at,
+        journal.row_hash AS row_hash
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN
+        resolver_activated_identity_batches AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+    WHERE
+        journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND journal.state_kind = 'mapping'
+        AND journal.lookup_key IN (SELECT identifier_key FROM requested_identity_identifier_candidates)
+        AND journal.sub_key = ''
+
+NODE latest_requested_mapping_versions
+SQL >
+    SELECT *
+    FROM candidate_requested_mapping_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, identifier_key
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        )
+        = 1
+
+NODE current_requested_identity_mappings
+SQL >
+    SELECT tenant_id, identifier_key, profile_id
+    FROM latest_requested_mapping_versions
+    WHERE is_deleted = 0
+
+NODE identity_mapping_resolution_candidates
+SQL >
+    SELECT
+        requested.tenant_id AS tenant_id,
+        requested.requested_identifier_type AS requested_identifier_type,
+        requested.requested_identifier_value AS requested_identifier_value,
+        requested.matched_identifier_type AS matched_identifier_type,
+        requested.matched_identifier_value AS matched_identifier_value,
+        requested.identifier_key AS matched_identifier_key,
+        requested.candidate_rank AS candidate_rank,
+        mappings.profile_id AS profile_id,
+        if(mappings.profile_id = '', 'not_found', 'active') AS resolution_status
+    FROM requested_identity_identifier_candidates AS requested
+    LEFT JOIN
+        current_requested_identity_mappings AS mappings
+        ON requested.tenant_id = mappings.tenant_id
+        AND requested.identifier_key = mappings.identifier_key
+
+NODE requested_identity_profile_ids
+SQL >
+    SELECT
+        tenant_id,
+        profile_id,
+        concat('profile:', toString(length(profile_id)), ':', profile_id) AS profile_state_key
+    FROM current_requested_identity_mappings
+    WHERE profile_id != ''
+    UNION
+    DISTINCT
+    SELECT
+        tenant_id,
+        assumeNotNull(requested_profile_id) AS profile_id,
+        concat(
+            'profile:',
+            toString(length(assumeNotNull(requested_profile_id))),
+            ':',
+            assumeNotNull(requested_profile_id)
+        ) AS profile_state_key
+    FROM normalized_identity_resolver_input
+    WHERE requested_profile_id IS NOT NULL
+
+NODE candidate_requested_profile_versions
+SQL >
+    %
+    SELECT
+        seed.tenant_id AS tenant_id,
+        seed.profile_id AS profile_id,
+        seed.profile_key AS profile_key,
+        seed.winner_identifier_key AS winner_identifier_key,
+        seed.member_identifier_keys AS member_identifier_keys,
+        seed.anonymous_ids AS anonymous_ids,
+        seed.user_ids AS user_ids,
+        seed.emails AS emails,
+        seed.phones AS phones,
+        seed.first_name AS first_name,
+        seed.last_name AS last_name,
+        seed.first_seen_at AS first_seen_at,
+        seed.last_seen_at AS last_seen_at,
+        seed.is_deleted AS is_deleted,
+        seed.batch_version AS batch_version,
+        seed.committed_at AS committed_at,
+        seed.row_hash AS row_hash
+    FROM identity_state_seed_enriched AS seed
+    WHERE
+        seed.tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND seed.state_kind = 'profile'
+        AND seed.state_key IN (SELECT profile_state_key FROM requested_identity_profile_ids)
+    UNION ALL
+    SELECT
+        journal.tenant_id AS tenant_id,
+        journal.profile_id AS profile_id,
+        journal.profile_key AS profile_key,
+        journal.winner_identifier_key AS winner_identifier_key,
+        journal.member_identifier_keys AS member_identifier_keys,
+        journal.anonymous_ids AS anonymous_ids,
+        journal.user_ids AS user_ids,
+        journal.emails AS emails,
+        journal.phones AS phones,
+        journal.first_name AS first_name,
+        journal.last_name AS last_name,
+        journal.first_seen_at AS first_seen_at,
+        journal.last_seen_at AS last_seen_at,
+        journal.is_deleted AS is_deleted,
+        journal.batch_version AS batch_version,
+        journal.committed_at AS committed_at,
+        journal.row_hash AS row_hash
+    FROM identity_state_delta_versions AS journal
+    INNER JOIN
+        resolver_activated_identity_batches AS activated
+        ON journal.tenant_id = activated.tenant_id
+        AND journal.batch_version = activated.batch_version
+        AND journal.batch_id = activated.batch_id
+    WHERE
+        journal.tenant_id = {{ String(p_tenant_id, 'boom') }}
+        AND journal.state_kind = 'profile'
+        AND journal.lookup_key IN (SELECT profile_id FROM requested_identity_profile_ids)
+        AND journal.sub_key = ''
+
+NODE latest_requested_profile_versions
+SQL >
+    SELECT *
+    FROM candidate_requested_profile_versions
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY tenant_id, profile_id
+            ORDER BY batch_version DESC, committed_at DESC, row_hash DESC
+        )
+        = 1
+
+NODE current_requested_identity_profiles
+SQL >
+    SELECT * FROM latest_requested_profile_versions WHERE is_deleted = 0
+
+NODE identity_direct_profile_resolution_candidates
+SQL >
+    SELECT
+        input.tenant_id AS tenant_id,
+        'profile_id' AS requested_identifier_type,
+        assumeNotNull(input.requested_profile_id) AS requested_identifier_value,
+        'profile_id' AS matched_identifier_type,
+        assumeNotNull(input.requested_profile_id) AS matched_identifier_value,
+        concat('profile_id:', assumeNotNull(input.requested_profile_id)) AS matched_identifier_key,
+        toUInt8(1) AS candidate_rank,
+        profiles.profile_id AS profile_id,
+        if(profiles.profile_id = '', 'not_found', 'active') AS resolution_status
+    FROM normalized_identity_resolver_input AS input
+    LEFT JOIN
+        current_requested_identity_profiles AS profiles
+        ON input.tenant_id = profiles.tenant_id
+        AND input.requested_profile_id = profiles.profile_id
+    WHERE input.requested_profile_id IS NOT NULL
+
+NODE all_identity_resolution_candidates
+SQL >
+    SELECT *
+    FROM identity_mapping_resolution_candidates
+    UNION ALL
+    SELECT *
+    FROM identity_direct_profile_resolution_candidates
+
+NODE best_identity_resolution_per_request
+SQL >
+    SELECT * EXCEPT resolution_rank
+    FROM
+        (
+            SELECT
+                *,
+                row_number() OVER (
+                    PARTITION BY tenant_id, requested_identifier_type, requested_identifier_value
+                    ORDER BY resolution_status = 'not_found', candidate_rank, profile_id
+                ) AS resolution_rank
+            FROM all_identity_resolution_candidates
+        )
+    WHERE resolution_rank = 1
+
+NODE active_identity_generation
+SQL >
+    SELECT
+        activated.tenant_id AS tenant_id,
+        activated.batch_version AS batch_version,
+        activated.batch_id AS batch_id,
+        activated.committed_at AS committed_at,
+        activated.input_hash AS input_hash,
+        activated.row_hash AS row_hash
+    FROM resolver_activated_identity_batches AS activated
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY activated.tenant_id
+            ORDER BY
+                activated.batch_version DESC,
+                activated.committed_at DESC,
+                activated.row_hash DESC,
+                activated.batch_id DESC
+        )
+        = 1
+
+NODE resolved_identity_endpoint
+SQL >
+    SELECT
+        resolved.tenant_id AS tenant_id,
+        resolved.requested_identifier_type AS requested_identifier_type,
+        resolved.requested_identifier_value AS requested_identifier_value,
+        resolved.matched_identifier_type AS matched_identifier_type,
+        resolved.matched_identifier_value AS matched_identifier_value,
+        resolved.matched_identifier_key AS matched_identifier_key,
+        resolved.resolution_status AS resolution_status,
+        resolved.profile_id AS profile_id,
+        profiles.profile_key AS profile_key,
+        profiles.winner_identifier_key AS winner_identifier_key,
+        profiles.member_identifier_keys AS member_identifier_keys,
+        profiles.anonymous_ids AS anonymous_ids,
+        profiles.user_ids AS user_ids,
+        profiles.emails AS emails,
+        profiles.phones AS phones,
+        profiles.first_name AS first_name,
+        profiles.last_name AS last_name,
+        profiles.first_seen_at AS first_seen_at,
+        profiles.last_seen_at AS last_seen_at,
+        generation.batch_version AS active_batch_version,
+        generation.batch_id AS active_batch_id,
+        generation.committed_at AS active_committed_at,
+        generation.input_hash AS active_input_hash,
+        toUInt64(0) AS pending_event_count,
+        toUInt64(0) AS overlaid_event_count,
+        toUInt64(0) AS rebuild_blocked_event_count,
+        toUInt8(0) AS pending_requires_exact_rebuild,
+        lower(hex(SHA256(''))) AS pending_input_hash,
+        toDateTime64(0, 6) AS pending_snapshot_at,
+        lower(
+            hex(SHA256(concat(generation.batch_id, ':', generation.input_hash)))
+        ) AS resolution_generation
+    FROM best_identity_resolution_per_request AS resolved
+    INNER JOIN active_identity_generation AS generation ON resolved.tenant_id = generation.tenant_id
+    LEFT JOIN
+        current_requested_identity_profiles AS profiles
+        ON resolved.tenant_id = profiles.tenant_id
+        AND resolved.profile_id = profiles.profile_id
+
+TYPE ENDPOINT

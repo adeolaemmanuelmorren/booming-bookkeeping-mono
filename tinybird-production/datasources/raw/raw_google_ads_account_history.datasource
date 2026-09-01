@@ -1,0 +1,37 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.google_ads.account_history.
+    Source role: google_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_at` Nullable(DateTime64(6)) `json:$.updated_at`,
+    `manager_customer_id` Nullable(Int64) `json:$.manager_customer_id`,
+    `auto_tagging_enabled` Nullable(Bool) `json:$.auto_tagging_enabled`,
+    `currency_code` Nullable(String) `json:$.currency_code`,
+    `descriptive_name` Nullable(String) `json:$.descriptive_name`,
+    `final_url_suffix` Nullable(String) `json:$.final_url_suffix`,
+    `hidden` Nullable(Bool) `json:$.hidden`,
+    `manager` Nullable(Bool) `json:$.manager`,
+    `optimization_score` Nullable(Float64) `json:$.optimization_score`,
+    `pay_per_conversion_eligibility_failure_reasons` Nullable(String) `json:$.pay_per_conversion_eligibility_failure_reasons`,
+    `test_account` Nullable(Bool) `json:$.test_account`,
+    `time_zone` Nullable(String) `json:$.time_zone`,
+    `tracking_url_template` Nullable(String) `json:$.tracking_url_template`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `_fivetran_start` Nullable(DateTime64(6)) `json:$._fivetran_start`,
+    `_fivetran_end` Nullable(DateTime64(6)) `json:$._fivetran_end`,
+    `_fivetran_active` Nullable(Bool) `json:$._fivetran_active`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(updated_at, toDateTime64(0, 6)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/google_ads/account_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet
+
+TOKEN boom_bigquery_tinybird_sync APPEND

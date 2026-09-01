@@ -1,0 +1,66 @@
+DESCRIPTION >
+    Materializes new Jitsu Events API form-submission versions
+    into their append-only canonical state.
+
+NODE materialized_form_submission_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        form_submission_id,
+        event_id,
+        submitted_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        checkout_member_name,
+        form_id,
+        form_name,
+        form_action,
+        form_method,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        payment_type,
+        coupon,
+        gclid,
+        gbraid,
+        fbclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        active_campaign_form_id,
+        registration_type,
+        content_name,
+        canonical_event_id,
+        is_checkout_form,
+        form_type,
+        offer_id,
+        source_version,
+        __tb_state_key
+    FROM jitsu_form_submissions_live_build
+
+TYPE MATERIALIZED
+DATASOURCE jitsu_form_submission_versions

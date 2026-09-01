@@ -1,0 +1,165 @@
+DESCRIPTION >
+    Builds the current identify contract from historical and live Jitsu inputs.
+    The stable jitsu_identifies resource reads its physical version state.
+
+NODE identify_live_ranked_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY source.source_fact_version DESC, source.ingested_at DESC, source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    WHERE source.tenant_id = 'boom'
+
+NODE identify_live_current_versions
+SQL >
+    SELECT * FROM identify_live_ranked_versions WHERE logical_version_rank = 1
+
+NODE identify_boom_domain_rows
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'boom_domains' AS source_system,
+        toUInt8(1) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        nullIf(trim(source.id), '') AS identify_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        nullIf(lowerUTF8(trim(coalesce(source.email, source.user_id))), '') AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        coalesce(
+            source.timestamp, source.sent_at, source.received_at, source.loaded_at
+        ) AS identified_at,
+        nullIf(trim(source.context_ip), '') AS ip_address,
+        nullIf(trim(source.context_user_agent), '') AS user_agent,
+        coalesce(
+            nullIf(trim(source.context_edge_city), ''), CAST(NULL AS Nullable(String))
+        ) AS geo_city,
+        coalesce(
+            nullIf(trim(source.context_edge_region), ''), CAST(NULL AS Nullable(String))
+        ) AS geo_region,
+        coalesce(
+            nullIf(trim(source.context_edge_country), ''), CAST(NULL AS Nullable(String))
+        ) AS geo_country,
+        coalesce(
+            source.loaded_at, source.received_at, source.sent_at, source.timestamp
+        ) AS source_version
+    FROM raw_boom_domains_identifies AS source LEFT ANTI
+    JOIN
+        identify_live_current_versions AS live
+        ON live.tenant_id = 'boom'
+        AND live.message_id = source.id
+
+NODE identify_jitsu_history_rows
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'jitsu_data' AS source_system,
+        toUInt8(2) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        nullIf(trim(source.message_id), '') AS identify_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        nullIf(lowerUTF8(trim(coalesce(source.email, source.user_id))), '') AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        coalesce(source.timestamp, source.sent_at, source.received_at) AS identified_at,
+        nullIf(trim(source.context_ip), '') AS ip_address,
+        nullIf(trim(source.context_user_agent), '') AS user_agent,
+        nullIf(trim(source.context_geo_city_name), '') AS geo_city,
+        nullIf(trim(source.context_geo_region_name), '') AS geo_region,
+        nullIf(trim(source.context_geo_country_code), '') AS geo_country,
+        coalesce(source.received_at, source.sent_at, source.timestamp) AS source_version
+    FROM raw_jitsu_data_identifies AS source LEFT ANTI
+    JOIN
+        identify_live_current_versions AS live
+        ON live.tenant_id = 'boom'
+        AND live.message_id = source.message_id
+
+NODE identify_live_rows
+SQL >
+    SELECT
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.source_deleted,
+        nullIf(trim(source.message_id), '') AS identify_id,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(source.email)), ''), nullIf(lowerUTF8(trim(source.user_id)), '')
+        ) AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        source.observed_at AS identified_at,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'ip')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_ip')), '')
+        ) AS ip_address,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'userAgent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'user_agent')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_user_agent')), '')
+        ) AS user_agent,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'cityName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_city')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_city_name')), '')
+        ) AS geo_city,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'regionName')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_region')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_region_name')), '')
+        ) AS geo_region,
+        coalesce(
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'edge', 'country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context', 'geo', 'countryCode')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_edge_country')), ''),
+            nullIf(trim(JSONExtractString(source.fact_payload, 'context_geo_country_code')), '')
+        ) AS geo_country,
+        source.ingested_at AS source_version
+    FROM identify_live_current_versions AS source
+    WHERE source.event_kind = 'identify'
+
+NODE identify_all_current_source_rows
+SQL >
+    SELECT *
+    FROM identify_boom_domain_rows
+    UNION ALL
+    SELECT *
+    FROM identify_jitsu_history_rows
+    UNION ALL
+    SELECT *
+    FROM identify_live_rows
+
+NODE identify_ranked_source_rows
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.identify_id
+            ORDER BY source.source_priority DESC, source.source_version DESC
+        ) AS source_rank
+    FROM identify_all_current_source_rows AS source
+
+NODE current_identify_rows
+SQL >
+    SELECT
+        tenant_id,
+        identify_id,
+        source_system,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        identified_at,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        source_version
+    FROM identify_ranked_source_rows
+    WHERE source_rank = 1 AND source_deleted = 0

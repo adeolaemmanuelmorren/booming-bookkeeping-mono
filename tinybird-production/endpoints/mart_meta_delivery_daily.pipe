@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Query the daily Meta delivery mart over a half-open Pacific date range.
+
+NODE endpoint
+SQL >
+    %
+    SELECT
+        date,
+        level,
+        account_id,
+        campaign_id,
+        adset_id,
+        ad_id,
+        campaign_name,
+        adset_name,
+        ad_name,
+        impressions,
+        spend,
+        reach,
+        frequency,
+        currency
+    FROM model_mart_meta_delivery_daily
+    WHERE date >= toDate(parseDateTime64BestEffort(
+        {{ String(p_range_start_pacific, '2000-01-01 00:00:00') }},
+        6,
+        'America/Los_Angeles'
+    ), 'America/Los_Angeles')
+      AND date < toDate(parseDateTime64BestEffort(
+        {{ String(p_range_end_pacific, '2100-01-01 00:00:00') }},
+        6,
+        'America/Los_Angeles'
+    ), 'America/Los_Angeles')
+    ORDER BY date, level, account_id, campaign_id, adset_id, ad_id
+
+TYPE endpoint

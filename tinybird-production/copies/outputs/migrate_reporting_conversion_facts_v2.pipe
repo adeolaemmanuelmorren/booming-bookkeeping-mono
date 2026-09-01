@@ -1,0 +1,28 @@
+DESCRIPTION >
+    One-time layout migration for anchor-pruned incremental journey builds.
+
+NODE indexed_conversion_facts
+SQL >
+    SELECT
+        tenant_id,
+        ifNull(identity_anchor_key, '') AS identity_anchor_key,
+        conversion_id,
+        fact_kind,
+        conversion_time,
+        conversion_source,
+        conversion_type,
+        manual_profile_id,
+        payment_source,
+        payment_id,
+        payment_customer_id,
+        payment_email,
+        payment_category,
+        is_repeat_payment,
+        net_amount,
+        registration_type,
+        client_payment_amount
+    FROM reporting_conversion_facts
+
+TYPE COPY
+TARGET_DATASOURCE reporting_conversion_facts_v2_current
+COPY_MODE replace

@@ -1,0 +1,86 @@
+DESCRIPTION >
+    Identity-neutral session facts resolved against the currently activated graph.
+
+NODE current_resolved_touchpoint_facts
+SQL >
+    SELECT
+        facts.touchpoint_id AS touchpoint_id,
+        facts.session_id AS session_id,
+        nullIf(
+            if(
+                identity_delta.state_key = '',
+                facts.identity_base_profile_id,
+                if(identity_delta.is_deleted = 0, identity_delta.profile_id, '')
+            ),
+            ''
+        ) AS profile_id,
+        facts.visitor_key AS visitor_key,
+        facts.anonymous_id AS anonymous_id,
+        facts.user_id AS user_id,
+        facts.session_start_timestamp AS session_start_timestamp,
+        facts.touchpoint_time AS touchpoint_time,
+        facts.session_end_timestamp AS session_end_timestamp,
+        facts.session_duration_seconds AS session_duration_seconds,
+        facts.page_view_count AS page_view_count,
+        facts.first_page_view_id AS first_page_view_id,
+        facts.first_page_url AS first_page_url,
+        facts.first_page_host AS first_page_host,
+        facts.first_page_path AS first_page_path,
+        facts.first_page_path_host AS first_page_path_host,
+        facts.ip_address AS ip_address,
+        facts.user_agent AS user_agent,
+        facts.device_platform AS device_platform,
+        facts.device_is_mobile AS device_is_mobile,
+        facts.geo_city AS geo_city,
+        facts.geo_region AS geo_region,
+        facts.geo_region_code AS geo_region_code,
+        facts.geo_country AS geo_country,
+        facts.geo_timezone AS geo_timezone,
+        facts.last_page_view_id AS last_page_view_id,
+        facts.last_page_url AS last_page_url,
+        facts.last_page_path AS last_page_path,
+        facts.utm_source AS utm_source,
+        facts.utm_medium AS utm_medium,
+        facts.utm_campaign AS utm_campaign,
+        facts.utm_content AS utm_content,
+        facts.utm_term AS utm_term,
+        facts.utm_id AS utm_id,
+        facts.campaign_id AS campaign_id,
+        facts.adset_id AS adset_id,
+        facts.ad_id AS ad_id,
+        facts.google_keyword_id AS google_keyword_id,
+        facts.google_keyword AS google_keyword,
+        facts.click_id AS click_id,
+        facts.click_id_type AS click_id_type,
+        facts.gclid AS gclid,
+        facts.gbraid AS gbraid,
+        facts.wbraid AS wbraid,
+        facts.fbclid AS fbclid,
+        facts.fbc_fbclid AS fbc_fbclid,
+        facts.ttclid AS ttclid,
+        facts.li_fat_id AS li_fat_id,
+        facts.rdt_cid AS rdt_cid,
+        facts.twclid AS twclid,
+        facts.fbc AS fbc,
+        facts.fbp AS fbp,
+        facts.ttp AS ttp,
+        facts.uetsid AS uetsid,
+        facts.uetvid AS uetvid,
+        facts.channel_source AS channel_source,
+        facts.channel_medium AS channel_medium,
+        toUInt8(profile_id IS NOT NULL) AS is_identified
+    FROM mart_touchpoints_all_facts_v2_current AS facts
+    LEFT ANY JOIN reporting_latest_identity_mapping_delta AS identity_delta
+        ON identity_delta.tenant_id = 'boom'
+        AND identity_delta.identifier_key = coalesce(
+            if(
+                facts.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', facts.anonymous_id)
+            ),
+            if(
+                facts.user_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('user_id:', lowerUTF8(facts.user_id))
+            )
+        )

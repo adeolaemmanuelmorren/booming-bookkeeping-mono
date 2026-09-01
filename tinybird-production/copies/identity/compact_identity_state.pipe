@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Append one bounded affected-component batch and its manifest. A separate Events
+    API write activates the batch only after manifest validation succeeds.
+
+NODE append_compacted_identity_state
+SQL >
+    SELECT * FROM identity_compaction_build
+
+TYPE COPY
+TARGET_DATASOURCE identity_state_delta_versions
+COPY_MODE append

@@ -1,0 +1,47 @@
+DESCRIPTION >
+    One-time migration from the resolved server-form snapshot into identity-neutral facts.
+
+NODE build_server_form_fact_seed
+SQL >
+    WITH normalized AS (
+        SELECT
+            *,
+            replaceRegexpAll(trimBoth(ifNull(phone, '')), '[^0-9]', '') AS phone_digits
+        FROM mart_form_submissions_server_side_current
+    ),
+    anchored AS (
+        SELECT
+            *,
+            multiIf(
+                length(phone_digits) = 10,
+                phone_digits,
+                length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+                substring(phone_digits, 2),
+                ''
+            ) AS national_phone
+        FROM normalized
+    )
+    SELECT
+        * EXCEPT (profile_id, phone_digits, national_phone),
+        coalesce(
+            if(email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', email)),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            )
+        ) AS identity_anchor_key
+    FROM anchored
+
+TYPE COPY
+TARGET_DATASOURCE mart_form_submissions_server_side_facts_current
+COPY_MODE replace

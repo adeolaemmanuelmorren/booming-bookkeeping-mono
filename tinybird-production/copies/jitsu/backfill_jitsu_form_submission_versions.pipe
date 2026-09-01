@@ -1,0 +1,141 @@
+DESCRIPTION >
+    One-time seed of current historical and pre-existing live form-submission
+    versions. It has no schedule and is safe to replay because readers deduplicate versions.
+
+NODE backfill_form_submission_version_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_system,
+        multiIf(source_system = 'jitsu_data', toUInt8(2), toUInt8(1)) AS source_priority,
+        toUInt8(0) AS source_deleted,
+        toUInt64(
+            greatest(toUnixTimestamp64Micro(ifNull(source_version, toDateTime64(0, 6))), 0)
+        ) AS source_fact_version,
+        ifNull(source_version, toDateTime64(0, 6)) AS source_ingested_at,
+        CAST(
+            hex(
+                SHA256(
+                    concat(
+                        source_system,
+                        '|',
+                        ifNull(form_submission_id, ''),
+                        '|',
+                        toString(ifNull(source_version, toDateTime64(0, 6)))
+                    )
+                )
+            ),
+            'FixedString(64)'
+        ) AS payload_hash,
+        form_submission_id,
+        event_id,
+        submitted_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        checkout_member_name,
+        form_id,
+        form_name,
+        form_action,
+        form_method,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        payment_type,
+        coupon,
+        gclid,
+        gbraid,
+        fbclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        active_campaign_form_id,
+        registration_type,
+        content_name,
+        canonical_event_id,
+        is_checkout_form,
+        form_type,
+        offer_id,
+        source_version,
+        ifNull(form_submission_id, '') AS __tb_state_key
+    FROM jitsu_form_submissions_build
+    WHERE source_system != 'jitsu_events_api'
+    UNION ALL
+    SELECT
+        tenant_id,
+        source_system,
+        source_priority,
+        source_deleted,
+        source_fact_version,
+        source_ingested_at,
+        payload_hash,
+        form_submission_id,
+        event_id,
+        submitted_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        checkout_member_name,
+        form_id,
+        form_name,
+        form_action,
+        form_method,
+        page_url,
+        page_path,
+        page_referrer,
+        ip_address,
+        user_agent,
+        geo_city,
+        geo_region,
+        geo_country,
+        stripe_payment_method_id,
+        payment_method_type,
+        payment_provider,
+        payment_type,
+        coupon,
+        gclid,
+        gbraid,
+        fbclid,
+        fbc,
+        fbp,
+        ttp,
+        uetsid,
+        uetvid,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        active_campaign_form_id,
+        registration_type,
+        content_name,
+        canonical_event_id,
+        is_checkout_form,
+        form_type,
+        offer_id,
+        source_version,
+        __tb_state_key
+    FROM jitsu_form_submissions_live_build
+
+TYPE COPY
+TARGET_DATASOURCE jitsu_form_submission_versions
+COPY_MODE append

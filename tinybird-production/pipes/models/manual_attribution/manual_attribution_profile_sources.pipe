@@ -1,0 +1,129 @@
+DESCRIPTION >
+    Normalized source records used to search for a profile during manual payment attribution.
+
+NODE latest_primary_stripe_customers_for_search
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'stripe' AS source_system,
+        id AS source_record_id,
+        created AS event_time,
+        nullIf(arrayElement(splitByChar(' ', trimBoth(ifNull(name, ''))), 1), '') AS first_name,
+        nullIf(arrayElement(splitByChar(' ', trimBoth(ifNull(name, ''))), -1), '') AS last_name,
+        nullIf(lowerUTF8(trimBoth(ifNull(email, ''))), '') AS email,
+        nullIf(trimBoth(ifNull(phone, '')), '') AS phone
+    FROM raw_stripe_customer
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC NULLS LAST) = 1
+
+NODE latest_kajabi_stripe_customers_for_search
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'stripe_kajabi' AS source_system,
+        id AS source_record_id,
+        created AS event_time,
+        nullIf(arrayElement(splitByChar(' ', trimBoth(ifNull(name, ''))), 1), '') AS first_name,
+        nullIf(arrayElement(splitByChar(' ', trimBoth(ifNull(name, ''))), -1), '') AS last_name,
+        nullIf(lowerUTF8(trimBoth(ifNull(email, ''))), '') AS email,
+        nullIf(trimBoth(ifNull(phone, '')), '') AS phone
+    FROM raw_stripe_kajabi_customer
+    QUALIFY row_number() OVER (PARTITION BY id ORDER BY _fivetran_synced DESC NULLS LAST) = 1
+
+NODE identify_profile_search_sources
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        'segment_identify' AS source_system,
+        identify_id AS source_record_id,
+        identified_at AS event_time,
+        CAST(NULL AS Nullable(String)) AS first_name,
+        CAST(NULL AS Nullable(String)) AS last_name,
+        email AS email,
+        phone AS phone
+    FROM jitsu_identifies
+    WHERE tenant_id = 'boom'
+
+NODE form_profile_search_sources
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        'segment_form' AS source_system,
+        form_submission_id AS source_record_id,
+        submitted_at AS event_time,
+        first_name AS first_name,
+        CAST(NULL AS Nullable(String)) AS last_name,
+        email AS email,
+        phone AS phone
+    FROM jitsu_form_submissions
+    WHERE tenant_id = 'boom'
+
+NODE activecampaign_profile_search_sources
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'activecampaign' AS source_system,
+        contact_id AS source_record_id,
+        contact_created_at AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM activecampaign_contacts_adapter
+    WHERE is_deleted = 0
+
+NODE all_profile_search_sources
+SQL >
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM identify_profile_search_sources
+    UNION ALL
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM form_profile_search_sources
+    UNION ALL
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM activecampaign_profile_search_sources
+    UNION ALL
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM latest_primary_stripe_customers_for_search
+    UNION ALL
+    SELECT
+        tenant_id AS tenant_id,
+        source_system AS source_system,
+        source_record_id AS source_record_id,
+        event_time AS event_time,
+        first_name AS first_name,
+        last_name AS last_name,
+        email AS email,
+        phone AS phone
+    FROM latest_kajabi_stripe_customers_for_search

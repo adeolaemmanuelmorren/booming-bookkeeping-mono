@@ -1,0 +1,371 @@
+DESCRIPTION >
+    Eligible Stripe Purchase conversion payloads using deterministic event IDs and
+    normalized browser-compatible product content.
+
+NODE resolved_repeatable_payments
+SQL >
+    SELECT
+        payments.payment_source AS payment_source,
+        assumeNotNull(payments.payment_id) AS payment_id,
+        assumeNotNull(payments.payment_time) AS payment_time,
+        payments.profile_id AS profile_id,
+        payments.payment_email AS payment_email,
+        payments.payment_phone AS payment_phone,
+        payments.payment_name AS payment_name,
+        payments.billing_address_line_1 AS billing_address_line_1,
+        payments.billing_address_city AS billing_address_city,
+        payments.billing_address_region AS billing_address_region,
+        payments.billing_address_zip AS billing_address_zip,
+        payments.billing_address_country AS billing_address_country,
+        payments.currency AS currency,
+        payments.amount_paid AS amount_paid,
+        payments.payment_occurrence_type AS payment_occurrence_type,
+        payments.is_repeat_payment AS is_repeat_payment,
+        products.product_id AS product_id,
+        products.product_name AS product_complete_name,
+        products.content_ids AS conversion_content_ids,
+        products.product_resolution_source AS product_resolution_source
+    FROM mart_payments AS payments
+    INNER JOIN
+        int_stripe_browser_product_resolution AS products
+        ON products.payment_source = payments.payment_source
+        AND products.payment_id = payments.payment_id
+    WHERE
+        payments.is_repeat_payment = 0
+        AND payments.payment_id IS NOT NULL
+        AND payments.payment_time IS NOT NULL
+        AND payments.payment_time >= now64(6) - INTERVAL 90 DAY
+
+NODE classified_repeatable_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            payment_source = 'stripe_kajabi'
+            AND arrayExists(
+                content_id -> match(content_id, 'booming bookkeeping mentorship program'),
+                conversion_content_ids
+            ),
+            'kajabi',
+            arrayExists(
+                content_id -> match(content_id, '(keyboard rich book|top tax loopholes)'),
+                conversion_content_ids
+            ),
+            'book',
+            arrayExists(
+                content_id -> match(content_id, '(vip|keyboard rich challenge)'), conversion_content_ids
+            ),
+            'vip',
+            payment_source = 'stripe'
+            AND amount_paid = 4997
+            AND arrayExists(
+                content_id -> content_id = 'booming bookkeeping installment', conversion_content_ids
+            ),
+            'mentorship',
+            payment_source = 'stripe'
+            AND arrayExists(
+                content_id -> match(content_id, 'booming bookkeeping mentorship program'),
+                conversion_content_ids
+            ),
+            'mentorship',
+            CAST(NULL AS Nullable(String))
+        ) AS product_case
+    FROM resolved_repeatable_payments
+
+NODE eligible_repeatable_payments
+SQL >
+    SELECT *
+    FROM classified_repeatable_payments
+    WHERE product_case IS NOT NULL AND notEmpty(conversion_content_ids)
+
+NODE repeatable_payment_events
+SQL >
+    SELECT
+        payment_source,
+        payment_id,
+        payment_time,
+        profile_id,
+        payment_email,
+        payment_phone,
+        payment_name,
+        billing_address_line_1,
+        billing_address_city,
+        billing_address_region,
+        billing_address_zip,
+        billing_address_country,
+        currency,
+        amount_paid,
+        payment_occurrence_type,
+        toBool(is_repeat_payment) AS is_repeat_payment,
+        assumeNotNull(product_case) AS product_case,
+        product_resolution_source,
+        assumeNotNull(product_id) AS product_id,
+        product_complete_name AS content_name,
+        conversion_content_ids,
+        concat('purchase_', payment_id) AS event_id,
+        multiIf(
+            arrayExists(
+                content_id -> match(
+                    content_id,
+                    '^(vip basic package|keyboard rich challenge basic vip|5-day keyboard rich challenge vip ticket|krc - basic vip)([^a-z0-9]|$)'
+                ),
+                conversion_content_ids
+            ),
+            'krc-paid-vip',
+            product_case = 'mentorship',
+            'bbb-high-ticket',
+            'product'
+        ) AS content_type,
+        amount_paid AS value,
+        upperUTF8(currency) AS conversion_currency,
+        toInt64(length(conversion_content_ids)) AS num_items,
+        arrayMap(
+            content_id -> CAST(
+                tuple(
+                    content_id,
+                    toInt64(1),
+                    CAST(
+                        amount_paid / toInt64(length(conversion_content_ids)),
+                        'Nullable(Decimal(38, 9))'
+                    )
+                ),
+                'Tuple(id String, quantity Int64, item_price Nullable(Decimal(38, 9)))'
+            ),
+            conversion_content_ids
+        ) AS contents
+    FROM eligible_repeatable_payments
+    QUALIFY
+        row_number() OVER (PARTITION BY event_id ORDER BY payment_time, payment_source, payment_id) = 1
+
+NODE repeatable_payment_click_context
+SQL >
+    SELECT
+        payments.payment_source,
+        payments.payment_id,
+        argMaxIf(
+            touchpoints.anonymous_id, touchpoints.touchpoint_time, touchpoints.anonymous_id IS NOT NULL
+        ) AS anonymous_id,
+        argMaxIf(
+            touchpoints.gclid, touchpoints.touchpoint_time, touchpoints.gclid IS NOT NULL
+        ) AS gclid,
+        argMaxIf(
+            touchpoints.wbraid, touchpoints.touchpoint_time, touchpoints.wbraid IS NOT NULL
+        ) AS wbraid,
+        argMaxIf(
+            touchpoints.gbraid, touchpoints.touchpoint_time, touchpoints.gbraid IS NOT NULL
+        ) AS gbraid,
+        argMaxIf(
+            touchpoints.fbclid, touchpoints.touchpoint_time, touchpoints.fbclid IS NOT NULL
+        ) AS fbclid,
+        argMaxIf(
+            touchpoints.fbc_fbclid,
+            tuple(touchpoints.touchpoint_time, touchpoints.touchpoint_id),
+            touchpoints.fbc_fbclid IS NOT NULL
+        ) AS latest_preconversion_fbc_fbclid,
+        argMaxIf(
+            touchpoints.ttclid, touchpoints.touchpoint_time, touchpoints.ttclid IS NOT NULL
+        ) AS ttclid
+    FROM repeatable_payment_events AS payments
+    INNER JOIN
+        mart_touchpoints_all AS touchpoints
+        ON touchpoints.profile_id = payments.profile_id
+        AND touchpoints.touchpoint_time <= payments.payment_time
+    GROUP BY payments.payment_source, payments.payment_id
+
+NODE repeatable_payment_meta_context
+SQL >
+    SELECT
+        payments.payment_source,
+        payments.payment_id,
+        argMaxIf(
+            attribution.ip_address,
+            tuple(attribution.event_time, attribution.event_id),
+            attribution.ip_address IS NOT NULL
+        ) AS latest_preconversion_ip_address,
+        argMaxIf(
+            attribution.fbc,
+            tuple(attribution.event_time, attribution.event_id),
+            attribution.fbc IS NOT NULL
+        ) AS latest_preconversion_fbc,
+        argMaxIf(
+            attribution.fbp,
+            tuple(attribution.event_time, attribution.event_id),
+            attribution.fbp IS NOT NULL
+        ) AS latest_preconversion_fbp
+    FROM repeatable_payment_events AS payments
+    INNER JOIN
+        int_attribution_events AS attribution
+        ON attribution.profile_id = payments.profile_id
+        AND attribution.event_time <= payments.payment_time
+    GROUP BY payments.payment_source, payments.payment_id
+
+NODE matching_browser_purchase_ips
+SQL >
+    SELECT
+        payments.payment_source,
+        payments.payment_id,
+        argMaxIf(
+            browser.ip_address,
+            tuple(browser.completed_at, browser.event_row_id),
+            browser.ip_address IS NOT NULL
+        ) AS browser_purchase_ip_address
+    FROM repeatable_payment_events AS payments
+    INNER JOIN jitsu_order_completed AS browser ON browser.event_id = payments.event_id
+    GROUP BY payments.payment_source, payments.payment_id
+
+NODE repeatable_customer_profiles
+SQL >
+    SELECT
+        profile_id,
+        first_name,
+        last_name,
+        nullIf(
+            arrayMin(arrayFilter(profile_phone -> trimBoth(profile_phone) != '', phones)), ''
+        ) AS phone
+    FROM mart_customers
+
+NODE repeatable_conversion_payload_rows
+SQL >
+    SELECT
+        payments.payment_source AS payment_source,
+        payments.payment_id AS payment_id,
+        payments.profile_id AS profile_id,
+        clicks.anonymous_id AS anonymous_id,
+        payments.event_id AS event_id,
+        'Purchase' AS event_name,
+        payments.payment_time AS conversion_ts,
+        payments.payment_email AS email,
+        coalesce(payments.payment_phone, profiles.phone) AS phone,
+        CAST(
+            tuple(
+                payments.billing_address_line_1,
+                coalesce(payments.billing_address_city, traits.first_known_geo_city),
+                coalesce(payments.billing_address_region, traits.first_known_geo_region),
+                payments.billing_address_zip,
+                coalesce(payments.billing_address_country, traits.first_known_geo_country)
+            ),
+            'Tuple(address_line_1 Nullable(String), city Nullable(String), region Nullable(String), zip Nullable(String), country Nullable(String))'
+        ) AS address,
+        coalesce(
+            profiles.first_name,
+            nullIf(arrayElement(splitByChar(' ', ifNull(payments.payment_name, '')), 1), '')
+        ) AS profile_first_name,
+        profiles.last_name AS profile_last_name,
+        payments.product_case AS product_case,
+        payments.product_resolution_source AS product_resolution_source,
+        payments.product_id AS product_id,
+        payments.payment_occurrence_type AS payment_occurrence_type,
+        payments.is_repeat_payment AS is_repeat_payment,
+        payments.conversion_content_ids AS content_ids,
+        payments.conversion_content_ids AS fb_content_ids,
+        payments.content_name AS content_name,
+        payments.content_type AS content_type,
+        payments.value AS value,
+        payments.conversion_currency AS currency,
+        payments.num_items AS num_items,
+        payments.contents AS contents,
+        payments.contents AS fb_contents,
+        CAST(
+            tuple(
+                clicks.gclid,
+                if(clicks.gclid IS NULL, clicks.wbraid, CAST(NULL AS Nullable(String))),
+                if(
+                    clicks.gclid IS NULL AND clicks.wbraid IS NULL,
+                    clicks.gbraid,
+                    CAST(NULL AS Nullable(String))
+                ),
+                clicks.fbclid,
+                clicks.ttclid
+            ),
+            'Tuple(gclid Nullable(String), wbraid Nullable(String), gbraid Nullable(String), fbclid Nullable(String), ttclid Nullable(String))'
+        ) AS click_ids,
+        coalesce(
+            meta.latest_preconversion_fbc, clicks.latest_preconversion_fbc_fbclid
+        ) AS pre_conversion_fbc,
+        meta.latest_preconversion_fbp AS pre_conversion_fbp,
+        if(
+            clicks.gclid IS NOT NULL
+            OR (clicks.gclid IS NULL AND clicks.wbraid IS NULL AND clicks.gbraid IS NULL),
+            payments.payment_email,
+            CAST(NULL AS Nullable(String))
+        ) AS compliant_email,
+        if(
+            clicks.gclid IS NOT NULL
+            OR (clicks.gclid IS NULL AND clicks.wbraid IS NULL AND clicks.gbraid IS NULL),
+            coalesce(payments.payment_phone, profiles.phone),
+            CAST(NULL AS Nullable(String))
+        ) AS compliant_phone,
+        toBool(
+            clicks.gclid IS NOT NULL
+            OR clicks.wbraid IS NOT NULL
+            OR clicks.gbraid IS NOT NULL
+            OR clicks.fbclid IS NOT NULL
+            OR clicks.ttclid IS NOT NULL
+        ) AS is_click,
+        coalesce(
+            browser.browser_purchase_ip_address, meta.latest_preconversion_ip_address, '127.0.0.1'
+        ) AS pre_conversion_ip_address,
+        coalesce(traits.first_known_ip_address, '127.0.0.1') AS first_known_ip_address,
+        coalesce(traits.last_known_ip_address, '127.0.0.1') AS last_known_ip_address,
+        coalesce(
+            traits.first_known_user_agent, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+        ) AS first_known_user_agent,
+        coalesce(
+            traits.last_known_user_agent, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+        ) AS last_known_user_agent,
+        traits.first_known_geo_city AS first_known_geo_city,
+        traits.first_known_geo_region AS first_known_geo_region,
+        traits.first_known_geo_country AS first_known_geo_country,
+        traits.last_known_geo_city AS last_known_geo_city,
+        traits.last_known_geo_region AS last_known_geo_region,
+        traits.last_known_geo_country AS last_known_geo_country,
+        traits.first_known_fbc AS first_known_fbc,
+        traits.first_known_fbp AS first_known_fbp,
+        traits.first_known_uetsid AS first_known_uetsid,
+        traits.first_known_uetvid AS first_known_uetvid,
+        traits.last_known_fbc AS last_known_fbc,
+        traits.last_known_fbp AS last_known_fbp,
+        traits.last_known_uetsid AS last_known_uetsid,
+        traits.last_known_uetvid AS last_known_uetvid,
+        CAST(
+            tuple(
+                'Purchase',
+                payments.event_id,
+                payments.payment_time,
+                payments.product_case,
+                payments.product_id,
+                payments.conversion_content_ids,
+                payments.conversion_content_ids,
+                payments.contents,
+                payments.content_name,
+                payments.content_type,
+                payments.value,
+                payments.conversion_currency,
+                CAST(
+                    tuple(
+                        payments.billing_address_line_1,
+                        coalesce(payments.billing_address_city, traits.first_known_geo_city),
+                        coalesce(payments.billing_address_region, traits.first_known_geo_region),
+                        payments.billing_address_zip,
+                        coalesce(payments.billing_address_country, traits.first_known_geo_country)
+                    ),
+                    'Tuple(address_line_1 Nullable(String), city Nullable(String), region Nullable(String), zip Nullable(String), country Nullable(String))'
+                )
+            ),
+            'Tuple(event_name String, event_id String, event_time DateTime64(6), product_case String, product_id String, content_ids Array(String), fb_content_ids Array(String), fb_contents Array(Tuple(id String, quantity Int64, item_price Nullable(Decimal(38, 9)))), content_name String, content_type String, value Nullable(Decimal(38, 9)), currency Nullable(String), address Tuple(address_line_1 Nullable(String), city Nullable(String), region Nullable(String), zip Nullable(String), country Nullable(String)))'
+        ) AS payload
+    FROM repeatable_payment_events AS payments
+    LEFT JOIN
+        repeatable_payment_click_context AS clicks
+        ON clicks.payment_source = payments.payment_source
+        AND clicks.payment_id = payments.payment_id
+    LEFT JOIN
+        repeatable_payment_meta_context AS meta
+        ON meta.payment_source = payments.payment_source
+        AND meta.payment_id = payments.payment_id
+    LEFT JOIN
+        matching_browser_purchase_ips AS browser
+        ON browser.payment_source = payments.payment_source
+        AND browser.payment_id = payments.payment_id
+    LEFT JOIN repeatable_customer_profiles AS profiles ON profiles.profile_id = payments.profile_id
+    LEFT JOIN int_attribution_traits AS traits ON traits.profile_id = payments.profile_id

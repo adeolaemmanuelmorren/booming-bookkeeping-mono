@@ -1,0 +1,27 @@
+DESCRIPTION >
+    Atomic request-time snapshot of the bounded uncommitted identity overlay. Member rows and
+    the summary digest are replaced together and never mutate the activated identity journal.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `record_kind` LowCardinality(String) `json:$.record_kind`,
+    `snapshot_id` FixedString(64) `json:$.snapshot_id`,
+    `snapshot_at` DateTime64(6) `json:$.snapshot_at`,
+    `event_id` FixedString(64) `json:$.event_id`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `prior_profile_id` String `json:$.prior_profile_id`,
+    `meta_node` String `json:$.meta_node`,
+    `component_label` UInt64 `json:$.component_label`,
+    `pending_event_count` UInt64 `json:$.pending_event_count`,
+    `overlaid_event_count` UInt64 `json:$.overlaid_event_count`,
+    `rebuild_blocked_event_count` UInt64 `json:$.rebuild_blocked_event_count`,
+    `pending_requires_exact_rebuild` UInt8 `json:$.pending_requires_exact_rebuild`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, record_kind, identifier_key, prior_profile_id, event_id

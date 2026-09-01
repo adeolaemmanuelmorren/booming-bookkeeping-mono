@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Versioned current-state projection of ActiveCampaign contacts. ReplacingMergeTree
+    keeps point-in-time reads fast while preserving late Fivetran corrections.
+
+SCHEMA >
+    `contact_id` Int64 `json:$.contact_id`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `first_name` Nullable(String) `json:$.first_name`,
+    `last_name` Nullable(String) `json:$.last_name`,
+    `contact_created_at` Nullable(DateTime64(6)) `json:$.contact_created_at`,
+    `source_version` DateTime64(6) `json:$.source_version`,
+    `is_deleted` UInt8 `json:$.is_deleted`
+
+ENGINE ReplacingMergeTree
+ENGINE_SORTING_KEY contact_id
+ENGINE_VER source_version

@@ -1,0 +1,7 @@
+DESCRIPTION >
+    Reusable current ActiveCampaign registration contract for downstream identity,
+    attribution, and reporting models.
+
+NODE current_activecampaign_registrations
+SQL >
+    SELECT * FROM activecampaign_registrations_current

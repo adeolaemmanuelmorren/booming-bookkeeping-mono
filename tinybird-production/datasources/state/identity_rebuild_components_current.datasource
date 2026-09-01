@@ -1,0 +1,37 @@
+DESCRIPTION >
+    Atomic converged component snapshot for one shadow generation. Component, member, and
+    summary rows form the physical boundary consumed by mapping and profile journal stages.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `record_kind` LowCardinality(String) `json:$.record_kind`,
+    `rebuild_id` FixedString(64) `json:$.rebuild_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `input_event_count` UInt64 `json:$.input_event_count`,
+    `input_hash` FixedString(64) `json:$.input_hash`,
+    `checkpoint_sequence` UInt64 `json:$.checkpoint_sequence`,
+    `component_label` String `json:$.component_label`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `member_first_seen_at` DateTime64(6) `json:$.member_first_seen_at`,
+    `member_last_seen_at` DateTime64(6) `json:$.member_last_seen_at`,
+    `winner_identifier_key` String `json:$.winner_identifier_key`,
+    `profile_key` String `json:$.profile_key`,
+    `profile_id` String `json:$.profile_id`,
+    `member_identifier_keys` Array(String) `json:$.member_identifier_keys[:]`,
+    `anonymous_ids` Array(String) `json:$.anonymous_ids[:]`,
+    `user_ids` Array(String) `json:$.user_ids[:]`,
+    `emails` Array(String) `json:$.emails[:]`,
+    `phones` Array(String) `json:$.phones[:]`,
+    `component_historical_profile_ids` Array(String) `json:$.component_historical_profile_ids[:]`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, rebuild_id, record_kind, component_label, identifier_key

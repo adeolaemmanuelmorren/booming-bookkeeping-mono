@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Replay-safe identity change queue ordered for the five-minute compaction cursor.
+    The legacy fact-ordered queue remains untouched for rollback only.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `event_id` FixedString(64) `json:$.event_id`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`,
+    `event_kind` LowCardinality(String) `json:$.event_kind`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `ingested_at` DateTime64(6) `json:$.ingested_at`,
+    `anonymous_id` String `json:$.anonymous_id`,
+    `user_id` String `json:$.user_id`,
+    `email` String `json:$.email`,
+    `phone` String `json:$.phone`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_deleted` UInt8 `json:$.fact_deleted`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`,
+    `evidence_keys` Array(String) `json:$.evidence_keys[:]`
+
+ENGINE MergeTree
+ENGINE_PARTITION_KEY toYYYYMM(ingested_at)
+ENGINE_SORTING_KEY tenant_id, ingested_at, event_id, producer_id, fact_kind, fact_key

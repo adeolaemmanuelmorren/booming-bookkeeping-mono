@@ -1,0 +1,164 @@
+DESCRIPTION >
+    First challenge-registration conversion payloads with deterministic event IDs
+    and the latest eligible pre-conversion attribution context.
+
+NODE first_conversion_events
+SQL >
+    SELECT
+        assumeNotNull(profile_id) AS profile_id,
+        lowerUTF8(trim(assumeNotNull(profile_email))) AS email,
+        profile_phone AS phone,
+        profile_first_name,
+        profile_last_name,
+        assumeNotNull(form_submit_time) AS conversion_ts,
+        registration_type,
+        content_name,
+        assumeNotNull(canonical_event_id) AS event_id
+    FROM mart_contact_first_conversions
+    WHERE profile_email IS NOT NULL AND form_submit_time IS NOT NULL AND canonical_event_id IS NOT NULL
+
+NODE first_conversion_click_context
+SQL >
+    SELECT
+        conversions.profile_id,
+        conversions.event_id,
+        argMaxIf(
+            touchpoints.anonymous_id, touchpoints.touchpoint_time, touchpoints.anonymous_id IS NOT NULL
+        ) AS anonymous_id,
+        argMaxIf(
+            touchpoints.gclid, touchpoints.touchpoint_time, touchpoints.gclid IS NOT NULL
+        ) AS gclid,
+        argMaxIf(
+            touchpoints.wbraid, touchpoints.touchpoint_time, touchpoints.wbraid IS NOT NULL
+        ) AS wbraid,
+        argMaxIf(
+            touchpoints.gbraid, touchpoints.touchpoint_time, touchpoints.gbraid IS NOT NULL
+        ) AS gbraid,
+        argMaxIf(
+            touchpoints.fbclid, touchpoints.touchpoint_time, touchpoints.fbclid IS NOT NULL
+        ) AS fbclid,
+        argMaxIf(
+            touchpoints.fbc_fbclid,
+            tuple(touchpoints.touchpoint_time, touchpoints.touchpoint_id),
+            touchpoints.fbc_fbclid IS NOT NULL
+        ) AS latest_preconversion_fbc_fbclid,
+        argMaxIf(
+            touchpoints.ttclid, touchpoints.touchpoint_time, touchpoints.ttclid IS NOT NULL
+        ) AS ttclid
+    FROM first_conversion_events AS conversions
+    INNER JOIN
+        mart_touchpoints_all AS touchpoints
+        ON touchpoints.profile_id = conversions.profile_id
+        AND touchpoints.touchpoint_time <= conversions.conversion_ts
+    GROUP BY conversions.profile_id, conversions.event_id
+
+NODE first_conversion_meta_context
+SQL >
+    SELECT
+        conversions.event_id,
+        argMaxIf(
+            attribution.fbc,
+            tuple(attribution.event_time, attribution.event_id),
+            attribution.fbc IS NOT NULL
+        ) AS latest_preconversion_fbc,
+        argMaxIf(
+            attribution.fbp,
+            tuple(attribution.event_time, attribution.event_id),
+            attribution.fbp IS NOT NULL
+        ) AS latest_preconversion_fbp
+    FROM first_conversion_events AS conversions
+    INNER JOIN
+        int_attribution_events AS attribution
+        ON attribution.profile_id = conversions.profile_id
+        AND attribution.event_time <= conversions.conversion_ts
+    GROUP BY conversions.event_id
+
+NODE first_conversion_payload_rows
+SQL >
+    SELECT
+        conversions.profile_id AS profile_id,
+        clicks.anonymous_id AS anonymous_id,
+        conversions.event_id AS event_id,
+        'CompleteRegistration' AS event_name,
+        conversions.conversion_ts AS conversion_ts,
+        conversions.email AS email,
+        conversions.phone AS phone,
+        conversions.profile_first_name AS profile_first_name,
+        conversions.profile_last_name AS profile_last_name,
+        conversions.registration_type AS registration_type,
+        conversions.content_name AS content_name,
+        CAST(
+            tuple(
+                clicks.gclid,
+                if(clicks.gclid IS NULL, clicks.wbraid, CAST(NULL AS Nullable(String))),
+                if(
+                    clicks.gclid IS NULL AND clicks.wbraid IS NULL,
+                    clicks.gbraid,
+                    CAST(NULL AS Nullable(String))
+                ),
+                clicks.fbclid,
+                clicks.ttclid
+            ),
+            'Tuple(gclid Nullable(String), wbraid Nullable(String), gbraid Nullable(String), fbclid Nullable(String), ttclid Nullable(String))'
+        ) AS click_ids,
+        coalesce(
+            meta.latest_preconversion_fbc, clicks.latest_preconversion_fbc_fbclid
+        ) AS pre_conversion_fbc,
+        meta.latest_preconversion_fbp AS pre_conversion_fbp,
+        if(
+            clicks.gclid IS NOT NULL
+            OR (clicks.gclid IS NULL AND clicks.wbraid IS NULL AND clicks.gbraid IS NULL),
+            conversions.email,
+            CAST(NULL AS Nullable(String))
+        ) AS compliant_email,
+        if(
+            clicks.gclid IS NOT NULL
+            OR (clicks.gclid IS NULL AND clicks.wbraid IS NULL AND clicks.gbraid IS NULL),
+            conversions.phone,
+            CAST(NULL AS Nullable(String))
+        ) AS compliant_phone,
+        toBool(
+            clicks.gclid IS NOT NULL
+            OR clicks.wbraid IS NOT NULL
+            OR clicks.gbraid IS NOT NULL
+            OR clicks.fbclid IS NOT NULL
+            OR clicks.ttclid IS NOT NULL
+        ) AS is_click,
+        coalesce(traits.first_known_ip_address, '127.0.0.1') AS first_known_ip_address,
+        coalesce(traits.last_known_ip_address, '127.0.0.1') AS last_known_ip_address,
+        coalesce(
+            traits.first_known_user_agent, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+        ) AS first_known_user_agent,
+        coalesce(
+            traits.last_known_user_agent, 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+        ) AS last_known_user_agent,
+        traits.first_known_geo_city AS first_known_geo_city,
+        traits.first_known_geo_region AS first_known_geo_region,
+        traits.first_known_geo_country AS first_known_geo_country,
+        traits.last_known_geo_city AS last_known_geo_city,
+        traits.last_known_geo_region AS last_known_geo_region,
+        traits.last_known_geo_country AS last_known_geo_country,
+        traits.first_known_fbc AS first_known_fbc,
+        traits.first_known_fbp AS first_known_fbp,
+        traits.first_known_uetsid AS first_known_uetsid,
+        traits.first_known_uetvid AS first_known_uetvid,
+        traits.last_known_fbc AS last_known_fbc,
+        traits.last_known_fbp AS last_known_fbp,
+        traits.last_known_uetsid AS last_known_uetsid,
+        traits.last_known_uetvid AS last_known_uetvid,
+        CAST(
+            tuple(
+                'CompleteRegistration',
+                conversions.event_id,
+                conversions.conversion_ts,
+                conversions.content_name
+            ),
+            'Tuple(event_name String, event_id String, event_time DateTime64(6), content_name String)'
+        ) AS payload
+    FROM first_conversion_events AS conversions
+    LEFT JOIN
+        first_conversion_click_context AS clicks
+        ON clicks.profile_id = conversions.profile_id
+        AND clicks.event_id = conversions.event_id
+    LEFT JOIN first_conversion_meta_context AS meta ON meta.event_id = conversions.event_id
+    LEFT JOIN int_attribution_traits AS traits ON traits.profile_id = conversions.profile_id
