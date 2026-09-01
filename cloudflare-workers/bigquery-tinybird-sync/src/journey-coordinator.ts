@@ -19,6 +19,7 @@ const IDLE_POLL_MS = 600_000;
 const BUILD_CALL_INTERVAL_MS = 1_000;
 const DEFAULT_BACKPRESSURE_MS = 60_000;
 const PROFILE_PAGE_LOOKAHEAD = 200;
+const REPAIR_PROFILE_LIMIT = 200;
 
 const JOURNEY_STATE_INSERT_SQL = `
   INSERT OR IGNORE INTO journey_state (
@@ -54,11 +55,29 @@ interface JourneyState {
   updated_at_ms: number;
 }
 
+interface ActiveJourneyBatch extends PendingJourneyBatch {
+  repairId?: string;
+}
+
+interface JourneyRepairRow {
+  [key: string]: string | number | null;
+  repair_id: string;
+  profile_ids_json: string;
+}
+
+export interface JourneyRepairInput {
+  repairId: string;
+  profileIds: string[];
+}
+
 export interface JourneyCoordinatorStatus {
   phase: JourneyPhase;
   cursorBatchVersion: number;
   cursorBatchId: string;
   activeIdentityBatchId: string | null;
+  activeRepairId: string | null;
+  pendingRepairBatches: number;
+  completedRepairBatches: number;
   completedConversions: number;
   totalConversions: number;
   completedOrphanKeys: number;
@@ -90,6 +109,39 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     return this.status();
   }
 
+  async enqueueRepair(input: JourneyRepairInput): Promise<JourneyCoordinatorStatus> {
+    const repairId = repairIdentifier(input.repairId);
+    const profileIds = repairProfileIds(input.profileIds);
+    const profileIdsJson = JSON.stringify(profileIds);
+    const existing = this.ctx.storage.sql.exec<JourneyRepairRow>(
+      "SELECT repair_id, profile_ids_json FROM journey_repairs WHERE repair_id = ?",
+      repairId,
+    ).toArray()[0];
+
+    if (existing && existing.profile_ids_json !== profileIdsJson) {
+      throw new Error(`Journey repair ${repairId} already has different profiles.`);
+    }
+    if (!existing) {
+      this.ctx.storage.sql.exec(
+        `
+          INSERT INTO journey_repairs (
+            repair_id,
+            profile_ids_json,
+            status,
+            created_at_ms,
+            completed_at_ms
+          ) VALUES (?, ?, 'pending', ?, NULL)
+        `,
+        repairId,
+        profileIdsJson,
+        Date.now(),
+      );
+    }
+
+    if (this.state().phase !== "failed") await this.ensureAlarm();
+    return this.status();
+  }
+
   async status(): Promise<JourneyCoordinatorStatus> {
     const state = this.state();
     const batch = parseActiveBatch(state.active_batch_json);
@@ -98,7 +150,10 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       phase: state.phase,
       cursorBatchVersion: state.cursor_batch_version,
       cursorBatchId: state.cursor_batch_id,
-      activeIdentityBatchId: batch?.batchId ?? null,
+      activeIdentityBatchId: batch && !batch.repairId ? batch.batchId : null,
+      activeRepairId: batch?.repairId ?? null,
+      pendingRepairBatches: this.countRepairs("pending"),
+      completedRepairBatches: this.countRepairs("complete"),
       completedConversions: state.conversion_index,
       totalConversions: batch?.conversionIds.length ?? 0,
       completedOrphanKeys: state.orphan_index,
@@ -139,6 +194,17 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
   }
 
   private async loadNextBatch(state: JourneyState): Promise<void> {
+    const repair = this.nextPendingRepair(state);
+    if (repair) {
+      this.startBatch(repair);
+      this.ctx.storage.sql.exec(
+        "UPDATE journey_repairs SET status = 'running' WHERE repair_id = ?",
+        repair.repairId,
+      );
+      await this.ensureAlarm();
+      return;
+    }
+
     const batch = await readPendingJourneyBatch(
       TENANT_ID,
       state.cursor_batch_version,
@@ -151,6 +217,11 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       return;
     }
 
+    this.startBatch(batch);
+    await this.ensureAlarm();
+  }
+
+  private startBatch(batch: ActiveJourneyBatch): void {
     this.updateState({
       phase: "running",
       active_batch_json: JSON.stringify(batch),
@@ -162,7 +233,6 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       next_attempt_at_ms: 0,
       last_error: null,
     });
-    await this.ensureAlarm();
   }
 
   // Page order matters: conversion-only pages first, profile pages last.
@@ -170,7 +240,7 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
   // profile page's higher batch version must be the one reads pick up.
   private async processNextPage(
     state: JourneyState,
-    batch: PendingJourneyBatch,
+    batch: ActiveJourneyBatch,
   ): Promise<void> {
     const conversionIds = batch.conversionIds.slice(
       state.conversion_index,
@@ -240,7 +310,7 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
 
   private async buildPage(
     state: JourneyState,
-    batch: PendingJourneyBatch,
+    batch: ActiveJourneyBatch,
     identifierKeys: string[],
     conversionIds: string[],
   ): Promise<void> {
@@ -266,11 +336,27 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     });
   }
 
-  private finishBatch(batch: PendingJourneyBatch): void {
+  private finishBatch(batch: ActiveJourneyBatch): void {
+    if (batch.repairId) {
+      this.ctx.storage.sql.exec(
+        `
+          UPDATE journey_repairs
+          SET status = 'complete', completed_at_ms = ?
+          WHERE repair_id = ?
+        `,
+        Date.now(),
+        batch.repairId,
+      );
+    }
+
     this.updateState({
       phase: "idle",
-      cursor_batch_version: batch.batchVersion,
-      cursor_batch_id: batch.batchId,
+      ...(batch.repairId
+        ? {}
+        : {
+            cursor_batch_version: batch.batchVersion,
+            cursor_batch_id: batch.batchId,
+          }),
       active_batch_json: "",
       active_journey_version_base: 0,
       conversion_index: 0,
@@ -280,6 +366,36 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       next_attempt_at_ms: 0,
       last_error: null,
     });
+  }
+
+  private nextPendingRepair(state: JourneyState): ActiveJourneyBatch | null {
+    const repair = this.ctx.storage.sql.exec<JourneyRepairRow>(
+      `
+        SELECT repair_id, profile_ids_json
+        FROM journey_repairs
+        WHERE status = 'pending'
+        ORDER BY created_at_ms, repair_id
+        LIMIT 1
+      `,
+    ).toArray()[0];
+    if (!repair) return null;
+
+    return {
+      tenantId: TENANT_ID,
+      batchVersion: state.cursor_batch_version,
+      batchId: `journey_repair:${repair.repair_id}`,
+      profileIds: repairProfileIds(JSON.parse(repair.profile_ids_json)),
+      orphanIdentifierKeys: [],
+      conversionIds: [],
+      repairId: repair.repair_id,
+    };
+  }
+
+  private countRepairs(status: "pending" | "complete"): number {
+    return this.ctx.storage.sql.exec<{ value: number }>(
+      "SELECT COUNT(*) AS value FROM journey_repairs WHERE status = ?",
+      status,
+    ).one().value;
   }
 
   private async handleError(error: unknown): Promise<void> {
@@ -320,6 +436,15 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       JOURNEY_STATE_INSERT_SQL,
       Date.now(),
     );
+    this.ctx.storage.sql.exec(`
+      CREATE TABLE IF NOT EXISTS journey_repairs (
+        repair_id TEXT PRIMARY KEY,
+        profile_ids_json TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'complete')),
+        created_at_ms INTEGER NOT NULL,
+        completed_at_ms INTEGER
+      );
+    `);
     this.ensureColumn("orphan_index", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("profile_index", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("page_number", "INTEGER NOT NULL DEFAULT 0");
@@ -368,18 +493,41 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
   }
 }
 
-function parseActiveBatch(value: string): PendingJourneyBatch | null {
+function parseActiveBatch(value: string): ActiveJourneyBatch | null {
   if (!value) return null;
-  const parsed = JSON.parse(value) as PendingJourneyBatch;
+  const parsed = JSON.parse(value) as ActiveJourneyBatch;
   if (
     !parsed.batchId
     || !Array.isArray(parsed.profileIds)
     || !Array.isArray(parsed.orphanIdentifierKeys)
     || !Array.isArray(parsed.conversionIds)
+    || (parsed.repairId !== undefined && typeof parsed.repairId !== "string")
   ) {
     return null;
   }
   return parsed;
+}
+
+function repairIdentifier(value: unknown): string {
+  if (typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,160}$/.test(value)) {
+    throw new Error("repairId must contain 1 to 160 safe identifier characters.");
+  }
+  return value;
+}
+
+function repairProfileIds(value: unknown): string[] {
+  if (!Array.isArray(value)) throw new Error("profileIds must be an array.");
+
+  const profileIds = [...new Set(value.map((profileId) => {
+    if (typeof profileId !== "string" || profileId.trim() === "") {
+      throw new Error("profileIds must contain non-empty strings.");
+    }
+    return profileId.trim();
+  }))].sort();
+  if (profileIds.length === 0 || profileIds.length > REPAIR_PROFILE_LIMIT) {
+    throw new Error(`profileIds must contain 1 to ${REPAIR_PROFILE_LIMIT} unique values.`);
+  }
+  return profileIds;
 }
 
 function isBackpressure(error: unknown): boolean {

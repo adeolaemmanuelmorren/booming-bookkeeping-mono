@@ -20,6 +20,53 @@ interface BuildCall {
 }
 
 describe("journey coordinator", () => {
+  it("durably repairs whole profiles without advancing the identity cursor", async () => {
+    const stub = env.JOURNEY_COORDINATOR.getByName("journey-profile-repair-test");
+    const pool = fetchMock.get(tinybirdOrigin);
+
+    pool
+      .intercept({
+        method: "GET",
+        path: (path) => path.startsWith("/v0/pipes/identity_worker_profile_heads.json"),
+      })
+      .reply(200, {
+        data: [identityProfile("profile-a", ["anonymous_id:a1", "user_id:a2"])],
+      });
+    pool
+      .intercept({
+        method: "GET",
+        path: (path) => path.startsWith("/v0/pipes/reporting_profile_journey_window_build.json"),
+      })
+      .reply(200, { data: [] });
+
+    await runInDurableObject(stub, async (instance: JourneyCoordinator) => {
+      await instance.enqueueRepair({
+        repairId: "pre-fix-0001",
+        profileIds: ["profile-a"],
+      });
+      const queued = await instance.enqueueRepair({
+        repairId: "pre-fix-0001",
+        profileIds: ["profile-a"],
+      });
+      expect(queued.pendingRepairBatches).toBe(1);
+
+      await instance.alarm();
+      expect((await instance.status()).activeRepairId).toBe("pre-fix-0001");
+
+      await instance.alarm();
+      await clearPacingDelay(instance);
+      await instance.alarm();
+
+      const completed = await instance.status();
+      expect(completed.phase).toBe("idle");
+      expect(completed.activeRepairId).toBeNull();
+      expect(completed.pendingRepairBatches).toBe(0);
+      expect(completed.completedRepairBatches).toBe(1);
+      expect(completed.cursorBatchVersion).toBe(0);
+      expect(completed.cursorBatchId).toBe("");
+    });
+  });
+
   it("pages conversions, orphan keys, then whole profiles in that order", async () => {
     const stub = env.JOURNEY_COORDINATOR.getByName("journey-page-order-test");
     const buildCalls: BuildCall[] = [];

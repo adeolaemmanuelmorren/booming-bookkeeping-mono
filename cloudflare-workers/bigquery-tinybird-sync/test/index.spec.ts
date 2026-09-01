@@ -120,4 +120,27 @@ describe("operator endpoints", () => {
       journeyBackfill: { status: "not_requested" },
     });
   });
+
+  it("queues an authorized whole-profile journey repair", async () => {
+    const response = await handleRequest(
+      new Request("https://sync.example.com/journey/repair", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-admin-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repairId: "pre-fix-0001",
+          profileIds: ["profile-a", "profile-b"],
+        }),
+      }),
+      testEnv(),
+    );
+
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({
+      phase: "idle",
+      pendingRepairBatches: 0,
+    });
+  });
 });

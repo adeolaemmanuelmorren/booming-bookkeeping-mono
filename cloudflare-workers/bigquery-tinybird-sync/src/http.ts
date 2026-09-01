@@ -107,6 +107,14 @@ export async function handleRequest(
     return jsonResponse(await journeyCoordinator(env).recoverFailed());
   }
 
+  if (url.pathname === "/journey/repair") {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    const authError = authorize(request, env);
+    if (authError) return authError;
+
+    return handleJourneyRepair(request, env);
+  }
+
   return jsonResponse({ error: "Not found" }, 404);
 }
 
@@ -188,6 +196,28 @@ async function handleBootstrap(request: Request, env: WorkerEnv): Promise<Respon
 async function handleJourneyBackfill(env: WorkerEnv): Promise<Response> {
   try {
     return jsonResponse(await coordinator(env).startJourneyBackfill(), 202);
+  } catch (error) {
+    return jsonResponse({ error: errorMessage(error) }, 400);
+  }
+}
+
+async function handleJourneyRepair(request: Request, env: WorkerEnv): Promise<Response> {
+  try {
+    const input = await parseJsonObject(request);
+    const repairId = input.repairId;
+    const profileIds = input.profileIds;
+    if (typeof repairId !== "string") throw new Error("repairId must be a string.");
+    if (!Array.isArray(profileIds)) throw new Error("profileIds must be an array.");
+
+    return jsonResponse(await journeyCoordinator(env).enqueueRepair({
+      repairId,
+      profileIds: profileIds.map((profileId) => {
+        if (typeof profileId !== "string") {
+          throw new Error("profileIds must contain only strings.");
+        }
+        return profileId;
+      }),
+    }), 202);
   } catch (error) {
     return jsonResponse({ error: errorMessage(error) }, 400);
   }

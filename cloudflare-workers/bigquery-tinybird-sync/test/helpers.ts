@@ -46,6 +46,9 @@ export function testJourneyCoordinator(): DurableObjectNamespace<JourneyCoordina
     cursorBatchVersion: 0,
     cursorBatchId: "",
     activeIdentityBatchId: null,
+    activeRepairId: null,
+    pendingRepairBatches: 0,
+    completedRepairBatches: 0,
     completedConversions: 0,
     totalConversions: 0,
     completedOrphanKeys: 0,
@@ -60,6 +63,7 @@ export function testJourneyCoordinator(): DurableObjectNamespace<JourneyCoordina
       tick: async () => status,
       status: async () => status,
       recoverFailed: async () => status,
+      enqueueRepair: async () => status,
     }),
   } as unknown as DurableObjectNamespace<JourneyCoordinator>;
 }
