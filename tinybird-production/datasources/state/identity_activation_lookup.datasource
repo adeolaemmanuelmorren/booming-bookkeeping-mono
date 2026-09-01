@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Narrow activation-marker ledger for request-time identity joins. It keeps
+    activation gating indexable by batch without scanning the full journal.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String),
+    `batch_version` UInt64,
+    `batch_id` String,
+    `committed_at` DateTime64(6),
+    `row_hash` FixedString(64)
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id, committed_at, row_hash
+ENGINE_SETTINGS "index_granularity=128"

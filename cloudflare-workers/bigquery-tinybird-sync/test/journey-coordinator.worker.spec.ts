@@ -15,6 +15,7 @@ afterEach(() => {
 
 interface BuildCall {
   identifierKeys: string[];
+  identifierProfileIds: string[];
   conversionIds: string[];
   batchVersion: number;
 }
@@ -126,6 +127,9 @@ describe("journey coordinator", () => {
         const query = new URLSearchParams(request.path.split("?")[1] ?? "");
         buildCalls.push({
           identifierKeys: splitArrayParameter(query.get("p_identifier_keys")),
+          identifierProfileIds: splitArrayParameter(
+            query.get("p_identifier_profile_ids"),
+          ),
           conversionIds: splitArrayParameter(query.get("p_conversion_ids")),
           batchVersion: 0,
         });
@@ -168,6 +172,13 @@ describe("journey coordinator", () => {
       "anonymous_id:still-mapped",
       "user_id:a2",
       "user_id:b2",
+    ]);
+    expect(buildCalls[2].identifierProfileIds).toEqual([
+      "profile-a",
+      "profile-b",
+      "profile-a",
+      "profile-a",
+      "profile-b",
     ]);
   });
 

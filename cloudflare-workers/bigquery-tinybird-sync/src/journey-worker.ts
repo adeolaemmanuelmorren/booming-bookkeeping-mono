@@ -11,6 +11,7 @@ export const JOURNEY_PROFILE_BATCH_LIMIT = 500;
 export interface ProfileJourneyPage {
   profileIds: string[];
   identifierKeys: string[];
+  identifierProfileIds: string[];
 }
 
 // A profile's member identifier keys must never be split across build calls:
@@ -22,7 +23,7 @@ export function takeProfilePage(
   keyLimit: number = JOURNEY_PROFILE_BATCH_LIMIT,
 ): ProfileJourneyPage {
   const takenProfileIds: string[] = [];
-  const identifierKeys: string[] = [];
+  const profileByIdentifierKey = new Map<string, string>();
 
   for (const profileId of profileIds) {
     const memberKeys = uniqueStrings(keysByProfile.get(profileId) ?? []);
@@ -33,23 +34,33 @@ export function takeProfilePage(
     }
     if (
       takenProfileIds.length > 0
-      && identifierKeys.length + memberKeys.length > keyLimit
+      && profileByIdentifierKey.size + memberKeys.length > keyLimit
     ) {
       break;
     }
     takenProfileIds.push(profileId);
-    identifierKeys.push(...memberKeys);
+    for (const identifierKey of memberKeys) {
+      const existingProfileId = profileByIdentifierKey.get(identifierKey);
+      if (existingProfileId && existingProfileId !== profileId) {
+        throw new Error(`Journey identifier ${identifierKey} belongs to multiple profiles.`);
+      }
+      profileByIdentifierKey.set(identifierKey, profileId);
+    }
   }
+
+  const identifierKeys = [...profileByIdentifierKey.keys()].sort();
 
   return {
     profileIds: takenProfileIds,
-    identifierKeys: uniqueStrings(identifierKeys),
+    identifierKeys,
+    identifierProfileIds: identifierKeys.map((key) => profileByIdentifierKey.get(key) ?? ""),
   };
 }
 
 export interface JourneyProfileBatchInput {
   tenantId: string;
   identifierKeys: string[];
+  identifierProfileIds?: string[];
   conversionIds?: string[];
   batchVersion: number;
   batchId: string;
@@ -66,7 +77,11 @@ export async function processJourneyProfileBatch(
   config: TinybirdApiConfig,
   fetcher: Fetcher = fetch,
 ): Promise<JourneyProfileBatchResult> {
-  const identifierKeys = uniqueStrings(input.identifierKeys);
+  const identifierMapping = normalizedIdentifierMapping(
+    input.identifierKeys,
+    input.identifierProfileIds,
+  );
+  const identifierKeys = identifierMapping.identifierKeys;
   const conversionIds = uniqueStrings(input.conversionIds ?? []);
   assertValidInput(input, identifierKeys, conversionIds);
 
@@ -77,6 +92,7 @@ export async function processJourneyProfileBatch(
   const sourceRows = await readProfileJourneyRows(
     identifierKeys,
     conversionIds,
+    identifierMapping.identifierProfileIds,
     config,
     fetcher,
   );
@@ -100,6 +116,37 @@ export async function processJourneyProfileBatch(
     identifierCount: identifierKeys.length,
     conversionCount: commitRows.length,
     journeyRowCount: versionRows.length,
+  };
+}
+
+function normalizedIdentifierMapping(
+  identifierKeys: string[],
+  identifierProfileIds: string[] | undefined,
+): { identifierKeys: string[]; identifierProfileIds?: string[] } {
+  if (identifierProfileIds === undefined) {
+    return { identifierKeys: uniqueStrings(identifierKeys) };
+  }
+  if (identifierKeys.length !== identifierProfileIds.length) {
+    throw new Error("Journey identifier keys and profile IDs must have equal lengths.");
+  }
+
+  const profileByKey = new Map<string, string>();
+  for (const [index, identifierKey] of identifierKeys.entries()) {
+    const profileId = identifierProfileIds[index];
+    if (!identifierKey || !profileId) {
+      throw new Error("Journey literal identity mappings must be non-empty.");
+    }
+    const existingProfileId = profileByKey.get(identifierKey);
+    if (existingProfileId && existingProfileId !== profileId) {
+      throw new Error(`Journey identifier ${identifierKey} belongs to multiple profiles.`);
+    }
+    profileByKey.set(identifierKey, profileId);
+  }
+
+  const sortedKeys = [...profileByKey.keys()].sort();
+  return {
+    identifierKeys: sortedKeys,
+    identifierProfileIds: sortedKeys.map((key) => profileByKey.get(key) ?? ""),
   };
 }
 

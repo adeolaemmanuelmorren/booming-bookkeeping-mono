@@ -26,7 +26,7 @@ SQL >
         journal.profile_id,
         journal.is_deleted
     FROM identity_mapping_delta_lookup AS journal
-    INNER JOIN activated_identity_batches AS activated
+    INNER JOIN identity_activation_lookup AS activated
         ON journal.tenant_id = activated.tenant_id
         AND journal.batch_version = activated.batch_version
         AND journal.batch_id = activated.batch_id
@@ -46,6 +46,29 @@ SQL >
 
 NODE scoped_current_identity_mappings
 SQL >
+    %
+    {% if defined(p_identifier_key) and defined(p_identifier_profile_id) %}
+    SELECT
+        'boom' AS tenant_id,
+        {{ String(p_identifier_key) }} AS identifier_key,
+        {{ String(p_identifier_profile_id) }} AS profile_id
+    {% elif defined(p_identifier_keys) and defined(p_identifier_profile_ids) %}
+    SELECT
+        'boom' AS tenant_id,
+        tupleElement(identifier_mapping, 1) AS identifier_key,
+        tupleElement(identifier_mapping, 2) AS profile_id
+    FROM
+        (
+            SELECT arrayJoin(
+                arrayZip(
+                    {{ Array(p_identifier_keys, 'String') }},
+                    {{ Array(p_identifier_profile_ids, 'String') }}
+                )
+            ) AS identifier_mapping
+        )
+    WHERE length({{ Array(p_identifier_keys, 'String') }})
+        = length({{ Array(p_identifier_profile_ids, 'String') }})
+    {% else %}
     SELECT
         if(delta.state_key = '', base.tenant_id, delta.tenant_id) AS tenant_id,
         if(delta.state_key = '', base.identifier_key, delta.identifier_key) AS identifier_key,
@@ -55,6 +78,7 @@ SQL >
         ON base.tenant_id = delta.tenant_id
         AND base.identifier_key = delta.identifier_key
     WHERE delta.state_key = '' OR delta.is_deleted = 0
+    {% end %}
 
 NODE scoped_conversion_fact_candidates
 SQL >

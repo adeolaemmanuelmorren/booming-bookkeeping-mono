@@ -526,11 +526,16 @@ export async function appendIdentityPendingFacts(
 export async function readProfileJourneyRows(
   identifierKeys: string[],
   conversionIds: string[],
+  identifierProfileIds: string[] | undefined,
   config: TinybirdApiConfig,
   fetcher: Fetcher = fetch,
 ): Promise<Record<string, unknown>[]> {
   const ids = uniqueStrings(identifierKeys);
   const conversions = uniqueStrings(conversionIds);
+  const profileByIdentifierKey = journeyProfileByIdentifierKey(
+    identifierKeys,
+    identifierProfileIds,
+  );
   if (ids.length === 0 && conversions.length === 0) return [];
   if (ids.length > 500) throw new Error("Journey identifier lookup exceeds 500 keys.");
   if (conversions.length > 500) {
@@ -540,7 +545,7 @@ export async function readProfileJourneyRows(
   const identifierRows = await readLiteralKeyChunks(
     "reporting_profile_journey_window_build",
     ids,
-    (chunk) => literalValueParameters("identifier", chunk),
+    (chunk) => journeyIdentifierParameters(chunk, profileByIdentifierKey),
     config,
     fetcher,
   );
@@ -559,6 +564,35 @@ export async function readProfileJourneyRows(
   );
 
   return [...identifierRows, ...conversionRows];
+}
+
+function journeyProfileByIdentifierKey(
+  identifierKeys: string[],
+  identifierProfileIds: string[] | undefined,
+): Map<string, string> | null {
+  if (identifierProfileIds === undefined) return null;
+  if (identifierKeys.length !== identifierProfileIds.length) {
+    throw new Error("Journey identifier keys and profile IDs must have equal lengths.");
+  }
+  return new Map(identifierKeys.map((key, index) => [key, identifierProfileIds[index]]));
+}
+
+function journeyIdentifierParameters(
+  identifierKeys: string[],
+  profileByIdentifierKey: Map<string, string> | null,
+): PipeParameters {
+  const parameters = literalValueParameters("identifier", identifierKeys);
+  if (!profileByIdentifierKey) return parameters;
+
+  const profileIds = identifierKeys.map((key) => {
+    const profileId = profileByIdentifierKey.get(key);
+    if (!profileId) throw new Error(`Journey identifier ${key} has no profile ID.`);
+    return profileId;
+  });
+  if (identifierKeys.length === 1 && identifierKeys[0].includes(",")) {
+    return { ...parameters, p_identifier_profile_id: profileIds[0] };
+  }
+  return { ...parameters, p_identifier_profile_ids: arrayParameter(profileIds) };
 }
 
 export async function readJourneyBackfillProfilePage(

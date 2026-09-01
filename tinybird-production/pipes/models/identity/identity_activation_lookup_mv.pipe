@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Projects activation markers from the identity journal into the narrow
+    lookup used by request-time identity joins.
+
+NODE materialize_identity_activation
+SQL >
+    SELECT
+        tenant_id,
+        batch_version,
+        batch_id,
+        committed_at,
+        row_hash
+    FROM identity_state_delta_versions
+    WHERE state_kind = 'activation_audit' AND is_deleted = 0
+
+TYPE materialized
+DATASOURCE identity_activation_lookup

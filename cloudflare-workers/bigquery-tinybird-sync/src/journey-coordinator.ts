@@ -300,7 +300,13 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     ));
     const page = takeProfilePage(lookaheadProfileIds, keysByProfile);
     if (page.identifierKeys.length > 0) {
-      await this.buildPage(state, batch, page.identifierKeys, []);
+      await this.buildPage(
+        state,
+        batch,
+        page.identifierKeys,
+        [],
+        page.identifierProfileIds,
+      );
     }
     this.advancePage(state, {
       profile_index: state.profile_index + page.profileIds.length,
@@ -313,11 +319,13 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     batch: ActiveJourneyBatch,
     identifierKeys: string[],
     conversionIds: string[],
+    identifierProfileIds?: string[],
   ): Promise<void> {
     const batchVersion = state.active_journey_version_base + state.page_number;
     await processJourneyProfileBatch({
       tenantId: batch.tenantId,
       identifierKeys,
+      identifierProfileIds,
       conversionIds,
       batchVersion,
       batchId: `${batch.batchId}_journey_${state.page_number}_${batchVersion}`,

@@ -55,6 +55,7 @@ describe("incremental journey Worker", () => {
     const result = await processJourneyProfileBatch({
       tenantId: "boom",
       identifierKeys: ["email:two@example.com", "email:one@example.com"],
+      identifierProfileIds: ["profile-1", "profile-1"],
       batchVersion: 1_787_878_380_010,
       batchId: "identity-1_journey_0_1787878380010",
     }, config, fetcher);
@@ -70,6 +71,9 @@ describe("incremental journey Worker", () => {
     expect(requests[0].url.searchParams.getAll("p_identifier_keys")).toEqual([
       "email:one@example.com,email:two@example.com",
     ]);
+    expect(requests[0].url.searchParams.get("p_identifier_profile_ids")).toBe(
+      "profile-1,profile-1",
+    );
     expect(requests[1].url.searchParams.get("name")).toBe(
       "reporting_journey_versions",
     );
@@ -110,6 +114,7 @@ describe("incremental journey Worker", () => {
     await processJourneyProfileBatch({
       tenantId: "boom",
       identifierKeys: ["email:last,first@example.com"],
+      identifierProfileIds: ["profile-1"],
       batchVersion: 1,
       batchId: "comma-key",
     }, config, fetcher);
@@ -118,6 +123,7 @@ describe("incremental journey Worker", () => {
       "email:last,first@example.com",
     );
     expect(requests[0].searchParams.has("p_identifier_keys")).toBe(false);
+    expect(requests[0].searchParams.get("p_identifier_profile_id")).toBe("profile-1");
   });
 
   it("never writes a commit when the journey row append fails", async () => {
@@ -208,6 +214,7 @@ describe("journey profile paging", () => {
 
     expect(page.profileIds).toEqual(["profile-a"]);
     expect(page.identifierKeys).toEqual(["anonymous_id:a1", "user_id:a2"]);
+    expect(page.identifierProfileIds).toEqual(["profile-a", "profile-a"]);
 
     const nextPage = takeProfilePage(["profile-b", "profile-c"], keysByProfile, 4);
     expect(nextPage.profileIds).toEqual(["profile-b", "profile-c"]);
@@ -216,6 +223,12 @@ describe("journey profile paging", () => {
       "anonymous_id:c1",
       "email:b3",
       "user_id:b2",
+    ]);
+    expect(nextPage.identifierProfileIds).toEqual([
+      "profile-b",
+      "profile-c",
+      "profile-b",
+      "profile-b",
     ]);
   });
 

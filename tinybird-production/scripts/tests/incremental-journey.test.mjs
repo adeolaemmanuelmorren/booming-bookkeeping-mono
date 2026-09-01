@@ -48,6 +48,8 @@ test("only the Worker-facing endpoint executes journey windows", async () => {
   assert.match(endpoint, /TYPE ENDPOINT/);
   assert.match(endpoint, /p_identifier_key/);
   assert.match(endpoint, /p_identifier_keys/);
+  assert.match(endpoint, /p_identifier_profile_ids/);
+  assert.match(endpoint, /arrayZip/);
   assert.match(endpoint, /p_conversion_ids/);
   assert.match(endpoint, /FROM reporting_conversion_facts_v2_current/);
   assert.match(endpoint, /FROM mart_touchpoints_all_facts_v3_current/);
@@ -68,12 +70,21 @@ test("journey point lookups keep bounded physical indexes", async () => {
   const mappingDelta = await resource(
     "datasources/state/identity_mapping_delta_lookup.datasource",
   );
+  const activationLookup = await resource(
+    "datasources/state/identity_activation_lookup.datasource",
+  );
+  const journeyWindow = await resource(
+    "pipes/models/attribution/reporting_profile_journey_window_build.pipe",
+  );
   const conversions = await resource(
     "datasources/state/reporting_conversion_facts_v2_current.datasource",
   );
 
   assert.match(mappingSeed, /ENGINE_SETTINGS "index_granularity=128"/);
   assert.match(mappingDelta, /ENGINE_SETTINGS "index_granularity=128"/);
+  assert.match(activationLookup, /ENGINE_SETTINGS "index_granularity=128"/);
+  assert.match(journeyWindow, /INNER JOIN identity_activation_lookup AS activated/);
+  assert.doesNotMatch(journeyWindow, /INNER JOIN activated_identity_batches AS activated/);
   assert.match(
     conversions,
     /INDEX conversion_id_bloom conversion_id TYPE bloom_filter\(0\.01\) GRANULARITY 1/,
