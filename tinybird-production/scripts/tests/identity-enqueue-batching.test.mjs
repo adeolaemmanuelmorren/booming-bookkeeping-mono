@@ -119,6 +119,11 @@ test("the shared source renders exactly one requested producer", () => {
   assert.doesNotMatch(contents, /String\(p_identity_producer, 'all'\)/);
   assert.doesNotMatch(contents, /NODE all_identity_fact_candidates|UNION ALL/);
   for (const producerId of producerIds) assert.ok(contents.includes(producerId));
+  assert.equal(
+    (contents.match(/defined\(p_source_ingested_to\)/g) ?? []).length,
+    producerIds.length,
+    "every identity producer must stop at the active generation end",
+  );
   assert.match(
     contents,
     /concat\(\s*fact_key,\s*':',\s*toString\(normalized_source_fact_version\),/,

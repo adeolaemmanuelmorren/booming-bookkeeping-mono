@@ -26,6 +26,11 @@ SQL >
             AND source_version >= parseDateTime64BestEffort(
                 {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
             )
+            {% if defined(p_source_ingested_to) %}
+                AND source_version < parseDateTime64BestEffort(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6
+                )
+            {% end %}
     {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:segment_form' %}
         SELECT
             tenant_id,
@@ -46,6 +51,11 @@ SQL >
             AND source_version >= parseDateTime64BestEffort(
                 {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
             )
+            {% if defined(p_source_ingested_to) %}
+                AND source_version < parseDateTime64BestEffort(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6
+                )
+            {% end %}
     {% elif defined(
         p_identity_producer
     ) and p_identity_producer == 'source_identity:segment_order_completed' %}
@@ -70,6 +80,11 @@ SQL >
             AND source_version >= parseDateTime64BestEffort(
                 {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
             )
+            {% if defined(p_source_ingested_to) %}
+                AND source_version < parseDateTime64BestEffort(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6
+                )
+            {% end %}
     {% elif defined(
         p_identity_producer
     ) and p_identity_producer == 'source_identity:segment_page_view' %}
@@ -92,6 +107,11 @@ SQL >
             AND source_version >= parseDateTime64BestEffort(
                 {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
             )
+            {% if defined(p_source_ingested_to) %}
+                AND source_version < parseDateTime64BestEffort(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6
+                )
+            {% end %}
     {% elif defined(
         p_identity_producer
     ) and p_identity_producer == 'source_identity:segment_attribution' %}
@@ -114,6 +134,11 @@ SQL >
             AND source_version >= parseDateTime64BestEffort(
                 {{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6
             )
+            {% if defined(p_source_ingested_to) %}
+                AND source_version < parseDateTime64BestEffort(
+                    {{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6
+                )
+            {% end %}
     {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:activecampaign' %}
         SELECT
             'boom' AS tenant_id,
@@ -159,6 +184,10 @@ SQL >
             AND {{ String(p_identity_producer, '') }} = 'source_identity:stripe'
             AND source_version
             >= parseDateTime64BestEffort({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6)
+            {% if defined(p_source_ingested_to) %}
+                AND source_version
+                    < parseDateTime64BestEffort({{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6)
+            {% end %}
     {% elif defined(p_identity_producer) and p_identity_producer == 'source_identity:stripe_kajabi' %}
         SELECT
             'boom' AS tenant_id,
@@ -181,6 +210,10 @@ SQL >
             AND {{ String(p_identity_producer, '') }} = 'source_identity:stripe_kajabi'
             AND source_version
             >= parseDateTime64BestEffort({{ String(p_source_ingested_from, '1970-01-01 00:00:00') }}, 6)
+            {% if defined(p_source_ingested_to) %}
+                AND source_version
+                    < parseDateTime64BestEffort({{ String(p_source_ingested_to, '2100-01-01 00:00:00') }}, 6)
+            {% end %}
     {% else %}
         SELECT
             tenant_id,

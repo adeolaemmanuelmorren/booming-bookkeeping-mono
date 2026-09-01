@@ -2332,15 +2332,20 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
     producerId: string,
     sourceIngestedFrom: string,
   ): { from: string; to?: string; hasNext: boolean } {
-    if (producerId !== "source_identity:activecampaign") {
-      return { from: sourceIngestedFrom, hasNext: false };
-    }
-
     const generationId = state.active_raw_generation;
     if (!generationId) throw new Error("Identity enqueue has no active raw generation.");
+    const generationEnd = this.generationEndedAt(generationId);
+
+    if (producerId !== "source_identity:activecampaign") {
+      return {
+        from: sourceIngestedFrom,
+        to: formatTinybirdDateTime(generationEnd),
+        hasNext: false,
+      };
+    }
+
     const from = state.identity_enqueue_window_from ?? sourceIngestedFrom;
     const fromDate = tinybirdDateTime(from, "identity_enqueue_window_from");
-    const generationEnd = this.generationEndedAt(generationId);
     const proposedEnd = new Date(
       fromDate.valueOf() + ACTIVECAMPAIGN_WINDOW_MINUTES * 60_000,
     );

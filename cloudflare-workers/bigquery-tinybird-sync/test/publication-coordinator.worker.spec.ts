@@ -219,7 +219,7 @@ describe("publication coordinator", () => {
     const cutoff = "2026-08-26 23:05:00";
     const firstBatch = IDENTITY_ENQUEUE_BATCHES[0];
 
-    mockEmptySourcePage(firstBatch.producerId, cutoff);
+    mockEmptySourcePage(firstBatch.producerId, cutoff, "2026-08-27 05:34:00");
 
     await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
       seedAwaitingPublication(
@@ -295,7 +295,7 @@ describe("publication coordinator", () => {
     const cutoff = "2026-08-27 05:14:00";
     const firstBatch = IDENTITY_ENQUEUE_BATCHES[0];
 
-    mockEmptySourcePage(firstBatch.producerId, cutoff);
+    mockEmptySourcePage(firstBatch.producerId, cutoff, "2026-08-27 05:34:00");
 
     await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
       seedAwaitingPublication(state, generationId, scheduledAt);
@@ -329,7 +329,7 @@ describe("publication coordinator", () => {
     );
     const cutoff = "2026-08-26 23:05:00";
 
-    mockEmptySourcePage("source_identity:stripe", cutoff);
+    mockEmptySourcePage("source_identity:stripe", cutoff, "2026-08-26 23:15:00");
 
     await runInDurableObject(stub, async (instance: PublicationCoordinator, state) => {
       seedIdentityEnqueue(
@@ -1535,10 +1535,11 @@ describe("publication coordinator", () => {
         const sourceIngestedFrom = batch.usesGenerationOverlapCutoff
           ? cutoff
           : "1970-01-01 00:00:00";
-        const sourceIngestedTo = batch.producerId === "source_identity:activecampaign"
-          ? "2026-08-26 12:24:00"
-          : undefined;
-        mockEmptySourcePage(batch.producerId, sourceIngestedFrom, sourceIngestedTo);
+        mockEmptySourcePage(
+          batch.producerId,
+          sourceIngestedFrom,
+          "2026-08-26 12:24:00",
+        );
         await instance.alarm();
       }
 
@@ -2033,11 +2034,9 @@ function seedIdentityEnqueue(
     cutoff,
   );
   seedPublication(state, generationId, kind);
-  if (kind === "recurring") {
-    const cutoffDate = new Date(`${cutoff.replace(" ", "T")}Z`);
-    const scheduledAt = new Date(cutoffDate.valueOf() + 10 * 60_000).toISOString();
-    seedCompletedRawRun(state, generationId, scheduledAt);
-  }
+  const cutoffDate = new Date(`${cutoff.replace(" ", "T")}Z`);
+  const scheduledAt = new Date(cutoffDate.valueOf() + 10 * 60_000).toISOString();
+  seedCompletedRawRun(state, generationId, scheduledAt);
 }
 
 function seedAwaitingPublication(
