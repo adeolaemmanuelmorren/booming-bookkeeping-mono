@@ -179,8 +179,14 @@ SQL >
 
 NODE current_journey_base_rows
 SQL >
-    SELECT *
-    FROM current_seed_journey_rows
-    UNION ALL
-    SELECT *
-    FROM current_committed_journey_rows
+    SELECT
+        journey.* EXCEPT (touchpoint_id),
+        nullIf(journey.touchpoint_id, '') AS touchpoint_id
+    FROM
+        (
+            SELECT *
+            FROM current_seed_journey_rows
+            UNION ALL
+            SELECT *
+            FROM current_committed_journey_rows
+        ) AS journey

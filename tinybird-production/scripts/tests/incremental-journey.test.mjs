@@ -29,6 +29,7 @@ test("journey payload rows are versioned and atomically activated per conversion
   assert.match(current, /FROM reporting_journey_seed_current AS seed/);
   assert.match(current, /LEFT ANTI JOIN latest_journey_commit_versions/);
   assert.match(current, /FROM current_seed_journey_rows[\s\S]*UNION ALL/);
+  assert.match(current, /nullIf\(journey\.touchpoint_id, ''\) AS touchpoint_id/);
 });
 
 test("only the Worker-facing endpoint executes journey windows", async () => {
