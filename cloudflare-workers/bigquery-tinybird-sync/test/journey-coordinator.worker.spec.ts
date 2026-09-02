@@ -119,13 +119,12 @@ describe("journey coordinator", () => {
         ],
       });
     const recordBuildCall = (query: URLSearchParams) => {
+      const mappings = parseIdentifierMappings(query.get("p_identifier_mappings_json"));
       buildCalls.push({
-        identifierKeys: query.has("p_identifier_keys_delimited")
-          ? splitDelimitedParameter(query.get("p_identifier_keys_delimited"))
+        identifierKeys: mappings.length > 0
+          ? mappings.map((mapping) => mapping.identifier_key)
           : splitArrayParameter(query.get("p_identifier_keys")),
-        identifierProfileIds: splitDelimitedParameter(
-          query.get("p_identifier_profile_ids_delimited"),
-        ),
+        identifierProfileIds: mappings.map((mapping) => mapping.profile_id),
         conversionIds: splitArrayParameter(query.get("p_conversion_ids")),
         batchVersion: 0,
       });
@@ -274,9 +273,11 @@ function splitArrayParameter(value: string | null): string[] {
   return value ? value.split(",") : [];
 }
 
-function splitDelimitedParameter(value: string | null): string[] {
+function parseIdentifierMappings(
+  value: string | null,
+): Array<{ identifier_key: string; profile_id: string }> {
   if (!value) return [];
-  return value.split("|").filter(Boolean);
+  return JSON.parse(value) as Array<{ identifier_key: string; profile_id: string }>;
 }
 
 async function clearPacingDelay(instance: JourneyCoordinator): Promise<void> {

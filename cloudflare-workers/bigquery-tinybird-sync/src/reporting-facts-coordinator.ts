@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { WorkerEnv } from "./sync";
+import { md5Hex } from "./md5";
 import {
   appendConversionFactDeltas,
   appendTouchpointFactDeltas,
@@ -32,6 +33,7 @@ const IDLE_POLL_MS = 120_000;
 const BUILD_CALL_INTERVAL_MS = 2_000;
 const DEFAULT_BACKPRESSURE_MS = 60_000;
 const CHANGED_WINDOW_LIMIT = 2_000;
+const JOURNEY_REPAIR_PROFILE_LIMIT = 200;
 const INGESTION_SETTLE_MS = 60_000;
 // The frozen fact seeds were exported at this cutoff; starting both cursors
 // here makes the first pass through the CDC loop double as the catch-up
@@ -231,7 +233,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
   // coordinator exists to remove, so the cursor only advances after touched
   // profiles are handed to the journey repair queue.
   private async finishWindow(state: FactsState, window: ActiveWindow): Promise<void> {
-    await this.flushJourneyRepairs(state, window.stream);
+    await this.flushJourneyRepairs(state, window);
 
     const latest = maxLastIngestedAt(windowItems(window));
     const cursor = latest ? nextCursorFrom(latest) : window.windowEnd;
@@ -248,7 +250,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
     await this.ensureAlarm();
   }
 
-  private async flushJourneyRepairs(state: FactsState, stream: FactsStream): Promise<void> {
+  private async flushJourneyRepairs(state: FactsState, window: ActiveWindow): Promise<void> {
     const anchorKeys = parseAnchorKeys(state.repair_anchor_keys_json);
     if (anchorKeys.length === 0) return;
 
@@ -257,13 +259,16 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       anchorKeys,
       this.tinybirdConfig(),
     );
-    const profileIds = [...new Set(mappings.map((mapping) => mapping.profileId))].sort();
-    if (profileIds.length === 0) return;
+    const repairBatches = journeyRepairBatches(
+      mappings.map((mapping) => mapping.profileId),
+      window.stream,
+      window.windowEnd,
+    );
+    const journeyCoordinator = this.env.JOURNEY_COORDINATOR.getByName(TENANT_ID);
 
-    await this.env.JOURNEY_COORDINATOR.getByName(TENANT_ID).enqueueRepair({
-      repairId: `facts_${stream}_${Date.now()}`,
-      profileIds,
-    });
+    for (const repair of repairBatches) {
+      await journeyCoordinator.enqueueRepair(repair);
+    }
   }
 
   private startWindow(window: ActiveWindow): void {
@@ -358,6 +363,26 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       ),
     };
   }
+}
+
+export function journeyRepairBatches(
+  profileIds: string[],
+  stream: FactsStream,
+  windowEnd: string,
+): Array<{ repairId: string; profileIds: string[] }> {
+  const uniqueProfileIds = [...new Set(profileIds)].sort();
+  const batches: Array<{ repairId: string; profileIds: string[] }> = [];
+
+  for (let index = 0; index < uniqueProfileIds.length; index += JOURNEY_REPAIR_PROFILE_LIMIT) {
+    const batchProfileIds = uniqueProfileIds.slice(index, index + JOURNEY_REPAIR_PROFILE_LIMIT);
+    const repairHash = md5Hex(`${stream}\0${windowEnd}\0${batchProfileIds.join("\0")}`);
+    batches.push({
+      repairId: `facts_${stream}_${repairHash}`,
+      profileIds: batchProfileIds,
+    });
+  }
+
+  return batches;
 }
 
 function windowItems(window: ActiveWindow): { lastIngestedAt: string }[] {

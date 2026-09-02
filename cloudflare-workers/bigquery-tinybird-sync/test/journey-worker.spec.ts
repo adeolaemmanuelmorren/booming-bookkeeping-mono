@@ -69,12 +69,10 @@ describe("incremental journey Worker", () => {
       "/v0/pipes/reporting_profile_journey_window_build.json",
     );
     const journeyParameters = new URLSearchParams(requests[0].body);
-    expect(journeyParameters.get("p_identifier_keys_delimited")).toBe(
-      "email:one@example.com|email:two@example.com",
-    );
-    expect(journeyParameters.get("p_identifier_profile_ids_delimited")).toBe(
-      "profile-1|profile-1",
-    );
+    expect(JSON.parse(journeyParameters.get("p_identifier_mappings_json") ?? "[]")).toEqual([
+      { identifier_key: "email:one@example.com", profile_id: "profile-1" },
+      { identifier_key: "email:two@example.com", profile_id: "profile-1" },
+    ]);
     expect(requests[1].url.searchParams.get("name")).toBe(
       "reporting_journey_versions",
     );
@@ -100,7 +98,7 @@ describe("incremental journey Worker", () => {
     ]);
   });
 
-  it("preserves comma-bearing identity keys in the delimited request body", async () => {
+  it("preserves comma-bearing identity keys in the JSON request body", async () => {
     const requests: { url: URL; body: string }[] = [];
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
@@ -121,10 +119,33 @@ describe("incremental journey Worker", () => {
     }, config, fetcher);
 
     const parameters = new URLSearchParams(requests[0].body);
-    expect(parameters.get("p_identifier_keys_delimited")).toBe(
-      "email:last,first@example.com",
-    );
-    expect(parameters.get("p_identifier_profile_ids_delimited")).toBe("profile-1");
+    expect(JSON.parse(parameters.get("p_identifier_mappings_json") ?? "[]")).toEqual([
+      { identifier_key: "email:last,first@example.com", profile_id: "profile-1" },
+    ]);
+  });
+
+  it("preserves apostrophes in the typed JSON mapping", async () => {
+    const requests: { url: URL; body: string }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      requests.push({ url: new URL(String(input)), body: String(init?.body ?? "") });
+      return jsonResponse({ data: [] });
+    }) as unknown as Fetcher;
+
+    await processJourneyProfileBatch({
+      tenantId: "boom",
+      identifierKeys: ["canonical_email:pamelawatson378@gmail.'com"],
+      identifierProfileIds: ["profile-1"],
+      batchVersion: 1,
+      batchId: "apostrophe-key",
+    }, config, fetcher);
+
+    const parameters = new URLSearchParams(requests[0].body);
+    expect(JSON.parse(parameters.get("p_identifier_mappings_json") ?? "[]")).toEqual([
+      {
+        identifier_key: "canonical_email:pamelawatson378@gmail.'com",
+        profile_id: "profile-1",
+      },
+    ]);
   });
 
   it("keeps the complete profile page in one request body", async () => {
@@ -161,12 +182,13 @@ describe("incremental journey Worker", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0].method).toBe("POST");
     const parameters = new URLSearchParams(requests[0].body);
-    expect(
-      (parameters.get("p_identifier_keys_delimited") ?? "").split("|"),
-    ).toHaveLength(20);
-    expect(new Set(
-      (parameters.get("p_identifier_profile_ids_delimited") ?? "").split("|"),
-    )).toEqual(new Set(["profile-a", "profile-b"]));
+    const mappings = JSON.parse(
+      parameters.get("p_identifier_mappings_json") ?? "[]",
+    ) as Array<{ identifier_key: string; profile_id: string }>;
+    expect(mappings).toHaveLength(20);
+    expect(new Set(mappings.map((mapping) => mapping.profile_id))).toEqual(
+      new Set(["profile-a", "profile-b"]),
+    );
   });
 
   it("never writes a commit when the journey row append fails", async () => {

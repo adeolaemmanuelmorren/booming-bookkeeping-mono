@@ -1,6 +1,7 @@
 import { env, fetchMock, runInDurableObject } from "cloudflare:test";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ReportingFactsCoordinator } from "../src/reporting-facts-coordinator";
+import { journeyRepairBatches } from "../src/reporting-facts-coordinator";
 
 const tinybirdOrigin = "https://api.us-east.tinybird.co";
 
@@ -14,6 +15,26 @@ afterEach(() => {
 });
 
 describe("reporting facts coordinator", () => {
+  it("splits journey repairs into deterministic 200-profile batches", () => {
+    const profileIds = Array.from({ length: 401 }, (_, index) => `profile-${index}`);
+    const first = journeyRepairBatches(
+      [...profileIds, "profile-0"],
+      "touchpoints",
+      "2026-09-01 10:00:00.000000",
+    );
+    const retry = journeyRepairBatches(
+      [...profileIds, "profile-0"],
+      "touchpoints",
+      "2026-09-01 10:00:00.000000",
+    );
+
+    expect(first.map((batch) => batch.profileIds.length)).toEqual([200, 200, 1]);
+    expect(first.map((batch) => batch.repairId)).toEqual(
+      retry.map((batch) => batch.repairId),
+    );
+    expect(new Set(first.flatMap((batch) => batch.profileIds)).size).toBe(401);
+  });
+
   it("rebuilds changed visitors, tombstones ghosts, and repairs journeys", async () => {
     const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-window-test");
     const pool = fetchMock.get(tinybirdOrigin);

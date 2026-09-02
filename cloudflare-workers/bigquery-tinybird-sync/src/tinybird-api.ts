@@ -599,8 +599,10 @@ function journeyIdentifierParameters(
     return profileId;
   });
   return {
-    p_identifier_keys_delimited: delimitedParameter(identifierKeys),
-    p_identifier_profile_ids_delimited: delimitedParameter(profileIds),
+    p_identifier_mappings_json: JSON.stringify(identifierKeys.map((identifierKey, index) => ({
+      identifier_key: identifierKey,
+      profile_id: profileIds[index],
+    }))),
   };
 }
 
@@ -1433,14 +1435,6 @@ function arrayParameter(values: string[]): string {
     throw new Error("Comma-bearing identity keys require a singleton lookup.");
   }
   return values.join(",");
-}
-
-function delimitedParameter(values: string[]): string {
-  const delimiter = "|";
-  if (values.some((value) => value.includes(delimiter))) {
-    throw new Error(`Journey identity values cannot contain ${delimiter}.`);
-  }
-  return values.join(delimiter);
 }
 
 function literalFactParameters(tenantId: string, factKeys: string[]): PipeParameters {

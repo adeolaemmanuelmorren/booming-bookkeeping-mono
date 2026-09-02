@@ -10,6 +10,12 @@ SQL >
     WHERE tenant_id = 'boom'
         {% if defined(p_identifier_key) %}
         AND identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_mappings_json) %}
+        AND identifier_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+            {% end %}
+        )
         {% elif defined(p_identifier_keys_delimited) %}
         AND identifier_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
         {% elif defined(p_identifier_keys) %}
@@ -35,6 +41,12 @@ SQL >
     WHERE journal.tenant_id = 'boom'
         {% if defined(p_identifier_key) %}
         AND journal.identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_mappings_json) %}
+        AND journal.identifier_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+            {% end %}
+        )
         {% elif defined(p_identifier_keys_delimited) %}
         AND journal.identifier_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
         {% elif defined(p_identifier_keys) %}
@@ -56,6 +68,22 @@ SQL >
         'boom' AS tenant_id,
         {{ String(p_identifier_key) }} AS identifier_key,
         {{ String(p_identifier_profile_id) }} AS profile_id
+    {% elif defined(p_identifier_mappings_json) %}
+    SELECT
+        'boom' AS tenant_id,
+        tupleElement(identifier_mapping, 1) AS identifier_key,
+        tupleElement(identifier_mapping, 2) AS profile_id
+    FROM
+        (
+            SELECT arrayJoin([
+                {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+                tuple(
+                    {{ String(mapping.get('identifier_key', '')) }},
+                    {{ String(mapping.get('profile_id', '')) }}
+                ){% if not last %},{% end %}
+                {% end %}
+            ]) AS identifier_mapping
+        )
     {% elif defined(p_identifier_keys_delimited) and defined(p_identifier_profile_ids_delimited) %}
     SELECT
         'boom' AS tenant_id,
@@ -113,6 +141,21 @@ SQL >
             OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
             {% end %}
         )
+        {% elif defined(p_identifier_mappings_json) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN (
+                {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+                {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+                {% end %}
+            )
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_mappings_json) %}
+        AND identity_anchor_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+            {% end %}
+        )
         {% elif defined(p_identifier_keys_delimited) and defined(p_conversion_ids) %}
         AND (
             identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
@@ -163,6 +206,21 @@ SQL >
             identity_anchor_key = {{ String(p_identifier_key) }}
             {% if defined(p_conversion_ids) %}
             OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+            {% end %}
+        )
+        {% elif defined(p_identifier_mappings_json) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN (
+                {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+                {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+                {% end %}
+            )
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_mappings_json) %}
+        AND identity_anchor_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
             {% end %}
         )
         {% elif defined(p_identifier_keys_delimited) and defined(p_conversion_ids) %}
@@ -418,6 +476,12 @@ SQL >
     FROM mart_touchpoints_all_facts_v3_current
     {% if defined(p_identifier_key) %}
         WHERE identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_mappings_json) %}
+        WHERE identity_anchor_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+            {% end %}
+        )
     {% elif defined(p_identifier_keys_delimited) %}
         WHERE identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
     {% elif defined(p_identifier_keys) %}
@@ -453,6 +517,12 @@ SQL >
     FROM mart_touchpoints_all_fact_deltas
     {% if defined(p_identifier_key) %}
         WHERE identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_mappings_json) %}
+        WHERE identity_anchor_key IN (
+            {% for last, mapping in enumerate_with_last(JSON(p_identifier_mappings_json, '[]')) %}
+            {{ String(mapping.get('identifier_key', '')) }}{% if not last %},{% end %}
+            {% end %}
+        )
     {% elif defined(p_identifier_keys_delimited) %}
         WHERE identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
     {% elif defined(p_identifier_keys) %}
