@@ -115,6 +115,22 @@ export async function handleRequest(
     return handleJourneyRepair(request, env);
   }
 
+  if (url.pathname === "/reporting-facts/status") {
+    if (request.method !== "GET") return methodNotAllowed("GET");
+    const authError = authorize(request, env);
+    if (authError) return authError;
+
+    return jsonResponse(await reportingFactsCoordinator(env).status());
+  }
+
+  if (url.pathname === "/reporting-facts/recover") {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    const authError = authorize(request, env);
+    if (authError) return authError;
+
+    return jsonResponse(await reportingFactsCoordinator(env).recoverFailed());
+  }
+
   return jsonResponse({ error: "Not found" }, 404);
 }
 
@@ -418,6 +434,10 @@ function coordinator(env: WorkerEnv) {
 
 function journeyCoordinator(env: WorkerEnv) {
   return env.JOURNEY_COORDINATOR.getByName("boom");
+}
+
+function reportingFactsCoordinator(env: WorkerEnv) {
+  return env.REPORTING_FACTS_COORDINATOR.getByName("boom");
 }
 
 function logQueuedRun(result: object): void {

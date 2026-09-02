@@ -1,0 +1,62 @@
+DESCRIPTION >
+    Live touchpoint ids per requested anchor key over the frozen base table
+    plus the CDC delta overlay. The reporting facts coordinator diffs this
+    against a fresh re-sessionization to tombstone session ids the rebuild no
+    longer produces.
+
+NODE base_touchpoint_heads
+SQL >
+    %
+    SELECT
+        identity_anchor_key,
+        touchpoint_id,
+        toUInt64(0) AS row_version,
+        toUInt8(0) AS is_deleted
+    FROM mart_touchpoints_all_facts_v3_current
+    {% if defined(p_anchor_keys) %}
+    WHERE identity_anchor_key IN {{ Array(p_anchor_keys, 'String') }}
+    {% elif defined(p_anchor_key) %}
+    WHERE identity_anchor_key = {{ String(p_anchor_key) }}
+    {% else %}
+    WHERE 0
+    {% end %}
+
+NODE delta_touchpoint_heads
+SQL >
+    %
+    SELECT
+        identity_anchor_key,
+        touchpoint_id,
+        row_version,
+        is_deleted
+    FROM mart_touchpoints_all_fact_deltas
+    {% if defined(p_anchor_keys) %}
+    WHERE identity_anchor_key IN {{ Array(p_anchor_keys, 'String') }}
+    {% elif defined(p_anchor_key) %}
+    WHERE identity_anchor_key = {{ String(p_anchor_key) }}
+    {% else %}
+    WHERE 0
+    {% end %}
+
+NODE ranked_touchpoint_heads
+SQL >
+    SELECT *
+    FROM
+        (
+            SELECT * FROM base_touchpoint_heads
+            UNION ALL
+            SELECT * FROM delta_touchpoint_heads
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identity_anchor_key, touchpoint_id
+            ORDER BY row_version DESC
+        ) = 1
+
+NODE current_touchpoint_heads
+SQL >
+    SELECT identity_anchor_key, touchpoint_id
+    FROM ranked_touchpoint_heads
+    WHERE is_deleted = 0
+
+TYPE ENDPOINT

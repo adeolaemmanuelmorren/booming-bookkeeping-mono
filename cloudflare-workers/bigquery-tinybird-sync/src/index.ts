@@ -4,6 +4,7 @@ import type { WorkerEnv } from "./sync";
 export { TinybirdSyncGate } from "./tinybird-gate";
 export { PublicationCoordinator } from "./publication-coordinator";
 export { JourneyCoordinator } from "./journey-coordinator";
+export { ReportingFactsCoordinator } from "./reporting-facts-coordinator";
 
 const SERVICE_NAME = "bigquery-tinybird-sync";
 
@@ -24,6 +25,7 @@ export default {
         scheduledAt: new Date(controller.scheduledTime).toISOString(),
       }),
       env.JOURNEY_COORDINATOR.getByName("boom").tick(),
+      env.REPORTING_FACTS_COORDINATOR.getByName("boom").tick(),
     ]);
     logRun(result);
   },

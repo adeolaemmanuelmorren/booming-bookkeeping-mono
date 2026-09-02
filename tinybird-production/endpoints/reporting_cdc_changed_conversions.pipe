@@ -1,0 +1,48 @@
+DESCRIPTION >
+    Conversion source entities whose raw versions changed inside an ingestion
+    window. The reporting facts coordinator rebuilds each returned entity's
+    conversion facts completely and tombstones whatever the rebuild no longer
+    produces.
+
+NODE changed_client_form_entities
+SQL >
+    %
+    SELECT
+        'client_form' AS entity_kind,
+        assumeNotNull(form_submission_id) AS entity_id,
+        max(source_ingested_at) AS last_ingested_at
+    FROM jitsu_form_submission_versions
+    WHERE tenant_id = 'boom'
+        AND form_submission_id IS NOT NULL
+        AND source_ingested_at
+            > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND source_ingested_at
+            <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    GROUP BY entity_id
+
+NODE changed_client_order_entities
+SQL >
+    %
+    SELECT
+        'client_order' AS entity_kind,
+        assumeNotNull(event_row_id) AS entity_id,
+        max(source_ingested_at) AS last_ingested_at
+    FROM jitsu_order_completed_versions
+    WHERE tenant_id = 'boom'
+        AND event_row_id IS NOT NULL
+        AND source_ingested_at
+            > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND source_ingested_at
+            <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    GROUP BY entity_id
+
+NODE changed_conversion_entities
+SQL >
+    %
+    SELECT * FROM changed_client_form_entities
+    UNION ALL
+    SELECT * FROM changed_client_order_entities
+    ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC
+    LIMIT {{ UInt64(p_limit, 2000) }}
+
+TYPE ENDPOINT

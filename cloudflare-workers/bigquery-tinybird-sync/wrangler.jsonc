@@ -27,6 +27,10 @@
       {
         "name": "JOURNEY_COORDINATOR",
         "class_name": "JourneyCoordinator"
+      },
+      {
+        "name": "REPORTING_FACTS_COORDINATOR",
+        "class_name": "ReportingFactsCoordinator"
       }
     ]
   },
@@ -42,6 +46,10 @@
     {
       "tag": "v3",
       "new_sqlite_classes": ["JourneyCoordinator"]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": ["ReportingFactsCoordinator"]
     }
   ],
   "vars": {

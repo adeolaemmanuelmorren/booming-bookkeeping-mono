@@ -19,6 +19,7 @@ import type {
   PublicationCoordinator,
 } from "./publication-coordinator";
 import type { JourneyCoordinator } from "./journey-coordinator";
+import type { ReportingFactsCoordinator } from "./reporting-facts-coordinator";
 import {
   MAX_TABLES_PER_RUN,
   SHARD_COUNT,
@@ -52,6 +53,7 @@ export interface WorkerEnv {
   TINYBIRD_SYNC_GATE: DurableObjectNamespace<TinybirdSyncGate>;
   PUBLICATION_COORDINATOR: DurableObjectNamespace<PublicationCoordinator>;
   JOURNEY_COORDINATOR: DurableObjectNamespace<JourneyCoordinator>;
+  REPORTING_FACTS_COORDINATOR: DurableObjectNamespace<ReportingFactsCoordinator>;
 }
 
 export interface SyncResult {

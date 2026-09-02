@@ -40,6 +40,7 @@ const RAW_RUN_LEASE_MS = 5 * 60_000;
 const REQUIRED_IDLE_INGESTION_POLLS = 2;
 const MIN_ALARM_DELAY_MS = 100;
 const COORDINATOR_BACKPRESSURE_MS = 60_000;
+const RAW_BACKLOG_AUTO_COMPACT_THRESHOLD = 3 * RAW_SLOT_COUNT;
 const HISTORY_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const IDENTITY_EPOCH = "1970-01-01 00:00:00";
 const IDENTITY_TENANT_ID = "boom";
@@ -621,6 +622,10 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
       throw new Error("Raw backlog compaction requires the collecting_raw phase.");
     }
 
+    return this.compactQueuedRawRuns(state);
+  }
+
+  private compactQueuedRawRuns(state: CoordinatorState): CompactRawBacklogResult {
     const queued = this.ctx.storage.sql.exec<RawRunRow>(
       `
         SELECT
@@ -1314,6 +1319,21 @@ export class PublicationCoordinator extends DurableObject<WorkerEnv> {
 
   private async processNextRawRun(state: CoordinatorState): Promise<void> {
     this.requeueExpiredRawRuns(Date.now());
+    // Scheduled runs keep arriving while catch-up processes, so a backlog can
+    // outgrow any fixed processing rate. Past the threshold, collapse queued
+    // runs to the latest per slot with widened export overlap; no coverage is
+    // lost and the queue stays bounded without operator intervention.
+    if (
+      !state.publication_kind
+      && this.countRawRuns("queued") > RAW_BACKLOG_AUTO_COMPACT_THRESHOLD
+    ) {
+      const compaction = this.compactQueuedRawRuns(state);
+      logEvent("raw_backlog_autocompacted", {
+        queuedBefore: compaction.queuedBefore,
+        queuedAfter: compaction.queuedAfter,
+        compactedRuns: compaction.compactedRuns,
+      });
+    }
     let generationId = state.active_raw_generation;
 
     if (this.completedRawSlots(generationId).length === RAW_SLOT_COUNT) {

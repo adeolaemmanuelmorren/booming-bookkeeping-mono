@@ -1,0 +1,407 @@
+DESCRIPTION >
+    Complete re-sessionization for explicitly requested visitors, emitting
+    finished mart_touchpoints_all_facts rows (v3 layout plus anchor key). Used
+    only by the reporting facts coordinator: it passes every visitor whose page
+    views changed, reads this build, diffs against stored heads, and appends
+    versioned delta rows. Mirrors sessionized_page_views, website_sessions and
+    website_session_touchpoints exactly, but scoped so the version scan prunes
+    to the requested visitors before any window function runs. fbclid first
+    seen is computed over the scoped visitors only; journey builds never read
+    fbc_fbclid, so cross-visitor drift there is accepted.
+
+NODE cdc_scoped_page_view_versions
+SQL >
+    %
+    SELECT *
+    FROM jitsu_page_view_versions
+    WHERE tenant_id = 'boom'
+        AND (
+            (
+                {% if defined(p_anonymous_ids) %}
+                anonymous_id IN {{ Array(p_anonymous_ids, 'String') }}
+                {% elif defined(p_anonymous_id) %}
+                anonymous_id = {{ String(p_anonymous_id) }}
+                {% else %}
+                0
+                {% end %}
+            )
+            OR (
+                anonymous_id IS NULL
+                AND (
+                    {% if defined(p_user_ids) %}
+                    user_id IN {{ Array(p_user_ids, 'String') }}
+                    {% elif defined(p_user_id) %}
+                    user_id = {{ String(p_user_id) }}
+                    {% else %}
+                    0
+                    {% end %}
+                )
+            )
+            OR (
+                anonymous_id IS NULL
+                AND user_id IS NULL
+                AND (
+                    {% if defined(p_page_view_ids) %}
+                    __tb_state_key IN {{ Array(p_page_view_ids, 'String') }}
+                    {% elif defined(p_page_view_id) %}
+                    __tb_state_key = {{ String(p_page_view_id) }}
+                    {% else %}
+                    0
+                    {% end %}
+                )
+            )
+        )
+
+NODE cdc_ranked_page_view_versions
+SQL >
+    SELECT
+        source.*,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.page_view_id
+            ORDER BY
+                source.source_priority DESC,
+                source.source_fact_version DESC,
+                source.source_ingested_at DESC,
+                source.payload_hash DESC
+        ) AS current_version_rank
+    FROM cdc_scoped_page_view_versions AS source
+
+NODE cdc_current_page_views
+SQL >
+    SELECT *
+    FROM cdc_ranked_page_view_versions
+    WHERE current_version_rank = 1 AND source_deleted = 0
+
+NODE cdc_ordered_session_page_views
+SQL >
+    SELECT
+        source.*,
+        coalesce(source.anonymous_id, source.user_id, source.page_view_id) AS visitor_key,
+        lagInFrame(source.page_view_timestamp) OVER (
+            PARTITION BY
+                source.tenant_id, coalesce(source.anonymous_id, source.user_id, source.page_view_id)
+            ORDER BY source.page_view_timestamp ASC, source.page_view_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS previous_page_view_timestamp
+    FROM cdc_current_page_views AS source
+    WHERE source.page_view_timestamp IS NOT NULL
+
+NODE cdc_flagged_session_page_views
+SQL >
+    SELECT
+        source.*,
+        toUInt8(
+            source.previous_page_view_timestamp IS NULL
+            OR toUnixTimestamp64Micro(assumeNotNull(source.page_view_timestamp))
+            - toUnixTimestamp64Micro(assumeNotNull(source.previous_page_view_timestamp))
+            >= 1860000000
+        ) AS starts_new_session
+    FROM cdc_ordered_session_page_views AS source
+
+NODE cdc_numbered_session_page_views
+SQL >
+    SELECT
+        source.*,
+        sum(source.starts_new_session) OVER (
+            PARTITION BY source.tenant_id, source.visitor_key
+            ORDER BY source.page_view_timestamp ASC, source.page_view_id ASC NULLS FIRST
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS visitor_session_number
+    FROM cdc_flagged_session_page_views AS source
+
+NODE cdc_sessionized_page_views
+SQL >
+    SELECT
+        source.*,
+        if(
+            source.visitor_key IS NULL,
+            CAST(NULL AS Nullable(String)),
+            lower(
+                hex(
+                    MD5(
+                        concat(
+                            assumeNotNull(source.visitor_key),
+                            '|',
+                            toString(source.visitor_session_number)
+                        )
+                    )
+                )
+            )
+        ) AS session_id
+    FROM cdc_numbered_session_page_views AS source
+
+NODE cdc_session_meta_delivery_rows
+SQL >
+    SELECT
+        source.date AS date,
+        toString(source.campaign_id) AS campaign_id,
+        toString(source.ad_id) AS ad_id
+    FROM raw_facebook_ads_basic_ad AS source
+    WHERE
+        source.date IS NOT NULL
+        AND source.date <= toDate(now(), 'America/Los_Angeles')
+        AND source.ad_id IS NOT NULL
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY source.date, source.account_id, source.ad_id
+            ORDER BY source._fivetran_synced DESC, source._fivetran_id DESC
+        )
+        = 1
+
+NODE cdc_session_meta_delivery_dimensions
+SQL >
+    SELECT
+        delivery.date AS date,
+        coalesce(dimensions.campaign_id, delivery.campaign_id) AS campaign_id,
+        dimensions.adset_id AS adset_id,
+        delivery.ad_id AS ad_id
+    FROM cdc_session_meta_delivery_rows AS delivery
+    LEFT JOIN
+        meta_ad_dimensions AS dimensions
+        ON dimensions.level = 'ad'
+        AND delivery.ad_id = dimensions.ad_id
+
+NODE cdc_session_meta_ad_lookup
+SQL >
+    SELECT campaign_id AS campaign_id, adset_id AS adset_id, ad_id AS ad_id
+    FROM cdc_session_meta_delivery_dimensions
+    QUALIFY
+        row_number() OVER (PARTITION BY adset_id, ad_id ORDER BY date DESC, campaign_id ASC NULLS FIRST)
+        = 1
+
+NODE cdc_session_page_view_rollups
+SQL >
+    SELECT
+        source.tenant_id AS tenant_id,
+        source.session_id AS session_id,
+        argMin(
+            tuple(
+                source.visitor_key AS visitor_key,
+                source.anonymous_id AS anonymous_id,
+                source.user_id AS user_id,
+                source.page_view_timestamp AS page_view_timestamp,
+                source.page_view_id AS page_view_id,
+                source.page_url AS page_url,
+                source.page_host AS page_host,
+                source.page_path AS page_path,
+                source.page_path_host AS page_path_host,
+                source.ip_address AS ip_address,
+                source.user_agent AS user_agent,
+                source.device_platform AS device_platform,
+                source.device_is_mobile AS device_is_mobile,
+                source.geo_city AS geo_city,
+                source.geo_region AS geo_region,
+                source.geo_region_code AS geo_region_code,
+                source.geo_country AS geo_country,
+                source.geo_timezone AS geo_timezone,
+                source.utm_source AS utm_source,
+                source.utm_medium AS utm_medium,
+                source.utm_campaign AS utm_campaign,
+                source.utm_content AS utm_content,
+                source.utm_term AS utm_term,
+                source.utm_id AS utm_id,
+                source.campaign_id AS campaign_id,
+                source.adset_id AS adset_id,
+                source.ad_id AS ad_id,
+                source.google_keyword_id AS google_keyword_id,
+                source.google_keyword AS google_keyword,
+                source.click_id AS click_id,
+                source.click_id_type AS click_id_type,
+                source.gclid AS gclid,
+                source.gbraid AS gbraid,
+                source.wbraid AS wbraid,
+                source.fbclid AS fbclid,
+                source.ttclid AS ttclid,
+                source.li_fat_id AS li_fat_id,
+                source.rdt_cid AS rdt_cid,
+                source.twclid AS twclid,
+                source.fbc AS fbc,
+                source.fbp AS fbp,
+                source.ttp AS ttp,
+                source.uetsid AS uetsid,
+                source.uetvid AS uetvid,
+                source.channel_source AS channel_source,
+                source.channel_medium AS channel_medium
+            ),
+            tuple(source.page_view_timestamp, source.page_view_id)
+        ) AS first_page,
+        argMax(
+            tuple(
+                source.page_view_timestamp AS page_view_timestamp,
+                source.page_view_id AS page_view_id,
+                source.page_url AS page_url,
+                source.page_path AS page_path
+            ),
+            tuple(source.page_view_timestamp, source.page_view_id)
+        ) AS last_page,
+        count() AS page_view_count
+    FROM cdc_sessionized_page_views AS source
+    GROUP BY source.tenant_id, source.session_id
+
+NODE cdc_website_session_rows
+SQL >
+    SELECT
+        sessions.tenant_id AS tenant_id,
+        sessions.session_id AS session_id,
+        tupleElement(sessions.first_page, 1) AS visitor_key,
+        tupleElement(sessions.first_page, 2) AS anonymous_id,
+        tupleElement(sessions.first_page, 3) AS user_id,
+        tupleElement(sessions.first_page, 4) AS session_start_timestamp,
+        tupleElement(sessions.last_page, 1) AS session_end_timestamp,
+        intDiv(
+            toUnixTimestamp64Micro(assumeNotNull(tupleElement(sessions.last_page, 1)))
+            - toUnixTimestamp64Micro(assumeNotNull(tupleElement(sessions.first_page, 4))),
+            1000000
+        ) AS session_duration_seconds,
+        sessions.page_view_count AS page_view_count,
+        tupleElement(sessions.first_page, 5) AS first_page_view_id,
+        tupleElement(sessions.first_page, 6) AS first_page_url,
+        tupleElement(sessions.first_page, 7) AS first_page_host,
+        tupleElement(sessions.first_page, 8) AS first_page_path,
+        tupleElement(sessions.first_page, 9) AS first_page_path_host,
+        tupleElement(sessions.first_page, 10) AS ip_address,
+        tupleElement(sessions.first_page, 11) AS user_agent,
+        tupleElement(sessions.first_page, 12) AS device_platform,
+        tupleElement(sessions.first_page, 13) AS device_is_mobile,
+        tupleElement(sessions.first_page, 14) AS geo_city,
+        tupleElement(sessions.first_page, 15) AS geo_region,
+        tupleElement(sessions.first_page, 16) AS geo_region_code,
+        tupleElement(sessions.first_page, 17) AS geo_country,
+        tupleElement(sessions.first_page, 18) AS geo_timezone,
+        tupleElement(sessions.last_page, 2) AS last_page_view_id,
+        tupleElement(sessions.last_page, 3) AS last_page_url,
+        tupleElement(sessions.last_page, 4) AS last_page_path,
+        tupleElement(sessions.first_page, 19) AS utm_source,
+        tupleElement(sessions.first_page, 20) AS utm_medium,
+        tupleElement(sessions.first_page, 21) AS utm_campaign,
+        tupleElement(sessions.first_page, 22) AS utm_content,
+        tupleElement(sessions.first_page, 23) AS utm_term,
+        tupleElement(sessions.first_page, 24) AS utm_id,
+        coalesce(tupleElement(sessions.first_page, 25), meta.campaign_id) AS campaign_id,
+        tupleElement(sessions.first_page, 26) AS adset_id,
+        tupleElement(sessions.first_page, 27) AS ad_id,
+        tupleElement(sessions.first_page, 28) AS google_keyword_id,
+        tupleElement(sessions.first_page, 29) AS google_keyword,
+        tupleElement(sessions.first_page, 30) AS click_id,
+        tupleElement(sessions.first_page, 31) AS click_id_type,
+        tupleElement(sessions.first_page, 32) AS gclid,
+        tupleElement(sessions.first_page, 33) AS gbraid,
+        tupleElement(sessions.first_page, 34) AS wbraid,
+        tupleElement(sessions.first_page, 35) AS fbclid,
+        tupleElement(sessions.first_page, 36) AS ttclid,
+        tupleElement(sessions.first_page, 37) AS li_fat_id,
+        tupleElement(sessions.first_page, 38) AS rdt_cid,
+        tupleElement(sessions.first_page, 39) AS twclid,
+        tupleElement(sessions.first_page, 40) AS fbc,
+        tupleElement(sessions.first_page, 41) AS fbp,
+        tupleElement(sessions.first_page, 42) AS ttp,
+        tupleElement(sessions.first_page, 43) AS uetsid,
+        tupleElement(sessions.first_page, 44) AS uetvid,
+        tupleElement(sessions.first_page, 45) AS channel_source,
+        tupleElement(sessions.first_page, 46) AS channel_medium
+    FROM cdc_session_page_view_rollups AS sessions
+    LEFT JOIN
+        cdc_session_meta_ad_lookup AS meta
+        ON tupleElement(sessions.first_page, 19) = 'meta'
+        AND tupleElement(sessions.first_page, 26) = meta.adset_id
+        AND tupleElement(sessions.first_page, 27) = meta.ad_id
+
+NODE cdc_session_fbclid_first_seen
+SQL >
+    SELECT
+        tenant_id AS tenant_id, fbclid AS fbclid, min(session_start_timestamp) AS fbclid_first_seen_at
+    FROM cdc_website_session_rows
+    WHERE fbclid IS NOT NULL
+    GROUP BY tenant_id, fbclid
+
+NODE cdc_touchpoint_fact_rows
+SQL >
+    SELECT
+        coalesce(
+            if(
+                sessions.anonymous_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('anonymous_id:', sessions.anonymous_id)
+            ),
+            if(
+                sessions.user_id IS NULL,
+                CAST(NULL AS Nullable(String)),
+                concat('user_id:', lowerUTF8(sessions.user_id))
+            ),
+            ''
+        ) AS identity_anchor_key,
+        lower(
+            hex(MD5(concat(assumeNotNull(sessions.session_id), '|website_session')))
+        ) AS touchpoint_id,
+        sessions.session_id AS session_id,
+        sessions.visitor_key AS visitor_key,
+        sessions.anonymous_id AS anonymous_id,
+        sessions.user_id AS user_id,
+        sessions.session_start_timestamp AS session_start_timestamp,
+        sessions.session_start_timestamp AS touchpoint_time,
+        sessions.session_end_timestamp AS session_end_timestamp,
+        sessions.session_duration_seconds AS session_duration_seconds,
+        sessions.page_view_count AS page_view_count,
+        sessions.first_page_view_id AS first_page_view_id,
+        sessions.first_page_url AS first_page_url,
+        sessions.first_page_host AS first_page_host,
+        sessions.first_page_path AS first_page_path,
+        sessions.first_page_path_host AS first_page_path_host,
+        sessions.ip_address AS ip_address,
+        sessions.user_agent AS user_agent,
+        sessions.device_platform AS device_platform,
+        sessions.device_is_mobile AS device_is_mobile,
+        sessions.geo_city AS geo_city,
+        sessions.geo_region AS geo_region,
+        sessions.geo_region_code AS geo_region_code,
+        sessions.geo_country AS geo_country,
+        sessions.geo_timezone AS geo_timezone,
+        sessions.last_page_view_id AS last_page_view_id,
+        sessions.last_page_url AS last_page_url,
+        sessions.last_page_path AS last_page_path,
+        sessions.utm_source AS utm_source,
+        sessions.utm_medium AS utm_medium,
+        sessions.utm_campaign AS utm_campaign,
+        sessions.utm_content AS utm_content,
+        sessions.utm_term AS utm_term,
+        sessions.utm_id AS utm_id,
+        sessions.campaign_id AS campaign_id,
+        sessions.adset_id AS adset_id,
+        sessions.ad_id AS ad_id,
+        sessions.google_keyword_id AS google_keyword_id,
+        sessions.google_keyword AS google_keyword,
+        sessions.click_id AS click_id,
+        sessions.click_id_type AS click_id_type,
+        sessions.gclid AS gclid,
+        sessions.gbraid AS gbraid,
+        sessions.wbraid AS wbraid,
+        sessions.fbclid AS fbclid,
+        if(
+            sessions.fbclid IS NOT NULL AND first_seen.fbclid_first_seen_at IS NOT NULL,
+            concat(
+                'fb.1.',
+                toString(toUnixTimestamp64Milli(assumeNotNull(first_seen.fbclid_first_seen_at))),
+                '.',
+                assumeNotNull(sessions.fbclid)
+            ),
+            CAST(NULL AS Nullable(String))
+        ) AS fbc_fbclid,
+        sessions.ttclid AS ttclid,
+        sessions.li_fat_id AS li_fat_id,
+        sessions.rdt_cid AS rdt_cid,
+        sessions.twclid AS twclid,
+        sessions.fbc AS fbc,
+        sessions.fbp AS fbp,
+        sessions.ttp AS ttp,
+        sessions.uetsid AS uetsid,
+        sessions.uetvid AS uetvid,
+        sessions.channel_source AS channel_source,
+        sessions.channel_medium AS channel_medium,
+        CAST(NULL AS Nullable(String)) AS identity_base_profile_id
+    FROM cdc_website_session_rows AS sessions
+    LEFT JOIN
+        cdc_session_fbclid_first_seen AS first_seen
+        ON sessions.tenant_id = first_seen.tenant_id
+        AND sessions.fbclid = first_seen.fbclid
+
+TYPE ENDPOINT

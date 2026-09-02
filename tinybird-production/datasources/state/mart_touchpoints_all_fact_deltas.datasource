@@ -1,0 +1,77 @@
+DESCRIPTION >
+    Versioned CDC overlay for mart_touchpoints_all_facts_v3_current. The base
+    table is a frozen migration seed; re-sessionized touchpoints for visitors
+    with new page views land here as new row_versions, and a session id that a
+    re-sessionization no longer produces lands as an is_deleted tombstone
+    (late page views renumber a visitor's later sessions). Readers take the
+    latest row_version per touchpoint over base-union-deltas. Written only by
+    the reporting facts coordinator Worker.
+
+SCHEMA >
+    `identity_anchor_key` String `json:$.identity_anchor_key`,
+    `touchpoint_id` String `json:$.touchpoint_id`,
+    `row_version` UInt64 `json:$.row_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `is_deleted` UInt8 `json:$.is_deleted`,
+    `session_id` Nullable(String) `json:$.session_id`,
+    `visitor_key` Nullable(String) `json:$.visitor_key`,
+    `anonymous_id` Nullable(String) `json:$.anonymous_id`,
+    `user_id` Nullable(String) `json:$.user_id`,
+    `session_start_timestamp` Nullable(DateTime64(6)) `json:$.session_start_timestamp`,
+    `touchpoint_time` Nullable(DateTime64(6)) `json:$.touchpoint_time`,
+    `session_end_timestamp` Nullable(DateTime64(6)) `json:$.session_end_timestamp`,
+    `session_duration_seconds` Int64 `json:$.session_duration_seconds`,
+    `page_view_count` UInt64 `json:$.page_view_count`,
+    `first_page_view_id` Nullable(String) `json:$.first_page_view_id`,
+    `first_page_url` Nullable(String) `json:$.first_page_url`,
+    `first_page_host` Nullable(String) `json:$.first_page_host`,
+    `first_page_path` Nullable(String) `json:$.first_page_path`,
+    `first_page_path_host` String `json:$.first_page_path_host`,
+    `ip_address` Nullable(String) `json:$.ip_address`,
+    `user_agent` Nullable(String) `json:$.user_agent`,
+    `device_platform` Nullable(String) `json:$.device_platform`,
+    `device_is_mobile` Nullable(Bool) `json:$.device_is_mobile`,
+    `geo_city` Nullable(String) `json:$.geo_city`,
+    `geo_region` Nullable(String) `json:$.geo_region`,
+    `geo_region_code` Nullable(String) `json:$.geo_region_code`,
+    `geo_country` Nullable(String) `json:$.geo_country`,
+    `geo_timezone` Nullable(String) `json:$.geo_timezone`,
+    `last_page_view_id` Nullable(String) `json:$.last_page_view_id`,
+    `last_page_url` Nullable(String) `json:$.last_page_url`,
+    `last_page_path` Nullable(String) `json:$.last_page_path`,
+    `utm_source` Nullable(String) `json:$.utm_source`,
+    `utm_medium` Nullable(String) `json:$.utm_medium`,
+    `utm_campaign` Nullable(String) `json:$.utm_campaign`,
+    `utm_content` Nullable(String) `json:$.utm_content`,
+    `utm_term` Nullable(String) `json:$.utm_term`,
+    `utm_id` Nullable(String) `json:$.utm_id`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `google_keyword_id` Nullable(String) `json:$.google_keyword_id`,
+    `google_keyword` Nullable(String) `json:$.google_keyword`,
+    `click_id` Nullable(String) `json:$.click_id`,
+    `click_id_type` Nullable(String) `json:$.click_id_type`,
+    `gclid` Nullable(String) `json:$.gclid`,
+    `gbraid` Nullable(String) `json:$.gbraid`,
+    `wbraid` Nullable(String) `json:$.wbraid`,
+    `fbclid` Nullable(String) `json:$.fbclid`,
+    `fbc_fbclid` Nullable(String) `json:$.fbc_fbclid`,
+    `ttclid` Nullable(String) `json:$.ttclid`,
+    `li_fat_id` Nullable(String) `json:$.li_fat_id`,
+    `rdt_cid` Nullable(String) `json:$.rdt_cid`,
+    `twclid` Nullable(String) `json:$.twclid`,
+    `fbc` Nullable(String) `json:$.fbc`,
+    `fbp` Nullable(String) `json:$.fbp`,
+    `ttp` Nullable(String) `json:$.ttp`,
+    `uetsid` Nullable(String) `json:$.uetsid`,
+    `uetvid` Nullable(String) `json:$.uetvid`,
+    `channel_source` Nullable(String) `json:$.channel_source`,
+    `channel_medium` Nullable(String) `json:$.channel_medium`,
+    `identity_base_profile_id` Nullable(String) `json:$.identity_base_profile_id`
+
+ENGINE ReplacingMergeTree
+ENGINE_VER row_version
+ENGINE_SORTING_KEY identity_anchor_key, touchpoint_id
+ENGINE_SETTINGS "index_granularity=128"

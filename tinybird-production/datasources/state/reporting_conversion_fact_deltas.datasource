@@ -1,0 +1,38 @@
+DESCRIPTION >
+    Versioned CDC overlay for reporting_conversion_facts_v2_current. The base
+    table is a frozen migration seed; every later change to a conversion fact
+    lands here as a new row_version, and a superseded or vanished conversion
+    lands as an is_deleted tombstone. Readers take the latest row_version per
+    conversion over base-union-deltas. Written only by the reporting facts
+    coordinator Worker.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `identity_anchor_key` String `json:$.identity_anchor_key`,
+    `conversion_id` String `json:$.conversion_id`,
+    `row_version` UInt64 `json:$.row_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `is_deleted` UInt8 `json:$.is_deleted`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `conversion_time` Nullable(DateTime64(6)) `json:$.conversion_time`,
+    `conversion_source` LowCardinality(String) `json:$.conversion_source`,
+    `conversion_type` LowCardinality(String) `json:$.conversion_type`,
+    `manual_profile_id` Nullable(String) `json:$.manual_profile_id`,
+    `payment_source` Nullable(String) `json:$.payment_source`,
+    `payment_id` Nullable(String) `json:$.payment_id`,
+    `payment_customer_id` Nullable(String) `json:$.payment_customer_id`,
+    `payment_email` Nullable(String) `json:$.payment_email`,
+    `payment_category` Nullable(String) `json:$.payment_category`,
+    `is_repeat_payment` UInt8 `json:$.is_repeat_payment`,
+    `net_amount` Float64 `json:$.net_amount`,
+    `registration_type` Nullable(String) `json:$.registration_type`,
+    `client_payment_amount` Float64 `json:$.client_payment_amount`
+
+ENGINE ReplacingMergeTree
+ENGINE_VER row_version
+ENGINE_SORTING_KEY tenant_id, identity_anchor_key, conversion_id
+ENGINE_SETTINGS "index_granularity=128"
+
+INDEXES >
+    INDEX conversion_id_bloom conversion_id TYPE bloom_filter(0.01) GRANULARITY 1

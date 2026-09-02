@@ -100,10 +100,10 @@ SQL >
     WHERE delta.state_key = '' OR delta.is_deleted = 0
     {% end %}
 
-NODE scoped_conversion_fact_candidates
+NODE scoped_base_conversion_facts
 SQL >
     %
-    SELECT *
+    SELECT *, toUInt64(0) AS fact_row_version, toUInt8(0) AS fact_is_deleted
     FROM reporting_conversion_facts_v2_current
     WHERE tenant_id = 'boom'
         {% if defined(p_identifier_key) %}
@@ -132,6 +132,119 @@ SQL >
         {% else %}
         AND 0
         {% end %}
+
+NODE scoped_delta_conversion_facts
+SQL >
+    %
+    SELECT
+        tenant_id,
+        identity_anchor_key,
+        conversion_id,
+        fact_kind,
+        conversion_time,
+        conversion_source,
+        conversion_type,
+        manual_profile_id,
+        payment_source,
+        payment_id,
+        payment_customer_id,
+        payment_email,
+        payment_category,
+        is_repeat_payment,
+        net_amount,
+        registration_type,
+        client_payment_amount,
+        row_version AS fact_row_version,
+        is_deleted AS fact_is_deleted
+    FROM reporting_conversion_fact_deltas
+    WHERE tenant_id = 'boom'
+        {% if defined(p_identifier_key) %}
+        AND (
+            identity_anchor_key = {{ String(p_identifier_key) }}
+            {% if defined(p_conversion_ids) %}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+            {% end %}
+        )
+        {% elif defined(p_identifier_keys_delimited) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_keys_delimited) %}
+        AND identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
+        {% elif defined(p_identifier_keys) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_keys) %}
+        AND identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+        {% elif defined(p_conversion_ids) %}
+        AND conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        {% else %}
+        AND 0
+        {% end %}
+
+NODE scoped_versioned_conversion_facts
+SQL >
+    SELECT *
+    FROM
+        (
+            SELECT
+                tenant_id,
+                identity_anchor_key,
+                conversion_id,
+                fact_kind,
+                conversion_time,
+                conversion_source,
+                conversion_type,
+                manual_profile_id,
+                payment_source,
+                payment_id,
+                payment_customer_id,
+                payment_email,
+                payment_category,
+                is_repeat_payment,
+                net_amount,
+                registration_type,
+                client_payment_amount,
+                fact_row_version,
+                fact_is_deleted
+            FROM scoped_base_conversion_facts
+            UNION ALL
+            SELECT
+                tenant_id,
+                identity_anchor_key,
+                conversion_id,
+                fact_kind,
+                conversion_time,
+                conversion_source,
+                conversion_type,
+                manual_profile_id,
+                payment_source,
+                payment_id,
+                payment_customer_id,
+                payment_email,
+                payment_category,
+                is_repeat_payment,
+                net_amount,
+                registration_type,
+                client_payment_amount,
+                fact_row_version,
+                fact_is_deleted
+            FROM scoped_delta_conversion_facts
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identity_anchor_key, conversion_id
+            ORDER BY fact_row_version DESC
+        ) = 1
+
+NODE scoped_conversion_fact_candidates
+SQL >
+    SELECT * EXCEPT (fact_row_version, fact_is_deleted)
+    FROM scoped_versioned_conversion_facts
+    WHERE fact_is_deleted = 0
 
 NODE scoped_resolved_conversion_candidates
 SQL >
@@ -278,9 +391,93 @@ SQL >
             AS revenue_unknown_server_side
     FROM scoped_ranked_conversion_facts
 
-NODE scoped_touchpoint_facts
+NODE scoped_base_touchpoint_facts
 SQL >
     %
+    SELECT
+        identity_anchor_key,
+        touchpoint_id,
+        session_id,
+        identity_base_profile_id,
+        session_start_timestamp,
+        touchpoint_time,
+        first_page_host,
+        first_page_path,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        campaign_id,
+        adset_id,
+        ad_id,
+        channel_source,
+        channel_medium,
+        toUInt64(0) AS fact_row_version,
+        toUInt8(0) AS fact_is_deleted
+    FROM mart_touchpoints_all_facts_v3_current
+    {% if defined(p_identifier_key) %}
+        WHERE identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_keys_delimited) %}
+        WHERE identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
+    {% elif defined(p_identifier_keys) %}
+        WHERE identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+    {% else %}
+        WHERE 0
+    {% end %}
+
+NODE scoped_delta_touchpoint_facts
+SQL >
+    %
+    SELECT
+        identity_anchor_key,
+        touchpoint_id,
+        session_id,
+        identity_base_profile_id,
+        session_start_timestamp,
+        touchpoint_time,
+        first_page_host,
+        first_page_path,
+        utm_source,
+        utm_medium,
+        utm_campaign,
+        utm_content,
+        utm_term,
+        campaign_id,
+        adset_id,
+        ad_id,
+        channel_source,
+        channel_medium,
+        row_version AS fact_row_version,
+        is_deleted AS fact_is_deleted
+    FROM mart_touchpoints_all_fact_deltas
+    {% if defined(p_identifier_key) %}
+        WHERE identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_keys_delimited) %}
+        WHERE identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
+    {% elif defined(p_identifier_keys) %}
+        WHERE identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
+    {% else %}
+        WHERE 0
+    {% end %}
+
+NODE scoped_versioned_touchpoint_facts
+SQL >
+    SELECT *
+    FROM
+        (
+            SELECT * FROM scoped_base_touchpoint_facts
+            UNION ALL
+            SELECT * FROM scoped_delta_touchpoint_facts
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identity_anchor_key, touchpoint_id
+            ORDER BY fact_row_version DESC
+        ) = 1
+
+NODE scoped_touchpoint_facts
+SQL >
     SELECT
         facts.touchpoint_id AS touchpoint_id,
         facts.session_id AS session_id,
@@ -299,19 +496,11 @@ SQL >
         facts.ad_id AS ad_id,
         facts.channel_source AS channel_source,
         facts.channel_medium AS channel_medium
-    FROM mart_touchpoints_all_facts_v3_current AS facts
+    FROM scoped_versioned_touchpoint_facts AS facts
     LEFT ANY JOIN scoped_current_identity_mappings AS identity_mapping
         ON identity_mapping.tenant_id = 'boom'
         AND identity_mapping.identifier_key = facts.identity_anchor_key
-    {% if defined(p_identifier_key) %}
-        WHERE facts.identity_anchor_key = {{ String(p_identifier_key) }}
-    {% elif defined(p_identifier_keys_delimited) %}
-        WHERE facts.identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
-    {% elif defined(p_identifier_keys) %}
-        WHERE facts.identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
-    {% else %}
-        WHERE 0
-    {% end %}
+    WHERE facts.fact_is_deleted = 0
 
 NODE conversion_touchpoint_candidates
 SQL >

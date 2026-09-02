@@ -79,3 +79,7 @@ SCHEMA >
 
 ENGINE MergeTree
 ENGINE_SORTING_KEY tenant_id, __tb_state_key, source_priority, source_fact_version, source_ingested_at, payload_hash
+
+INDEXES >
+    INDEX anonymous_id_bloom anonymous_id TYPE bloom_filter(0.01) GRANULARITY 1
+    INDEX user_id_bloom user_id TYPE bloom_filter(0.01) GRANULARITY 1

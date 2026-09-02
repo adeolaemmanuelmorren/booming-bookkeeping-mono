@@ -1,0 +1,67 @@
+DESCRIPTION >
+    Live conversion fact identity per requested conversion id over the frozen
+    base table plus the CDC delta overlay. Bloom-filter indexes on
+    conversion_id keep the literal lookups pruned. The reporting facts
+    coordinator diffs this against a fresh rebuild to tombstone superseded
+    conversions, including rows stranded under an old anchor key.
+
+NODE base_conversion_heads
+SQL >
+    %
+    SELECT
+        tenant_id,
+        identity_anchor_key,
+        conversion_id,
+        toUInt64(0) AS row_version,
+        toUInt8(0) AS is_deleted
+    FROM reporting_conversion_facts_v2_current
+    WHERE tenant_id = 'boom'
+        {% if defined(p_conversion_ids) %}
+        AND conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        {% elif defined(p_conversion_id) %}
+        AND conversion_id = {{ String(p_conversion_id) }}
+        {% else %}
+        AND 0
+        {% end %}
+
+NODE delta_conversion_heads
+SQL >
+    %
+    SELECT
+        tenant_id,
+        identity_anchor_key,
+        conversion_id,
+        row_version,
+        is_deleted
+    FROM reporting_conversion_fact_deltas
+    WHERE tenant_id = 'boom'
+        {% if defined(p_conversion_ids) %}
+        AND conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        {% elif defined(p_conversion_id) %}
+        AND conversion_id = {{ String(p_conversion_id) }}
+        {% else %}
+        AND 0
+        {% end %}
+
+NODE ranked_conversion_heads
+SQL >
+    SELECT *
+    FROM
+        (
+            SELECT * FROM base_conversion_heads
+            UNION ALL
+            SELECT * FROM delta_conversion_heads
+        )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identity_anchor_key, conversion_id
+            ORDER BY row_version DESC
+        ) = 1
+
+NODE current_conversion_heads
+SQL >
+    SELECT identity_anchor_key, conversion_id
+    FROM ranked_conversion_heads
+    WHERE is_deleted = 0
+
+TYPE ENDPOINT

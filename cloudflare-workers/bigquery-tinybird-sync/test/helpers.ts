@@ -14,6 +14,10 @@ import type {
   JourneyCoordinator,
   JourneyCoordinatorStatus,
 } from "../src/journey-coordinator";
+import type {
+  ReportingFactsCoordinator,
+  ReportingFactsStatus,
+} from "../src/reporting-facts-coordinator";
 
 export function testEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
   return {
@@ -36,6 +40,7 @@ export function testEnv(overrides: Partial<WorkerEnv> = {}): WorkerEnv {
     TINYBIRD_SYNC_GATE: testTinybirdGate(),
     PUBLICATION_COORDINATOR: testPublicationCoordinator(),
     JOURNEY_COORDINATOR: testJourneyCoordinator(),
+    REPORTING_FACTS_COORDINATOR: testReportingFactsCoordinator(),
     ...overrides,
   };
 }
@@ -66,6 +71,27 @@ export function testJourneyCoordinator(): DurableObjectNamespace<JourneyCoordina
       enqueueRepair: async () => status,
     }),
   } as unknown as DurableObjectNamespace<JourneyCoordinator>;
+}
+
+export function testReportingFactsCoordinator(): DurableObjectNamespace<ReportingFactsCoordinator> {
+  const status: ReportingFactsStatus = {
+    phase: "idle",
+    touchpointCursor: "2026-08-26 23:05:00.000000",
+    conversionCursor: "2026-08-26 23:05:00.000000",
+    activeStream: null,
+    completedItems: 0,
+    totalItems: 0,
+    pendingRepairAnchors: 0,
+    nextAttemptAt: null,
+    lastError: null,
+  };
+  return {
+    getByName: () => ({
+      tick: async () => status,
+      status: async () => status,
+      recoverFailed: async () => status,
+    }),
+  } as unknown as DurableObjectNamespace<ReportingFactsCoordinator>;
 }
 
 export function testPublicationCoordinator(overrides: Partial<{

@@ -703,6 +703,214 @@ export async function readPendingJourneyBatch(
   };
 }
 
+export interface ChangedVisitor {
+  visitorKind: "anonymous" | "user" | "page_view";
+  visitorValue: string;
+  lastIngestedAt: string;
+}
+
+export interface ChangedConversionEntity {
+  entityKind: "client_form" | "client_order";
+  entityId: string;
+  lastIngestedAt: string;
+}
+
+export interface TouchpointFactHead {
+  identityAnchorKey: string;
+  touchpointId: string;
+}
+
+export interface ConversionFactHead {
+  identityAnchorKey: string;
+  conversionId: string;
+}
+
+export async function readChangedVisitors(
+  ingestedFrom: string,
+  ingestedTo: string,
+  limit: number,
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<ChangedVisitor[]> {
+  const rows = await readPipeRows(
+    "reporting_cdc_changed_visitors",
+    {
+      p_ingested_from: ingestedFrom,
+      p_ingested_to: ingestedTo,
+      p_limit: String(limit),
+    },
+    config,
+    fetcher,
+  );
+  return rows.map((row) => ({
+    visitorKind: visitorKind(row.visitor_kind),
+    visitorValue: requiredString(row.visitor_value, "visitor_value"),
+    lastIngestedAt: requiredString(row.last_ingested_at, "last_ingested_at"),
+  }));
+}
+
+export async function readChangedConversionEntities(
+  ingestedFrom: string,
+  ingestedTo: string,
+  limit: number,
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<ChangedConversionEntity[]> {
+  const rows = await readPipeRows(
+    "reporting_cdc_changed_conversions",
+    {
+      p_ingested_from: ingestedFrom,
+      p_ingested_to: ingestedTo,
+      p_limit: String(limit),
+    },
+    config,
+    fetcher,
+  );
+  return rows.map((row) => ({
+    entityKind: conversionEntityKind(row.entity_kind),
+    entityId: requiredString(row.entity_id, "entity_id"),
+    lastIngestedAt: requiredString(row.last_ingested_at, "last_ingested_at"),
+  }));
+}
+
+export async function readTouchpointFactCdcBuild(
+  visitors: {
+    anonymousIds: string[];
+    userIds: string[];
+    pageViewIds: string[];
+  },
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<Record<string, unknown>[]> {
+  const parameters: PipeParameters = {
+    ...cdcLiteralParameters("p_anonymous_ids", "p_anonymous_id", visitors.anonymousIds),
+    ...cdcLiteralParameters("p_user_ids", "p_user_id", visitors.userIds),
+    ...cdcLiteralParameters("p_page_view_ids", "p_page_view_id", visitors.pageViewIds),
+  };
+  if (Object.keys(parameters).length === 0) return [];
+
+  return readPipeRows(
+    "reporting_touchpoint_facts_cdc_build",
+    parameters,
+    config,
+    fetcher,
+  );
+}
+
+export async function readTouchpointFactHeads(
+  anchorKeys: string[],
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<TouchpointFactHead[]> {
+  const keys = uniqueStrings(anchorKeys);
+  if (keys.length === 0) return [];
+
+  const rows = await readLiteralKeyChunks(
+    "reporting_touchpoint_fact_heads",
+    keys,
+    (chunk) => cdcLiteralParameters("p_anchor_keys", "p_anchor_key", chunk),
+    config,
+    fetcher,
+  );
+  return rows.map((row) => ({
+    identityAnchorKey: requiredString(row.identity_anchor_key, "identity_anchor_key"),
+    touchpointId: requiredString(row.touchpoint_id, "touchpoint_id"),
+  }));
+}
+
+export async function readConversionFactCdcBuild(
+  entities: {
+    formSubmissionIds: string[];
+    orderEventIds: string[];
+  },
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<Record<string, unknown>[]> {
+  const parameters: PipeParameters = {
+    ...cdcLiteralParameters(
+      "p_form_submission_ids",
+      "p_form_submission_id",
+      entities.formSubmissionIds,
+    ),
+    ...cdcLiteralParameters("p_order_event_ids", "p_order_event_id", entities.orderEventIds),
+  };
+  if (Object.keys(parameters).length === 0) return [];
+
+  return readPipeRows(
+    "reporting_conversion_facts_cdc_build",
+    parameters,
+    config,
+    fetcher,
+  );
+}
+
+export async function readConversionFactHeads(
+  conversionIds: string[],
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<ConversionFactHead[]> {
+  const ids = uniqueStrings(conversionIds);
+  if (ids.length === 0) return [];
+
+  const rows = await readLiteralKeyChunks(
+    "reporting_conversion_fact_heads",
+    ids,
+    (chunk) => cdcLiteralParameters("p_conversion_ids", "p_conversion_id", chunk),
+    config,
+    fetcher,
+  );
+  return rows.map((row) => ({
+    identityAnchorKey: stringValue(
+      row.identity_anchor_key ?? "",
+      "identity_anchor_key",
+    ),
+    conversionId: requiredString(row.conversion_id, "conversion_id"),
+  }));
+}
+
+export async function appendTouchpointFactDeltas(
+  rows: Record<string, unknown>[],
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  await appendEventRows("mart_touchpoints_all_fact_deltas", rows, config, fetcher);
+}
+
+export async function appendConversionFactDeltas(
+  rows: Record<string, unknown>[],
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<void> {
+  await appendEventRows("reporting_conversion_fact_deltas", rows, config, fetcher);
+}
+
+// Mirrors literalValueParameters: comma-joined array values, with a singleton
+// parameter fallback for a value that itself contains a comma.
+function cdcLiteralParameters(
+  plural: string,
+  singular: string,
+  values: string[],
+): PipeParameters {
+  if (values.length === 0) return {};
+  if (values.length === 1 && values[0].includes(",")) {
+    return { [singular]: values[0] };
+  }
+  if (values.some((value) => value.includes(","))) {
+    throw new Error(`${plural} values containing commas need singleton lookups.`);
+  }
+  return { [plural]: values.join(",") };
+}
+
+function visitorKind(value: unknown): ChangedVisitor["visitorKind"] {
+  if (value === "anonymous" || value === "user" || value === "page_view") return value;
+  throw new Error("Tinybird visitor_kind value is invalid.");
+}
+
+function conversionEntityKind(value: unknown): ChangedConversionEntity["entityKind"] {
+  if (value === "client_form" || value === "client_order") return value;
+  throw new Error("Tinybird entity_kind value is invalid.");
+}
+
 function identityPendingFactEvent(fact: PendingIdentityFact): object {
   const payload = parseFactPayload(fact.factPayload);
 
