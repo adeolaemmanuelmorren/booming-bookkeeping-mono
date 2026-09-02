@@ -542,13 +542,21 @@ export async function readProfileJourneyRows(
     throw new Error("Journey conversion lookup exceeds 500 IDs.");
   }
 
-  const identifierRows = await readLiteralKeyChunks(
-    "reporting_profile_journey_window_build",
-    ids,
-    (chunk) => journeyIdentifierParameters(chunk, profileByIdentifierKey),
-    config,
-    fetcher,
-  );
+  const journeyParameters = journeyIdentifierParameters(ids, profileByIdentifierKey);
+  const identifierRows = profileByIdentifierKey
+    ? await readPipeRowsFromBody(
+        "reporting_profile_journey_window_build",
+        journeyParameters,
+        config,
+        fetcher,
+      )
+    : await readLiteralKeyChunks(
+        "reporting_profile_journey_window_build",
+        ids,
+        (chunk) => journeyIdentifierParameters(chunk, null),
+        config,
+        fetcher,
+      );
   const foundConversionIds = new Set(identifierRows.map((row) => (
     requiredString(row.conversion_id, "conversion_id")
   )));
@@ -581,18 +589,19 @@ function journeyIdentifierParameters(
   identifierKeys: string[],
   profileByIdentifierKey: Map<string, string> | null,
 ): PipeParameters {
-  const parameters = literalValueParameters("identifier", identifierKeys);
-  if (!profileByIdentifierKey) return parameters;
+  if (!profileByIdentifierKey) {
+    return literalValueParameters("identifier", identifierKeys);
+  }
 
   const profileIds = identifierKeys.map((key) => {
     const profileId = profileByIdentifierKey.get(key);
     if (!profileId) throw new Error(`Journey identifier ${key} has no profile ID.`);
     return profileId;
   });
-  if (identifierKeys.length === 1 && identifierKeys[0].includes(",")) {
-    return { ...parameters, p_identifier_profile_id: profileIds[0] };
-  }
-  return { ...parameters, p_identifier_profile_ids: arrayParameter(profileIds) };
+  return {
+    p_identifier_keys_delimited: delimitedParameter(identifierKeys),
+    p_identifier_profile_ids_delimited: delimitedParameter(profileIds),
+  };
 }
 
 export async function readJourneyBackfillProfilePage(
@@ -848,14 +857,7 @@ async function readPipeRows(
   fetcher: Fetcher,
 ): Promise<Record<string, unknown>[]> {
   validateResourceName(pipeName, "Pipe");
-  const query = new URLSearchParams();
-  for (const [name, value] of Object.entries(parameters).sort()) {
-    const values = Array.isArray(value) ? value : [value];
-    for (const item of values) {
-      validatePipeParameter(name, item);
-      query.append(name, item);
-    }
-  }
+  const query = validatedPipeParameters(parameters);
   const response = await tinybirdRequest(
     `/v0/pipes/${encodeURIComponent(pipeName)}.json?${query.toString()}`,
     { method: "GET" },
@@ -869,6 +871,45 @@ async function readPipeRows(
   }
 
   return body.data.filter(isRecord);
+}
+
+async function readPipeRowsFromBody(
+  pipeName: string,
+  parameters: PipeParameters,
+  config: TinybirdApiConfig,
+  fetcher: Fetcher,
+): Promise<Record<string, unknown>[]> {
+  validateResourceName(pipeName, "Pipe");
+  const bodyParameters = validatedPipeParameters(parameters);
+  const response = await tinybirdRequest(
+    `/v0/pipes/${encodeURIComponent(pipeName)}.json`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: bodyParameters.toString(),
+    },
+    config,
+    fetcher,
+  );
+  const body = await readJson<RowsResponse>(response, `${pipeName} query`);
+
+  if (!Array.isArray(body.data)) {
+    throw new Error(`Tinybird ${pipeName} query did not return a data array.`);
+  }
+
+  return body.data.filter(isRecord);
+}
+
+function validatedPipeParameters(parameters: PipeParameters): URLSearchParams {
+  const query = new URLSearchParams();
+  for (const [name, value] of Object.entries(parameters).sort()) {
+    const values = Array.isArray(value) ? value : [value];
+    for (const item of values) {
+      validatePipeParameter(name, item);
+      query.append(name, item);
+    }
+  }
+  return query;
 }
 
 async function readLiteralKeyChunks(
@@ -1184,6 +1225,14 @@ function arrayParameter(values: string[]): string {
     throw new Error("Comma-bearing identity keys require a singleton lookup.");
   }
   return values.join(",");
+}
+
+function delimitedParameter(values: string[]): string {
+  const delimiter = "|";
+  if (values.some((value) => value.includes(delimiter))) {
+    throw new Error(`Journey identity values cannot contain ${delimiter}.`);
+  }
+  return values.join(delimiter);
 }
 
 function literalFactParameters(tenantId: string, factKeys: string[]): PipeParameters {

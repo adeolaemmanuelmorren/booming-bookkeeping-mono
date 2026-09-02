@@ -10,6 +10,8 @@ SQL >
     WHERE tenant_id = 'boom'
         {% if defined(p_identifier_key) %}
         AND identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_keys_delimited) %}
+        AND identifier_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
         {% elif defined(p_identifier_keys) %}
         AND identifier_key IN {{ Array(p_identifier_keys, 'String') }}
         {% else %}
@@ -33,6 +35,8 @@ SQL >
     WHERE journal.tenant_id = 'boom'
         {% if defined(p_identifier_key) %}
         AND journal.identifier_key = {{ String(p_identifier_key) }}
+        {% elif defined(p_identifier_keys_delimited) %}
+        AND journal.identifier_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
         {% elif defined(p_identifier_keys) %}
         AND journal.identifier_key IN {{ Array(p_identifier_keys, 'String') }}
         {% else %}
@@ -52,6 +56,22 @@ SQL >
         'boom' AS tenant_id,
         {{ String(p_identifier_key) }} AS identifier_key,
         {{ String(p_identifier_profile_id) }} AS profile_id
+    {% elif defined(p_identifier_keys_delimited) and defined(p_identifier_profile_ids_delimited) %}
+    SELECT
+        'boom' AS tenant_id,
+        tupleElement(identifier_mapping, 1) AS identifier_key,
+        tupleElement(identifier_mapping, 2) AS profile_id
+    FROM
+        (
+            SELECT arrayJoin(
+                arrayZip(
+                    {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }},
+                    {{ split_to_array(p_identifier_profile_ids_delimited, '', separator='|') }}
+                )
+            ) AS identifier_mapping
+        )
+    WHERE length({{ split_to_array(p_identifier_keys_delimited, '', separator='|') }})
+        = length({{ split_to_array(p_identifier_profile_ids_delimited, '', separator='|') }})
     {% elif defined(p_identifier_keys) and defined(p_identifier_profile_ids) %}
     SELECT
         'boom' AS tenant_id,
@@ -93,6 +113,13 @@ SQL >
             OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
             {% end %}
         )
+        {% elif defined(p_identifier_keys_delimited) and defined(p_conversion_ids) %}
+        AND (
+            identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
+            OR conversion_id IN {{ Array(p_conversion_ids, 'String') }}
+        )
+        {% elif defined(p_identifier_keys_delimited) %}
+        AND identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
         {% elif defined(p_identifier_keys) and defined(p_conversion_ids) %}
         AND (
             identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
@@ -278,6 +305,8 @@ SQL >
         AND identity_mapping.identifier_key = facts.identity_anchor_key
     {% if defined(p_identifier_key) %}
         WHERE facts.identity_anchor_key = {{ String(p_identifier_key) }}
+    {% elif defined(p_identifier_keys_delimited) %}
+        WHERE facts.identity_anchor_key IN {{ split_to_array(p_identifier_keys_delimited, '', separator='|') }}
     {% elif defined(p_identifier_keys) %}
         WHERE facts.identity_anchor_key IN {{ Array(p_identifier_keys, 'String') }}
     {% else %}

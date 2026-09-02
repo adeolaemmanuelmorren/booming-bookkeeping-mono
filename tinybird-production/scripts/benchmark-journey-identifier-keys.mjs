@@ -15,12 +15,19 @@ if (identifierKeys.length !== requestedKeyCount) {
 }
 
 const url = new URL("/v0/pipes/reporting_profile_journey_build.json", tinybirdConfig.host);
-url.searchParams.set("p_identifier_keys", identifierKeys.join(","));
-url.searchParams.set("p_identifier_profile_ids", identifierProfileIds.join(","));
+const parameters = new URLSearchParams({
+  p_identifier_keys_delimited: delimitedParameter(identifierKeys),
+  p_identifier_profile_ids_delimited: delimitedParameter(identifierProfileIds),
+});
 
 const startedAt = performance.now();
 const response = await fetch(url, {
-  headers: { Authorization: `Bearer ${tinybirdConfig.token}` },
+  method: "POST",
+  headers: {
+    Authorization: `Bearer ${tinybirdConfig.token}`,
+    "Content-Type": "application/x-www-form-urlencoded",
+  },
+  body: parameters,
 });
 const body = await response.json();
 const keyList = sqlStrings(identifierKeys);
@@ -123,4 +130,12 @@ async function measureSql(config, name, sql) {
 
 function sqlStrings(values) {
   return values.map((value) => `'${value.replaceAll("'", "''")}'`).join(", ");
+}
+
+function delimitedParameter(values) {
+  const delimiter = "|";
+  if (values.some((value) => value.includes(delimiter))) {
+    throw new Error(`Journey parameter values cannot contain ${delimiter}.`);
+  }
+  return values.join(delimiter);
 }

@@ -35,7 +35,7 @@ describe("journey coordinator", () => {
       });
     pool
       .intercept({
-        method: "GET",
+        method: "POST",
         path: (path) => path.startsWith("/v0/pipes/reporting_profile_journey_window_build.json"),
       })
       .reply(200, { data: [] });
@@ -118,6 +118,19 @@ describe("journey coordinator", () => {
           identityProfile("profile-b", ["anonymous_id:b1", "user_id:b2"]),
         ],
       });
+    const recordBuildCall = (query: URLSearchParams) => {
+      buildCalls.push({
+        identifierKeys: query.has("p_identifier_keys_delimited")
+          ? splitDelimitedParameter(query.get("p_identifier_keys_delimited"))
+          : splitArrayParameter(query.get("p_identifier_keys")),
+        identifierProfileIds: splitDelimitedParameter(
+          query.get("p_identifier_profile_ids_delimited"),
+        ),
+        conversionIds: splitArrayParameter(query.get("p_conversion_ids")),
+        batchVersion: 0,
+      });
+      return { data: [] };
+    };
     pool
       .intercept({
         method: "GET",
@@ -125,17 +138,17 @@ describe("journey coordinator", () => {
       })
       .reply(200, (request) => {
         const query = new URLSearchParams(request.path.split("?")[1] ?? "");
-        buildCalls.push({
-          identifierKeys: splitArrayParameter(query.get("p_identifier_keys")),
-          identifierProfileIds: splitArrayParameter(
-            query.get("p_identifier_profile_ids"),
-          ),
-          conversionIds: splitArrayParameter(query.get("p_conversion_ids")),
-          batchVersion: 0,
-        });
-        return { data: [] };
+        return recordBuildCall(query);
       })
-      .times(3);
+      .times(2);
+    pool
+      .intercept({
+        method: "POST",
+        path: "/v0/pipes/reporting_profile_journey_window_build.json",
+      })
+      .reply(200, (request) => (
+        recordBuildCall(new URLSearchParams(String(request.body ?? "")))
+      ));
     // Only the conversion page appends: it writes a zero-row commit marker.
     // The orphan and profile pages return no rows, so nothing is appended.
     pool
@@ -259,6 +272,11 @@ describe("journey coordinator", () => {
 
 function splitArrayParameter(value: string | null): string[] {
   return value ? value.split(",") : [];
+}
+
+function splitDelimitedParameter(value: string | null): string[] {
+  if (!value) return [];
+  return value.split("|").filter(Boolean);
 }
 
 async function clearPacingDelay(instance: JourneyCoordinator): Promise<void> {

@@ -40,6 +40,11 @@ console.log(JSON.stringify({
   matchedProfiles: sampleSize - mismatches.length,
   mismatchedProfiles: mismatches.length,
   mismatches: mismatches.slice(0, 10),
+  mismatchDetails: mismatchDetails(
+    mismatches.slice(0, 10).map((mismatch) => mismatch.profileId),
+    bigQueryRows,
+    tinybirdRows,
+  ),
 }, null, 2));
 
 if (mismatches.length > 0) process.exitCode = 1;
@@ -93,9 +98,9 @@ async function queryTinybird(config, profileIds, conversionCutoff) {
   return queryTinybirdSql(config, `
     SELECT
       ${tinybirdColumns().join(",\n      ")}
-    FROM reporting_current_journey_base_rows
+    FROM reporting_current_journey_base_rows AS journey
     WHERE profile_id IN (${sqlStrings(profileIds)})
-      AND conversion_time < parseDateTime64BestEffort('${conversionCutoff}', 6)
+      AND journey.conversion_time < parseDateTime64BestEffort('${conversionCutoff}', 6)
     ORDER BY profile_id, conversion_id, touchpoint_id
   `);
 }
@@ -235,7 +240,10 @@ function canonicalRow(row) {
 function canonicalValue(column, value) {
   if (value === null || value === undefined) return null;
   if (numericColumns().has(column)) return Number(value).toFixed(9);
-  if (booleanColumns().has(column)) return value === true || Number(value) === 1 ? "1" : "0";
+  if (booleanColumns().has(column)) {
+    const normalized = String(value).toLowerCase();
+    return value === true || Number(value) === 1 || normalized === "true" ? "1" : "0";
+  }
   return String(value);
 }
 
@@ -298,4 +306,57 @@ function sqlStrings(values) {
 
 function emptyDigest() {
   return { rows: 0, hash: null };
+}
+
+function mismatchDetails(profileIds, bigQueryRows, tinybirdRows) {
+  const expected = rowsByProfileAndKey(bigQueryRows);
+  const actual = rowsByProfileAndKey(tinybirdRows);
+
+  return profileIds.map((profileId) => {
+    const expectedRows = expected.get(profileId) ?? new Map();
+    const actualRows = actual.get(profileId) ?? new Map();
+    const missingKeys = [...expectedRows.keys()].filter((key) => !actualRows.has(key));
+    const extraKeys = [...actualRows.keys()].filter((key) => !expectedRows.has(key));
+    const differingColumns = new Map();
+    let changedRows = 0;
+
+    for (const [key, expectedRow] of expectedRows) {
+      const actualRow = actualRows.get(key);
+      if (!actualRow) continue;
+
+      const changedColumns = commonColumns().filter(
+        (column) => expectedRow[column] !== actualRow[column],
+      );
+      if (changedColumns.length === 0) continue;
+
+      changedRows += 1;
+      for (const column of changedColumns) {
+        differingColumns.set(column, (differingColumns.get(column) ?? 0) + 1);
+      }
+    }
+
+    return {
+      profileId,
+      missingRows: missingKeys.length,
+      missingKeys: missingKeys.slice(0, 10),
+      extraRows: extraKeys.length,
+      extraKeys: extraKeys.slice(0, 10),
+      changedRows,
+      differingColumns: Object.fromEntries(
+        [...differingColumns].sort((left, right) => right[1] - left[1]),
+      ),
+    };
+  });
+}
+
+function rowsByProfileAndKey(rows) {
+  const result = new Map();
+  for (const row of rows) {
+    const profileId = String(row.profile_id);
+    const profileRows = result.get(profileId) ?? new Map();
+    const canonical = canonicalRow(row);
+    profileRows.set(`${canonical.conversion_id}\u0000${canonical.touchpoint_id}`, canonical);
+    result.set(profileId, profileRows);
+  }
+  return result;
 }

@@ -68,11 +68,12 @@ describe("incremental journey Worker", () => {
     expect(requests[0].url.pathname).toBe(
       "/v0/pipes/reporting_profile_journey_window_build.json",
     );
-    expect(requests[0].url.searchParams.getAll("p_identifier_keys")).toEqual([
-      "email:one@example.com,email:two@example.com",
-    ]);
-    expect(requests[0].url.searchParams.get("p_identifier_profile_ids")).toBe(
-      "profile-1,profile-1",
+    const journeyParameters = new URLSearchParams(requests[0].body);
+    expect(journeyParameters.get("p_identifier_keys_delimited")).toBe(
+      "email:one@example.com|email:two@example.com",
+    );
+    expect(journeyParameters.get("p_identifier_profile_ids_delimited")).toBe(
+      "profile-1|profile-1",
     );
     expect(requests[1].url.searchParams.get("name")).toBe(
       "reporting_journey_versions",
@@ -99,11 +100,11 @@ describe("incremental journey Worker", () => {
     ]);
   });
 
-  it("looks up comma-bearing identity keys through the singular parameter", async () => {
-    const requests: URL[] = [];
-    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+  it("preserves comma-bearing identity keys in the delimited request body", async () => {
+    const requests: { url: URL; body: string }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(String(input));
-      requests.push(url);
+      requests.push({ url, body: String(init?.body ?? "") });
 
       if (url.pathname.endsWith("/reporting_profile_journey_window_build.json")) {
         return jsonResponse({ data: [] });
@@ -119,11 +120,53 @@ describe("incremental journey Worker", () => {
       batchId: "comma-key",
     }, config, fetcher);
 
-    expect(requests[0].searchParams.get("p_identifier_key")).toBe(
+    const parameters = new URLSearchParams(requests[0].body);
+    expect(parameters.get("p_identifier_keys_delimited")).toBe(
       "email:last,first@example.com",
     );
-    expect(requests[0].searchParams.has("p_identifier_keys")).toBe(false);
-    expect(requests[0].searchParams.get("p_identifier_profile_id")).toBe("profile-1");
+    expect(parameters.get("p_identifier_profile_ids_delimited")).toBe("profile-1");
+  });
+
+  it("keeps the complete profile page in one request body", async () => {
+    const requests: { url: URL; method: string; body: string }[] = [];
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = new URL(String(input));
+      requests.push({
+        url,
+        method: String(init?.method ?? "GET"),
+        body: String(init?.body ?? ""),
+      });
+      return jsonResponse({ data: [] });
+    }) as unknown as Fetcher;
+    const profileAKeys = Array.from(
+      { length: 10 },
+      (_, index) => `anonymous_id:a-${index}-${"x".repeat(700)}`,
+    );
+    const profileBKeys = Array.from(
+      { length: 10 },
+      (_, index) => `anonymous_id:b-${index}-${"y".repeat(700)}`,
+    );
+
+    await processJourneyProfileBatch({
+      tenantId: "boom",
+      identifierKeys: [...profileAKeys, ...profileBKeys],
+      identifierProfileIds: [
+        ...profileAKeys.map(() => "profile-a"),
+        ...profileBKeys.map(() => "profile-b"),
+      ],
+      batchVersion: 1,
+      batchId: "whole-profile-url-chunks",
+    }, config, fetcher);
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].method).toBe("POST");
+    const parameters = new URLSearchParams(requests[0].body);
+    expect(
+      (parameters.get("p_identifier_keys_delimited") ?? "").split("|"),
+    ).toHaveLength(20);
+    expect(new Set(
+      (parameters.get("p_identifier_profile_ids_delimited") ?? "").split("|"),
+    )).toEqual(new Set(["profile-a", "profile-b"]));
   });
 
   it("never writes a commit when the journey row append fails", async () => {

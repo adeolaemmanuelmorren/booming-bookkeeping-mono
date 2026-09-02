@@ -49,6 +49,9 @@ test("only the Worker-facing endpoint executes journey windows", async () => {
   assert.match(endpoint, /p_identifier_key/);
   assert.match(endpoint, /p_identifier_keys/);
   assert.match(endpoint, /p_identifier_profile_ids/);
+  assert.match(endpoint, /p_identifier_keys_delimited/);
+  assert.match(endpoint, /p_identifier_profile_ids_delimited/);
+  assert.match(endpoint, /split_to_array\([^)]*separator='\|'\)/);
   assert.match(endpoint, /arrayZip/);
   assert.match(endpoint, /p_conversion_ids/);
   assert.match(endpoint, /FROM reporting_conversion_facts_v2_current/);
