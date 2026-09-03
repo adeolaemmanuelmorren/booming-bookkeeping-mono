@@ -83,6 +83,7 @@ export function testReportingFactsCoordinator(): DurableObjectNamespace<Reportin
     completedItems: 0,
     totalItems: 0,
     pendingRepairAnchors: 0,
+    pendingRepairConversions: 0,
     nextAttemptAt: null,
     lastError: null,
   };

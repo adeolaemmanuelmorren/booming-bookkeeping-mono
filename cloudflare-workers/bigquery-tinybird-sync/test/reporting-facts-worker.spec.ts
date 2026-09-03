@@ -178,6 +178,7 @@ describe("conversion delta diffing", () => {
       "email:new@example.com",
       "email:old@example.com",
     ]);
+    expect(diff.affectedConversionIds).toEqual(["client_form:f1"]);
   });
 
   it("leaves an unchanged head alone", () => {

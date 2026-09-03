@@ -68,6 +68,50 @@ describe("journey coordinator", () => {
     });
   });
 
+  it("tombstones a deleted conversion during a targeted repair", async () => {
+    const stub = env.JOURNEY_COORDINATOR.getByName("journey-conversion-repair-test");
+    const appended: Record<string, unknown>[] = [];
+    const pool = fetchMock.get(tinybirdOrigin);
+
+    pool
+      .intercept({
+        method: "GET",
+        path: (path) => path.startsWith("/v0/pipes/reporting_profile_journey_window_build.json"),
+      })
+      .reply(200, { data: [] });
+    pool
+      .intercept({
+        method: "POST",
+        path: (path) => path.startsWith("/v0/events"),
+      })
+      .reply(200, (request) => {
+        appended.push(...String(request.body)
+          .trim()
+          .split("\n")
+          .map((line) => JSON.parse(line) as Record<string, unknown>));
+        return { successful_rows: 1, quarantined_rows: 0 };
+      });
+
+    await runInDurableObject(stub, async (instance: JourneyCoordinator) => {
+      await instance.enqueueRepair({
+        repairId: "deleted-conversion-0001",
+        profileIds: [],
+        conversionIds: ["server_form:deleted-1"],
+      });
+      await instance.alarm();
+      await instance.alarm();
+      await clearPacingDelay(instance);
+      await instance.alarm();
+    });
+
+    expect(appended).toHaveLength(1);
+    expect(appended[0]).toMatchObject({
+      conversion_id: "server_form:deleted-1",
+      journey_row_count: 0,
+      is_deleted: 1,
+    });
+  });
+
   it("pages conversions, orphan keys, then whole profiles in that order", async () => {
     const stub = env.JOURNEY_COORDINATOR.getByName("journey-page-order-test");
     const buildCalls: BuildCall[] = [];

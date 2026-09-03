@@ -1,6 +1,6 @@
 # Reporting facts CDC — spec and deploy runbook
 
-Date: 2026-09-01. This closes the staleness the parity check exposed: journey builds were incremental, but the fact tables they read were frozen migration seeds (touchpoints stop Aug 28; conversion facts keep one superseded form). This is the third application of the seed + delta pattern — identity, journeys, now facts.
+Date: 2026-09-01. Production proof updated 2026-09-03. This closes the staleness the parity check exposed: journey builds were incremental, but the fact tables they read were frozen migration seeds (touchpoints stop Aug 28; conversion facts keep one superseded form). This is the third application of the seed + delta pattern — identity, journeys, now facts.
 
 ## Design
 
@@ -14,7 +14,7 @@ Date: 2026-09-01. This closes the staleness the parity check exposed: journey bu
 1. Every cycle it reads *changed entities* from the raw version tables: visitors with new page views, client form / client order entities, and server form / Stripe payment entities. Server conversions use their own cursor so the production upgrade can replay from the immutable seed cutoff without resetting the already-current client cursors.
 2. It rebuilds **whole entities**: a visitor is fully re-sessionized (`reporting_touchpoint_facts_cdc_build`, scoped by literal anonymous/user ids — bloom indexes added to `jitsu_page_view_versions`; form/order entities rebuilt via `reporting_conversion_facts_cdc_build`, scoped by `__tb_state_key`, which is already the sort key). The journey paging lesson is baked in: an entity's data is never split across builds.
 3. It diffs the rebuild against stored heads (`reporting_touchpoint_fact_heads`, `reporting_conversion_fact_heads`) and **tombstones what the rebuild no longer produces**. This matters twice: `session_id = MD5(visitor_key | session_number)`, so a late page view renumbers a visitor's later sessions and the old ids must die; and a conversion whose anchor changed (new email) gets its old row tombstoned *under the old anchor* — the exact "superseded server form" parity bug.
-4. **Late data triggers journey repair.** Before a window's cursor advances, every affected anchor key is resolved to current profiles and pushed into the journey coordinator's existing repair queue. Fresh facts with stale journeys would just recreate the disease one layer up.
+4. **Late data triggers journey repair.** Before a window's cursor advances, every affected anchor key is resolved to current profiles and every changed conversion ID is pushed into the journey coordinator's durable repair queue. Conversion IDs are required because a deleted conversion is absent from a rebuilt profile's output; its explicit ID produces the zero-row commit that tombstones its old journey. Repair scope is persisted before fact deltas are appended, so a retry after an interrupted append cannot lose the journey handoff.
 5. Cursor semantics: changed-entity reads are ordered by `last_ingested_at` ascending; the cursor advances to the window's high-water mark minus one second, so a page cut mid-timestamp re-processes instead of skipping. Rebuilds are idempotent, so overlap is free.
 6. Same operational contract as the journey DO: 429/5xx/timeout are backpressure (Retry-After honored, checkpoint kept); `failed` is for correctness errors; `GET /reporting-facts/status`, `POST /reporting-facts/recover`.
 
@@ -36,7 +36,14 @@ Date: 2026-09-01. This closes the staleness the parity check exposed: journey bu
 4. Re-check the 1-in-50 outlier profile — likely fixed by the above; if not, diagnose it, don't amnesty it.
 5. Queue: watch one scheduled cycle confirm `raw_backlog_autocompacted` fires if queued > 30 and the queue stays bounded.
 
-## Explicitly not covered yet
+## Production proof — 2026-09-03
 
-- Journey versions compaction (unchanged roadmap item).
-- Read-side cutover of the three snapshot Copies (unchanged; gated on parity).
+- The server-only replay reached the live cursor and repaired the historical gap without resetting Jitsu touchpoint or client-conversion cursors.
+- A same-timestamp ActiveCampaign deletion exposed a GCP watermark hole. The exporter now reconciles one of six deterministic buckets of historical deleted contact-tag assignments per run, covering every old deletion hourly with about 288 extra rows per contact-tag run.
+- The final deleted conversion received an explicit zero-row journey commit after the repair contract was extended to carry conversion IDs.
+- Fixed-cutoff parity passed: 50 of 50 sampled profiles matched, with 1,760 BigQuery rows and 1,760 Tinybird rows and no mismatches.
+- Tinybird deployment 126 removed the three obsolete full-history reporting Copies. The reporting outputs already read the atomically committed journey state.
+
+## Remaining maintenance
+
+- Journey versions compaction. The versions journal contains 10,724,403 rows versus 1,853,807 current journey rows, so the fold is now due. It must preserve writes that arrive during the fold; do not truncate or replace the live journal without an atomic cutoff protocol.

@@ -247,7 +247,6 @@ const requiredResources = [
   "snapshot_int_stripe_browser_product_resolution",
   "int_stripe_browser_product_resolution",
   "mart_revenue_attribution_build",
-  "snapshot_mart_revenue_attribution",
   "mart_revenue_attribution",
   "reporting_profile_journey_window_build",
   "reporting_profile_journey_build",

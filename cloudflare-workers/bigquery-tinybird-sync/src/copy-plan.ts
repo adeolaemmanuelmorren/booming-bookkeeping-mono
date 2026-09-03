@@ -111,9 +111,6 @@ export const RETIRED_REPORTING_COPIES = [
   copyStep("snapshot_mart_payments_client_side"),
   copyStep("snapshot_int_payment_plan_timing"),
   copyStep("snapshot_segretl_repeatable_conversions"),
-  copyStep("snapshot_mart_conversions_with_touchpoints"),
-  copyStep("snapshot_mart_conversions_multi_touch"),
-  copyStep("snapshot_mart_revenue_attribution"),
 ] as const satisfies readonly CopyPlanStep[];
 
 export const RETIRED_IDENTITY_COMPACTION_COPIES = [

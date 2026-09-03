@@ -166,6 +166,7 @@ export function touchpointDeltaRows(
 export interface ConversionDeltaDiff {
   deltaRows: Record<string, unknown>[];
   affectedAnchorKeys: string[];
+  affectedConversionIds: string[];
 }
 
 export function conversionDeltaRows(
@@ -175,6 +176,7 @@ export function conversionDeltaRows(
 ): ConversionDeltaDiff {
   const liveKeys = new Set<string>();
   const affectedAnchorKeys = new Set<string>();
+  const affectedConversionIds = new Set<string>();
   const deltaRows: Record<string, unknown>[] = [];
 
   for (const row of buildRows) {
@@ -182,6 +184,7 @@ export function conversionDeltaRows(
     const conversionId = requiredString(row.conversion_id, "conversion_id");
     liveKeys.add(`${anchorKey}|${conversionId}`);
     if (anchorKey !== "") affectedAnchorKeys.add(anchorKey);
+    affectedConversionIds.add(conversionId);
     deltaRows.push({
       ...row,
       identity_anchor_key: anchorKey,
@@ -195,6 +198,7 @@ export function conversionDeltaRows(
   for (const head of heads) {
     if (liveKeys.has(`${head.identityAnchorKey}|${head.conversionId}`)) continue;
     if (head.identityAnchorKey !== "") affectedAnchorKeys.add(head.identityAnchorKey);
+    affectedConversionIds.add(head.conversionId);
     deltaRows.push({
       tenant_id: "boom",
       identity_anchor_key: head.identityAnchorKey,
@@ -212,7 +216,11 @@ export function conversionDeltaRows(
     });
   }
 
-  return { deltaRows, affectedAnchorKeys: [...affectedAnchorKeys].sort() };
+  return {
+    deltaRows,
+    affectedAnchorKeys: [...affectedAnchorKeys].sort(),
+    affectedConversionIds: [...affectedConversionIds].sort(),
+  };
 }
 
 export function maxLastIngestedAt(

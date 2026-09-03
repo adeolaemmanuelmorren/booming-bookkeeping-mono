@@ -19,11 +19,13 @@ describe("reporting facts coordinator", () => {
     const profileIds = Array.from({ length: 401 }, (_, index) => `profile-${index}`);
     const first = journeyRepairBatches(
       [...profileIds, "profile-0"],
+      ["server_form:deleted-1"],
       "touchpoints",
       "2026-09-01 10:00:00.000000",
     );
     const retry = journeyRepairBatches(
       [...profileIds, "profile-0"],
+      ["server_form:deleted-1"],
       "touchpoints",
       "2026-09-01 10:00:00.000000",
     );
@@ -33,6 +35,9 @@ describe("reporting facts coordinator", () => {
       retry.map((batch) => batch.repairId),
     );
     expect(new Set(first.flatMap((batch) => batch.profileIds)).size).toBe(401);
+    expect(first.flatMap((batch) => batch.conversionIds)).toEqual([
+      "server_form:deleted-1",
+    ]);
   });
 
   it("rebuilds changed visitors, tombstones ghosts, and repairs journeys", async () => {

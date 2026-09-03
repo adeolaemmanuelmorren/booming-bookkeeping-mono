@@ -35,9 +35,9 @@ Date: 2026-08-31. The code is written and tested (87 tests pass, `npm run check`
 - Journey DO stuck `failed` → fix the cause, then `POST /journey/recover`. `failed` now only means a correctness error (e.g. a >500-key profile, multi-profile conversion); 429/timeout/5xx never land there.
 - Wrong or partial journey rows from before this fix: re-enqueue the affected identity batch's profiles (any later merge touching them also repairs them, since profile pages always rebuild whole profiles).
 
-## Still on the roadmap (unchanged, see the Notion review doc)
+## Post-proof status — 2026-09-03
 
-Do not start these until all four gates above pass. The read-side migration points reports at the journey table, so the journey table must first be proven correct and cheap to maintain.
+All four gates passed. Fixed-cutoff parity is 50 of 50 sampled profiles and 1,760 of 1,760 rows.
 
-1. Point report endpoints at stored journey rows; delete the three snapshot Copies (`snapshot_mart_conversions_with_touchpoints` / `_multi_touch` / `_revenue_attribution`) — they still rebuild full marts from all history every cycle and will re-hit the 30s Copy cap as history grows.
-2. Journey-versions compaction (seed + delta fold, same pattern as the identity journal) before the versions table dwarfs live rows.
+1. **Complete.** Report pipes read stored journey rows, and Tinybird deployment 126 deleted `snapshot_mart_conversions_with_touchpoints`, `snapshot_mart_conversions_multi_touch`, and `snapshot_mart_revenue_attribution`.
+2. **Due.** Journey-versions compaction: the versions journal is 10,724,403 rows versus 1,853,807 current rows. Implement the fold with an atomic cutoff so concurrent Worker appends remain visible.

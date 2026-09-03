@@ -63,11 +63,13 @@ interface JourneyRepairRow {
   [key: string]: string | number | null;
   repair_id: string;
   profile_ids_json: string;
+  conversion_ids_json: string;
 }
 
 export interface JourneyRepairInput {
   repairId: string;
   profileIds: string[];
+  conversionIds?: string[];
 }
 
 export interface JourneyCoordinatorStatus {
@@ -111,15 +113,30 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
 
   async enqueueRepair(input: JourneyRepairInput): Promise<JourneyCoordinatorStatus> {
     const repairId = repairIdentifier(input.repairId);
-    const profileIds = repairProfileIds(input.profileIds);
+    const profileIds = repairProfileIds(input.profileIds, true);
+    const conversionIds = repairConversionIds(input.conversionIds ?? [], true);
+    if (profileIds.length === 0 && conversionIds.length === 0) {
+      throw new Error("Journey repair must contain profiles or conversions.");
+    }
     const profileIdsJson = JSON.stringify(profileIds);
+    const conversionIdsJson = JSON.stringify(conversionIds);
     const existing = this.ctx.storage.sql.exec<JourneyRepairRow>(
-      "SELECT repair_id, profile_ids_json FROM journey_repairs WHERE repair_id = ?",
+      `
+        SELECT repair_id, profile_ids_json, conversion_ids_json
+        FROM journey_repairs
+        WHERE repair_id = ?
+      `,
       repairId,
     ).toArray()[0];
 
-    if (existing && existing.profile_ids_json !== profileIdsJson) {
-      throw new Error(`Journey repair ${repairId} already has different profiles.`);
+    if (
+      existing
+      && (
+        existing.profile_ids_json !== profileIdsJson
+        || existing.conversion_ids_json !== conversionIdsJson
+      )
+    ) {
+      throw new Error(`Journey repair ${repairId} already has different scope.`);
     }
     if (!existing) {
       this.ctx.storage.sql.exec(
@@ -127,13 +144,15 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
           INSERT INTO journey_repairs (
             repair_id,
             profile_ids_json,
+            conversion_ids_json,
             status,
             created_at_ms,
             completed_at_ms
-          ) VALUES (?, ?, 'pending', ?, NULL)
+          ) VALUES (?, ?, ?, 'pending', ?, NULL)
         `,
         repairId,
         profileIdsJson,
+        conversionIdsJson,
         Date.now(),
       );
     }
@@ -379,7 +398,7 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
   private nextPendingRepair(state: JourneyState): ActiveJourneyBatch | null {
     const repair = this.ctx.storage.sql.exec<JourneyRepairRow>(
       `
-        SELECT repair_id, profile_ids_json
+        SELECT repair_id, profile_ids_json, conversion_ids_json
         FROM journey_repairs
         WHERE status = 'pending'
         ORDER BY created_at_ms, repair_id
@@ -392,9 +411,12 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       tenantId: TENANT_ID,
       batchVersion: state.cursor_batch_version,
       batchId: `journey_repair:${repair.repair_id}`,
-      profileIds: repairProfileIds(JSON.parse(repair.profile_ids_json)),
+      profileIds: repairProfileIds(JSON.parse(repair.profile_ids_json), true),
       orphanIdentifierKeys: [],
-      conversionIds: [],
+      conversionIds: repairConversionIds(
+        JSON.parse(repair.conversion_ids_json),
+        true,
+      ),
       repairId: repair.repair_id,
     };
   }
@@ -448,6 +470,7 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
       CREATE TABLE IF NOT EXISTS journey_repairs (
         repair_id TEXT PRIMARY KEY,
         profile_ids_json TEXT NOT NULL,
+        conversion_ids_json TEXT NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('pending', 'running', 'complete')),
         created_at_ms INTEGER NOT NULL,
         completed_at_ms INTEGER
@@ -456,6 +479,10 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     this.ensureColumn("orphan_index", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("profile_index", "INTEGER NOT NULL DEFAULT 0");
     this.ensureColumn("page_number", "INTEGER NOT NULL DEFAULT 0");
+    this.ensureRepairColumn(
+      "conversion_ids_json",
+      "TEXT NOT NULL DEFAULT '[]'",
+    );
   }
 
   private ensureColumn(name: string, definition: string): void {
@@ -465,6 +492,16 @@ export class JourneyCoordinator extends DurableObject<WorkerEnv> {
     if (columns.some((column) => column.name === name)) return;
     this.ctx.storage.sql.exec(
       `ALTER TABLE journey_state ADD COLUMN ${name} ${definition}`,
+    );
+  }
+
+  private ensureRepairColumn(name: string, definition: string): void {
+    const columns = this.ctx.storage.sql.exec<{ name: string }>(
+      "SELECT name FROM pragma_table_info('journey_repairs')",
+    ).toArray();
+    if (columns.some((column) => column.name === name)) return;
+    this.ctx.storage.sql.exec(
+      `ALTER TABLE journey_repairs ADD COLUMN ${name} ${definition}`,
     );
   }
 
@@ -523,19 +560,38 @@ function repairIdentifier(value: unknown): string {
   return value;
 }
 
-function repairProfileIds(value: unknown): string[] {
-  if (!Array.isArray(value)) throw new Error("profileIds must be an array.");
+function repairProfileIds(value: unknown, allowEmpty = false): string[] {
+  return repairStrings(value, "profileIds", REPAIR_PROFILE_LIMIT, allowEmpty);
+}
 
-  const profileIds = [...new Set(value.map((profileId) => {
-    if (typeof profileId !== "string" || profileId.trim() === "") {
-      throw new Error("profileIds must contain non-empty strings.");
+function repairConversionIds(value: unknown, allowEmpty = false): string[] {
+  return repairStrings(
+    value,
+    "conversionIds",
+    JOURNEY_PROFILE_BATCH_LIMIT,
+    allowEmpty,
+  );
+}
+
+function repairStrings(
+  value: unknown,
+  name: string,
+  limit: number,
+  allowEmpty: boolean,
+): string[] {
+  if (!Array.isArray(value)) throw new Error(`${name} must be an array.`);
+
+  const values = [...new Set(value.map((item) => {
+    if (typeof item !== "string" || item.trim() === "") {
+      throw new Error(`${name} must contain non-empty strings.`);
     }
-    return profileId.trim();
+    return item.trim();
   }))].sort();
-  if (profileIds.length === 0 || profileIds.length > REPAIR_PROFILE_LIMIT) {
-    throw new Error(`profileIds must contain 1 to ${REPAIR_PROFILE_LIMIT} unique values.`);
+  const minimum = allowEmpty ? 0 : 1;
+  if (values.length < minimum || values.length > limit) {
+    throw new Error(`${name} must contain ${minimum} to ${limit} unique values.`);
   }
-  return profileIds;
+  return values;
 }
 
 function isBackpressure(error: unknown): boolean {

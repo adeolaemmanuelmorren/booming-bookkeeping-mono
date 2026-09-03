@@ -230,8 +230,12 @@ async function handleJourneyRepair(request: Request, env: WorkerEnv): Promise<Re
     const input = await parseJsonObject(request);
     const repairId = input.repairId;
     const profileIds = input.profileIds;
+    const conversionIds = input.conversionIds ?? [];
     if (typeof repairId !== "string") throw new Error("repairId must be a string.");
     if (!Array.isArray(profileIds)) throw new Error("profileIds must be an array.");
+    if (!Array.isArray(conversionIds)) {
+      throw new Error("conversionIds must be an array.");
+    }
 
     return jsonResponse(await journeyCoordinator(env).enqueueRepair({
       repairId,
@@ -240,6 +244,12 @@ async function handleJourneyRepair(request: Request, env: WorkerEnv): Promise<Re
           throw new Error("profileIds must contain only strings.");
         }
         return profileId;
+      }),
+      conversionIds: conversionIds.map((conversionId) => {
+        if (typeof conversionId !== "string") {
+          throw new Error("conversionIds must contain only strings.");
+        }
+        return conversionId;
       }),
     }), 202);
   } catch (error) {

@@ -84,7 +84,7 @@ describe("Copy publication plans", () => {
       ...AUTOMATED_COPY_PIPES,
       ...RETIRED_IDENTITY_COPIES,
       ...RETIRED_REPORTING_COPIES.map(({ pipeName }) => pipeName),
-    ]).size).toBe(57);
+    ]).size).toBe(54);
 
     for (const pipeName of RETIRED_IDENTITY_COPIES) {
       expect(AUTOMATED_COPY_PIPES).not.toContain(pipeName);

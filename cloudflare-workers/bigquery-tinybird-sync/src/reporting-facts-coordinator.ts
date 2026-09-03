@@ -34,6 +34,7 @@ const BUILD_CALL_INTERVAL_MS = 2_000;
 const DEFAULT_BACKPRESSURE_MS = 60_000;
 const CHANGED_WINDOW_LIMIT = 2_000;
 const JOURNEY_REPAIR_PROFILE_LIMIT = 200;
+const JOURNEY_REPAIR_CONVERSION_LIMIT = 500;
 const INGESTION_SETTLE_MS = 60_000;
 // The frozen fact seeds were exported at this cutoff; starting every cursor
 // here makes the first pass through the CDC loop double as the catch-up
@@ -53,6 +54,7 @@ interface FactsState {
   window_index: number;
   page_number: number;
   repair_anchor_keys_json: string;
+  repair_conversion_ids_json: string;
   last_error: string | null;
   next_attempt_at_ms: number;
   updated_at_ms: number;
@@ -74,6 +76,7 @@ export interface ReportingFactsStatus {
   completedItems: number;
   totalItems: number;
   pendingRepairAnchors: number;
+  pendingRepairConversions: number;
   nextAttemptAt: string | null;
   lastError: string | null;
 }
@@ -112,6 +115,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       window_index: 0,
       page_number: 0,
       repair_anchor_keys_json: "[]",
+      repair_conversion_ids_json: "[]",
       last_error: null,
       next_attempt_at_ms: 0,
     });
@@ -132,6 +136,9 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       completedItems: state.window_index,
       totalItems: window ? windowItems(window).length : 0,
       pendingRepairAnchors: parseAnchorKeys(state.repair_anchor_keys_json).length,
+      pendingRepairConversions: parseConversionIds(
+        state.repair_conversion_ids_json,
+      ).length,
       nextAttemptAt: state.next_attempt_at_ms > 0
         ? new Date(state.next_attempt_at_ms).toISOString()
         : null,
@@ -234,7 +241,6 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       committedAt: new Date().toISOString(),
     };
     let consumed: number;
-    let affectedAnchorKeys: string[];
 
     if (window.stream === "touchpoints") {
       const page = takeVisitorPage(remaining as ChangedVisitor[]);
@@ -244,11 +250,11 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         this.tinybirdConfig(),
       );
       const diff = touchpointDeltaRows(buildRows, heads, batch);
+      this.accumulateRepairAnchors(state, diff.affectedAnchorKeys);
       if (diff.deltaRows.length > 0) {
         await appendTouchpointFactDeltas(diff.deltaRows, this.tinybirdConfig());
       }
       consumed = page.visitors.length;
-      affectedAnchorKeys = diff.affectedAnchorKeys;
     } else {
       const page = takeConversionEntityPage(remaining as ChangedConversionEntity[]);
       const buildRows = await readConversionFactCdcBuild(page, this.tinybirdConfig());
@@ -257,14 +263,14 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         this.tinybirdConfig(),
       );
       const diff = conversionDeltaRows(buildRows, heads, batch);
+      this.accumulateRepairAnchors(state, diff.affectedAnchorKeys);
+      this.accumulateRepairConversions(state, diff.affectedConversionIds);
       if (diff.deltaRows.length > 0) {
         await appendConversionFactDeltas(diff.deltaRows, this.tinybirdConfig());
       }
       consumed = page.entities.length;
-      affectedAnchorKeys = diff.affectedAnchorKeys;
     }
 
-    this.accumulateRepairAnchors(state, affectedAnchorKeys);
     this.updateState({
       window_index: state.window_index + consumed,
       page_number: state.page_number + 1,
@@ -294,6 +300,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       active_window_json: "",
       window_index: 0,
       repair_anchor_keys_json: "[]",
+      repair_conversion_ids_json: "[]",
       next_attempt_at_ms: 0,
       last_error: null,
     });
@@ -302,15 +309,19 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
 
   private async flushJourneyRepairs(state: FactsState, window: ActiveWindow): Promise<void> {
     const anchorKeys = parseAnchorKeys(state.repair_anchor_keys_json);
-    if (anchorKeys.length === 0) return;
+    const conversionIds = parseConversionIds(state.repair_conversion_ids_json);
+    if (anchorKeys.length === 0 && conversionIds.length === 0) return;
 
-    const mappings = await readCurrentIdentityMappings(
-      TENANT_ID,
-      anchorKeys,
-      this.tinybirdConfig(),
-    );
+    const mappings = anchorKeys.length === 0
+      ? []
+      : await readCurrentIdentityMappings(
+        TENANT_ID,
+        anchorKeys,
+        this.tinybirdConfig(),
+      );
     const repairBatches = journeyRepairBatches(
       mappings.map((mapping) => mapping.profileId),
+      conversionIds,
       window.stream,
       window.windowEnd,
     );
@@ -328,6 +339,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       window_index: 0,
       page_number: 0,
       repair_anchor_keys_json: "[]",
+      repair_conversion_ids_json: "[]",
       next_attempt_at_ms: 0,
       last_error: null,
     });
@@ -338,6 +350,15 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
     const merged = new Set(parseAnchorKeys(state.repair_anchor_keys_json));
     for (const key of anchorKeys) merged.add(key);
     this.updateState({ repair_anchor_keys_json: JSON.stringify([...merged].sort()) });
+  }
+
+  private accumulateRepairConversions(state: FactsState, conversionIds: string[]): void {
+    if (conversionIds.length === 0) return;
+    const merged = new Set(parseConversionIds(state.repair_conversion_ids_json));
+    for (const conversionId of conversionIds) merged.add(conversionId);
+    this.updateState({
+      repair_conversion_ids_json: JSON.stringify([...merged].sort()),
+    });
   }
 
   private async handleError(error: unknown): Promise<void> {
@@ -370,6 +391,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         window_index INTEGER NOT NULL,
         page_number INTEGER NOT NULL,
         repair_anchor_keys_json TEXT NOT NULL,
+        repair_conversion_ids_json TEXT NOT NULL,
         last_error TEXT,
         next_attempt_at_ms INTEGER NOT NULL,
         updated_at_ms INTEGER NOT NULL
@@ -379,8 +401,28 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       "server_conversion_cursor",
       `TEXT NOT NULL DEFAULT '${CDC_EPOCH}'`,
     );
+    this.ensureColumn(
+      "repair_conversion_ids_json",
+      "TEXT NOT NULL DEFAULT '[]'",
+    );
     this.ctx.storage.sql.exec(
-      `INSERT OR IGNORE INTO facts_state VALUES (1, 'idle', ?, ?, ?, '', 0, 0, '[]', NULL, 0, ?)`,
+      `
+        INSERT OR IGNORE INTO facts_state (
+          id,
+          phase,
+          touchpoint_cursor,
+          conversion_cursor,
+          server_conversion_cursor,
+          active_window_json,
+          window_index,
+          page_number,
+          repair_anchor_keys_json,
+          repair_conversion_ids_json,
+          last_error,
+          next_attempt_at_ms,
+          updated_at_ms
+        ) VALUES (1, 'idle', ?, ?, ?, '', 0, 0, '[]', '[]', NULL, 0, ?)
+      `,
       CDC_EPOCH,
       CDC_EPOCH,
       CDC_EPOCH,
@@ -431,18 +473,42 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
 
 export function journeyRepairBatches(
   profileIds: string[],
+  conversionIds: string[],
   stream: FactsStream,
   windowEnd: string,
-): Array<{ repairId: string; profileIds: string[] }> {
+): Array<{ repairId: string; profileIds: string[]; conversionIds: string[] }> {
   const uniqueProfileIds = [...new Set(profileIds)].sort();
-  const batches: Array<{ repairId: string; profileIds: string[] }> = [];
+  const uniqueConversionIds = [...new Set(conversionIds)].sort();
+  const batches: Array<{
+    repairId: string;
+    profileIds: string[];
+    conversionIds: string[];
+  }> = [];
+  const batchCount = Math.max(
+    Math.ceil(uniqueProfileIds.length / JOURNEY_REPAIR_PROFILE_LIMIT),
+    Math.ceil(uniqueConversionIds.length / JOURNEY_REPAIR_CONVERSION_LIMIT),
+  );
 
-  for (let index = 0; index < uniqueProfileIds.length; index += JOURNEY_REPAIR_PROFILE_LIMIT) {
-    const batchProfileIds = uniqueProfileIds.slice(index, index + JOURNEY_REPAIR_PROFILE_LIMIT);
-    const repairHash = md5Hex(`${stream}\0${windowEnd}\0${batchProfileIds.join("\0")}`);
+  for (let index = 0; index < batchCount; index += 1) {
+    const batchProfileIds = uniqueProfileIds.slice(
+      index * JOURNEY_REPAIR_PROFILE_LIMIT,
+      (index + 1) * JOURNEY_REPAIR_PROFILE_LIMIT,
+    );
+    const batchConversionIds = uniqueConversionIds.slice(
+      index * JOURNEY_REPAIR_CONVERSION_LIMIT,
+      (index + 1) * JOURNEY_REPAIR_CONVERSION_LIMIT,
+    );
+    const repairHash = md5Hex([
+      stream,
+      windowEnd,
+      ...batchConversionIds,
+      "profiles",
+      ...batchProfileIds,
+    ].join("\0"));
     batches.push({
       repairId: `facts_${stream}_${repairHash}`,
       profileIds: batchProfileIds,
+      conversionIds: batchConversionIds,
     });
   }
 
@@ -481,6 +547,14 @@ function parseAnchorKeys(value: string): string[] {
   const parsed = JSON.parse(value || "[]") as unknown;
   if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
     throw new Error("Stored repair anchor keys are invalid.");
+  }
+  return parsed as string[];
+}
+
+function parseConversionIds(value: string): string[] {
+  const parsed = JSON.parse(value || "[]") as unknown;
+  if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+    throw new Error("Stored repair conversion IDs are invalid.");
   }
   return parsed as string[];
 }
