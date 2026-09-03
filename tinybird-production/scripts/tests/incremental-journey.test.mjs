@@ -143,12 +143,9 @@ test("server forms and payments use the same bounded conversion CDC path", async
   assert.match(changed, /'server_form' AS entity_kind/);
   assert.match(changed, /'server_payment' AS entity_kind/);
   assert.match(changed, /FROM activecampaign_contact_tags_adapter/);
-  assert.match(changed, /FROM activecampaign_registration_build/);
-  assert.match(changed, /current_server_form_fact_heads/);
-  assert.match(changed, /current_registration_form_facts/);
-  assert.match(changed, /changed_or_new_server_form_ids/);
-  assert.match(changed, /removed_or_superseded_server_form_ids/);
-  assert.match(changed, /LEFT ANTI JOIN current_server_form_fact_heads/);
+  assert.match(changed, /activecampaign_registration_tag_policy/);
+  assert.match(changed, /current_server_form_fact_ids/);
+  assert.match(changed, /current_registration_form_assignments/);
   assert.match(changed, /FROM activecampaign_tag_semantic_versions FINAL/);
   assert.match(changed, /semantic_hash != previous_semantic_hash/);
   assert.match(changed, /INNER JOIN changed_server_form_tag_semantics/);
