@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CDC_ENTITY_PAGE_LIMIT,
   conversionDeltaRows,
   expectedConversionIds,
   maxLastIngestedAt,
@@ -63,6 +64,17 @@ describe("reporting facts paging", () => {
     expect(page.orderEventIds).toEqual(["order-1"]);
     expect(page.serverFormSubmissionIds).toEqual(["server-form-1"]);
     expect(page.serverPaymentKeys).toEqual(["stripe:charge-1"]);
+  });
+
+  it("uses the production-proven 500-entity build page", () => {
+    const entities = Array.from({ length: 501 }, (_, index) => ({
+      entityKind: "server_form" as const,
+      entityId: `server-form-${index}`,
+      lastIngestedAt: "t",
+    }));
+
+    expect(CDC_ENTITY_PAGE_LIMIT).toBe(500);
+    expect(takeConversionEntityPage(entities).entities).toHaveLength(500);
   });
 });
 

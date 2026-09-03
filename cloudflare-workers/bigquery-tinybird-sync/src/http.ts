@@ -131,6 +131,14 @@ export async function handleRequest(
     return jsonResponse(await reportingFactsCoordinator(env).recoverFailed());
   }
 
+  if (url.pathname === "/reporting-facts/replay-server") {
+    if (request.method !== "POST") return methodNotAllowed("POST");
+    const authError = authorize(request, env);
+    if (authError) return authError;
+
+    return jsonResponse(await reportingFactsCoordinator(env).replayServerFromSeed());
+  }
+
   return jsonResponse({ error: "Not found" }, 404);
 }
 

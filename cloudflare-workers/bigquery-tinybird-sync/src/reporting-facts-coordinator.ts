@@ -99,6 +99,26 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
     return this.status();
   }
 
+  async replayServerFromSeed(): Promise<ReportingFactsStatus> {
+    const state = this.state();
+    if (parseActiveWindow(state.active_window_json)) {
+      throw new Error("Cannot replay server facts while a reporting window is active.");
+    }
+
+    this.updateState({
+      phase: "running",
+      server_conversion_cursor: CDC_EPOCH,
+      active_window_json: "",
+      window_index: 0,
+      page_number: 0,
+      repair_anchor_keys_json: "[]",
+      last_error: null,
+      next_attempt_at_ms: 0,
+    });
+    await this.ensureAlarm();
+    return this.status();
+  }
+
   async status(): Promise<ReportingFactsStatus> {
     const state = this.state();
     const window = parseActiveWindow(state.active_window_json);

@@ -212,6 +212,33 @@ describe("reporting facts coordinator", () => {
     });
   });
 
+  it("replays only the server stream from the immutable seed cutoff", async () => {
+    const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-server-replay-test");
+
+    await runInDurableObject(stub, async (instance: ReportingFactsCoordinator) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (instance as any).ctx.storage.sql.exec(
+        `
+          UPDATE facts_state
+          SET phase = 'idle',
+              touchpoint_cursor = '2026-09-03 02:53:46.762000',
+              conversion_cursor = '2026-09-03 02:53:46.762000',
+              server_conversion_cursor = '2026-09-03 02:53:46.762000'
+          WHERE id = 1
+        `,
+      );
+
+      const status = await instance.replayServerFromSeed();
+
+      expect(status.phase).toBe("running");
+      expect(status.serverConversionCursor).toBe("2026-08-26 23:05:00.000000");
+      expect(status.touchpointCursor).toBe("2026-09-03 02:53:46.762000");
+      expect(status.conversionCursor).toBe("2026-09-03 02:53:46.762000");
+      expect(status.activeStream).toBeNull();
+      expect(status.lastError).toBeNull();
+    });
+  });
+
   it("treats a 429 as backpressure and keeps the window", async () => {
     const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-backpressure-test");
     const pool = fetchMock.get(tinybirdOrigin);

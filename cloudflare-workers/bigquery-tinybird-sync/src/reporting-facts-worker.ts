@@ -6,7 +6,7 @@ import type {
 } from "./tinybird-api";
 
 export const CDC_VISITOR_PAGE_LIMIT = 200;
-export const CDC_ENTITY_PAGE_LIMIT = 200;
+export const CDC_ENTITY_PAGE_LIMIT = 500;
 
 export interface VisitorPage {
   visitors: ChangedVisitor[];
