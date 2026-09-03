@@ -109,14 +109,18 @@ export function buildExportQuery(
   const version = greatestTimestamp(table);
   const partition = partitionPredicate(table, startAt, runAt);
   const source = quoteTable(table.source);
-  const selectList = buildSelectList(table);
+  const deletionReconciliation = activeCampaignDeletionReconciliation(table, runAt);
+  const selectList = buildSelectList(table, deletionReconciliation);
   const versionPredicates = [
     `${version} >= TIMESTAMP '${formatTimestamp(startAt)}'`,
     `${version} < TIMESTAMP '${formatTimestamp(runAt)}'`,
   ];
-  const predicates = partition
+  const incrementalPredicates = partition
     ? [partition, ...versionPredicates]
     : versionPredicates;
+  const where = deletionReconciliation
+    ? `(${incrementalPredicates.join("\n  AND ")})\n  OR (${deletionReconciliation.predicate})`
+    : incrementalPredicates.join("\n  AND ");
 
   return [
     "EXPORT DATA OPTIONS(",
@@ -127,7 +131,7 @@ export function buildExportQuery(
     "SELECT",
     selectList,
     `FROM ${source}`,
-    `WHERE ${predicates.join("\n  AND ")}`,
+    `WHERE ${where}`,
   ].join("\n");
 }
 
@@ -327,11 +331,46 @@ function buildBackfillJobId(resourceName: string, snapshotAt: Date): string {
   return `tinybird_backfill_${timestamp}_${resource}`;
 }
 
-function buildSelectList(table: SourceTable): string {
+interface DeletionReconciliation {
+  observedAt: string;
+  predicate: string;
+}
+
+function activeCampaignDeletionReconciliation(
+  table: SourceTable,
+  runAt: Date,
+): DeletionReconciliation | null {
+  if (table.resourceName !== "raw_activecampaign_contact_tag") return null;
+
+  const tenMinuteWindow = Math.floor(runAt.valueOf() / 600_000);
+  const bucket = ((tenMinuteWindow % 6) + 6) % 6;
+  return {
+    observedAt: formatTimestamp(runAt),
+    predicate: [
+      "COALESCE(`_fivetran_deleted`, FALSE)",
+      `MOD(MOD(FARM_FINGERPRINT(CAST(\`id\` AS STRING)), 6) + 6, 6) = ${bucket}`,
+    ].join(" AND "),
+  };
+}
+
+function buildSelectList(
+  table: SourceTable,
+  deletionReconciliation: DeletionReconciliation | null,
+): string {
   const jsonColumns = new Set(table.jsonColumns);
   const geographyColumns = new Set(table.geographyColumns);
   const projections = table.columns.map((column) => {
     const identifier = quoteIdentifier(column);
+
+    if (column === "_fivetran_synced" && deletionReconciliation) {
+      return [
+        "  IF(",
+        "    COALESCE(`_fivetran_deleted`, FALSE),",
+        `    TIMESTAMP '${deletionReconciliation.observedAt}',`,
+        "    `_fivetran_synced`",
+        "  ) AS `_fivetran_synced`",
+      ].join("\n");
+    }
 
     if (jsonColumns.has(column)) {
       return `  TO_JSON_STRING(${identifier}) AS ${identifier}`;

@@ -59,6 +59,21 @@ describe("BigQuery export", () => {
     );
   });
 
+  it("reconciles one hourly shard of old ActiveCampaign assignment deletions", () => {
+    const table = TABLE_MANIFEST.find(({ resourceName }) => (
+      resourceName === "raw_activecampaign_contact_tag"
+    ));
+    if (!table) throw new Error("raw_activecampaign_contact_tag is missing");
+
+    const plan = buildExportPlan(table, runAt, exportConfig());
+
+    expect(plan.query).toContain("COALESCE(`_fivetran_deleted`, FALSE)");
+    expect(plan.query).toContain("FARM_FINGERPRINT(CAST(`id` AS STRING))");
+    expect(plan.query).toContain("TIMESTAMP '2026-08-26 12:34:00.000+00'");
+    expect(plan.query).toContain("AS `_fivetran_synced`");
+    expect(plan.query).toContain("  OR (");
+  });
+
   it("exports all seven missing Stripe tables as one typed auxiliary union", () => {
     const table = TABLE_MANIFEST.find(({ resourceName }) => (
       resourceName === "raw_stripe_auxiliary"
