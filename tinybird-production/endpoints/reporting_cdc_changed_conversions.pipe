@@ -38,6 +38,31 @@ SQL >
             <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
     GROUP BY entity_id
 
+NODE changed_server_form_tag_semantics
+SQL >
+    %
+    SELECT
+        tag_id,
+        max(candidate_source_version) AS source_version
+    FROM (
+        SELECT
+            tag_id,
+            source_version AS candidate_source_version,
+            semantic_hash,
+            lagInFrame(semantic_hash, 1, semantic_hash) OVER (
+                PARTITION BY tag_id
+                ORDER BY source_version
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+            ) AS previous_semantic_hash
+        FROM activecampaign_tag_semantic_versions FINAL
+    )
+    WHERE candidate_source_version
+            > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND candidate_source_version
+            <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND semantic_hash != previous_semantic_hash
+    GROUP BY tag_id
+
 NODE changed_server_form_contact_versions
 SQL >
     %
@@ -61,12 +86,8 @@ SQL >
         UNION ALL
         SELECT assignment.contact_id AS contact_id, tag.source_version AS changed_at
         FROM activecampaign_contact_tags_adapter AS assignment
-        INNER JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = assignment.tag_id
+        INNER JOIN changed_server_form_tag_semantics AS tag ON tag.tag_id = assignment.tag_id
         WHERE {{ String(p_entity_scope, 'client') }} = 'server'
-            AND tag.source_version
-                > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
-            AND tag.source_version
-                <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
     )
     WHERE contact_id != ''
     GROUP BY contact_id
