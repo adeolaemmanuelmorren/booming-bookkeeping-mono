@@ -194,21 +194,17 @@ tb --cloud copy run snapshot_mart_payments_client_side
 tb --cloud copy run snapshot_int_payment_plan_timing
 tb --cloud copy run snapshot_segretl_repeatable_conversions
 
-# Stage D.
-tb --cloud copy run snapshot_mart_conversions_with_touchpoints
-
-# Stage E. These three are independent after Stage D.
-tb --cloud copy run snapshot_mart_conversions_multi_touch
-tb --cloud copy run snapshot_mart_revenue_attribution
+# Stages D and E were retired in deployment 126.
+# Conversion journeys, multi-touch, and revenue attribution now read the
+# atomically committed incremental journey state. Do not run snapshot Copies.
 ```
 
-`snapshot_mart_revenue_attribution` also requires the completed payment-plan Copy.
 `snapshot_segretl_repeatable_conversions` requires completed browser-product,
 payment, touchpoint, server-form, and Jitsu-order state.
 
 ## Direct snapshot-backed outputs
 
-Ten of the 40 same-named output Pipes are shallow readers over replace-mode Data
+Seven of the 40 same-named output Pipes are shallow readers over replace-mode Data
 Sources:
 
 | Output | Data Source | Refresh Copy |
@@ -219,9 +215,6 @@ Sources:
 | `mart_payments` | `mart_payments_current` | `snapshot_mart_payments` |
 | `mart_payments_client_side` | `mart_payments_client_side_current` | `snapshot_mart_payments_client_side` |
 | `mart_touchpoints_all` | `mart_touchpoints_all_current` | `snapshot_mart_touchpoints_all` |
-| `mart_conversions_with_touchpoints` | `mart_conversions_with_touchpoints_current` | `snapshot_mart_conversions_with_touchpoints` |
-| `mart_conversions_multi_touch` | `mart_conversions_multi_touch_current` | `snapshot_mart_conversions_multi_touch` |
-| `mart_revenue_attribution` | `mart_revenue_attribution_current` | `snapshot_mart_revenue_attribution` |
 | `segretl_repeatable_conversions` | `segretl_repeatable_conversions_current` | `snapshot_segretl_repeatable_conversions` |
 
 Four other replace-mode Data Sources are physical prerequisites rather than

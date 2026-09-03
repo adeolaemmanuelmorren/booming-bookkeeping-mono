@@ -143,4 +143,23 @@ describe("operator endpoints", () => {
       pendingRepairBatches: 0,
     });
   });
+
+  it("queues a conversion-only journey repair without a profile placeholder", async () => {
+    const response = await handleRequest(
+      new Request("https://sync.example.com/journey/repair", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-admin-token",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          repairId: "deleted-conversion-0001",
+          conversionIds: ["server_form:deleted-1"],
+        }),
+      }),
+      testEnv(),
+    );
+
+    expect(response.status).toBe(202);
+  });
 });

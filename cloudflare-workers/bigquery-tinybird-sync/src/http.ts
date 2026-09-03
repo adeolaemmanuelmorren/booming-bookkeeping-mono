@@ -229,7 +229,7 @@ async function handleJourneyRepair(request: Request, env: WorkerEnv): Promise<Re
   try {
     const input = await parseJsonObject(request);
     const repairId = input.repairId;
-    const profileIds = input.profileIds;
+    const profileIds = input.profileIds ?? [];
     const conversionIds = input.conversionIds ?? [];
     if (typeof repairId !== "string") throw new Error("repairId must be a string.");
     if (!Array.isArray(profileIds)) throw new Error("profileIds must be an array.");
