@@ -39,18 +39,23 @@ describe("reporting facts coordinator", () => {
     const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-window-test");
     const pool = fetchMock.get(tinybirdOrigin);
     const appended: Record<string, unknown>[][] = [];
+    let requestedWindowEnd = "";
 
     pool
       .intercept({
         method: "GET",
         path: (path) => path.startsWith("/v0/pipes/reporting_cdc_changed_visitors.json"),
       })
-      .reply(200, {
-        data: [{
-          visitor_kind: "anonymous",
-          visitor_value: "anon-1",
-          last_ingested_at: "2026-09-01 10:00:05.000000",
-        }],
+      .reply(200, (request) => {
+        const query = new URL(request.path, tinybirdOrigin).searchParams;
+        requestedWindowEnd = query.get("p_ingested_to") ?? "";
+        return {
+          data: [{
+            visitor_kind: "anonymous",
+            visitor_value: "anon-1",
+            last_ingested_at: "2026-09-01 10:00:05.000000",
+          }],
+        };
       });
     pool
       .intercept({
@@ -115,7 +120,7 @@ describe("reporting facts coordinator", () => {
       const status = await instance.status();
       expect(status.activeStream).toBeNull();
       expect(status.lastError).toBeNull();
-      expect(status.touchpointCursor).toBe("2026-09-01 10:00:04.000000");
+      expect(status.touchpointCursor).toBe(requestedWindowEnd);
     });
 
     const rows = appended.flat();

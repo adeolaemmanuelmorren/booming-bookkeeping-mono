@@ -19,8 +19,7 @@ import {
 import {
   conversionDeltaRows,
   expectedConversionIds,
-  maxLastIngestedAt,
-  nextCursorFrom,
+  nextWindowCursor,
   takeConversionEntityPage,
   takeVisitorPage,
   tinybirdDateTime64,
@@ -235,8 +234,11 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
   private async finishWindow(state: FactsState, window: ActiveWindow): Promise<void> {
     await this.flushJourneyRepairs(state, window);
 
-    const latest = maxLastIngestedAt(windowItems(window));
-    const cursor = latest ? nextCursorFrom(latest) : window.windowEnd;
+    const cursor = nextWindowCursor(
+      windowItems(window),
+      window.windowEnd,
+      CHANGED_WINDOW_LIMIT,
+    );
     this.updateState({
       ...(window.stream === "touchpoints"
         ? { touchpoint_cursor: cursor }

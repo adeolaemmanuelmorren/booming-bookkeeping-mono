@@ -4,6 +4,7 @@ import {
   expectedConversionIds,
   maxLastIngestedAt,
   nextCursorFrom,
+  nextWindowCursor,
   takeConversionEntityPage,
   takeVisitorPage,
   tinybirdDateTime64,
@@ -88,6 +89,14 @@ describe("reporting facts anchors and cursors", () => {
       .toBe("2026-09-01 10:00:04.500000");
     expect(tinybirdDateTime64(Date.UTC(2026, 8, 1, 10, 0, 0, 250)))
       .toBe("2026-09-01 10:00:00.250000");
+  });
+
+  it("advances a partial window to its fully-read boundary", () => {
+    expect(nextWindowCursor(
+      [{ lastIngestedAt: "2026-09-01 10:00:05.000000" }],
+      "2026-09-01 10:01:00.000000",
+      2_000,
+    )).toBe("2026-09-01 10:01:00.000000");
   });
 });
 

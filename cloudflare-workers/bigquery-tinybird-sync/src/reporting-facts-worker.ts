@@ -216,6 +216,18 @@ export function nextCursorFrom(lastIngestedAt: string): string {
   return tinybirdDateTime64(parsed - 1_000);
 }
 
+export function nextWindowCursor(
+  rows: readonly { lastIngestedAt: string }[],
+  windowEnd: string,
+  windowLimit: number,
+): string {
+  if (rows.length < windowLimit) return windowEnd;
+
+  const latest = maxLastIngestedAt(rows);
+  if (latest === null) return windowEnd;
+  return nextCursorFrom(latest);
+}
+
 export function tinybirdDateTime64(epochMs: number): string {
   const iso = new Date(epochMs).toISOString();
   return `${iso.slice(0, 10)} ${iso.slice(11, 23)}000`;
