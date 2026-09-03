@@ -467,7 +467,7 @@ function parseAnchorKeys(value: string): string[] {
 
 function isBackpressure(error: unknown): boolean {
   if (error instanceof TinybirdRequestError) {
-    return error.status === 429 || error.status >= 500;
+    return error.status === 408 || error.status === 429 || error.status >= 500;
   }
   return error instanceof DOMException && error.name === "TimeoutError";
 }

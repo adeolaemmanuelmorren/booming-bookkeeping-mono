@@ -232,6 +232,27 @@ describe("reporting facts coordinator", () => {
       expect(status.nextAttemptAt).not.toBeNull();
     });
   });
+
+  it("treats a Tinybird 408 as retryable backpressure", async () => {
+    const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-timeout-test");
+    const pool = fetchMock.get(tinybirdOrigin);
+
+    pool
+      .intercept({
+        method: "GET",
+        path: (path) => path.startsWith("/v0/pipes/reporting_cdc_changed_visitors.json"),
+      })
+      .reply(408, { error: "query timeout" });
+
+    await runInDurableObject(stub, async (instance: ReportingFactsCoordinator) => {
+      await instance.alarm();
+
+      const status = await instance.status();
+      expect(status.phase).toBe("running");
+      expect(status.lastError).toContain("408");
+      expect(status.nextAttemptAt).not.toBeNull();
+    });
+  });
 });
 
 async function clearPacing(instance: ReportingFactsCoordinator): Promise<void> {
