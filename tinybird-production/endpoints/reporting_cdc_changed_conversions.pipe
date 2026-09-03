@@ -71,16 +71,82 @@ SQL >
     WHERE contact_id != ''
     GROUP BY contact_id
 
+NODE current_registration_form_assignments
+SQL >
+    SELECT
+        assignment.contact_tag_id AS contact_tag_id
+    FROM activecampaign_contact_tags_adapter AS assignment
+    INNER JOIN changed_server_form_contact_versions AS changed
+        ON changed.contact_id = assignment.contact_id
+    INNER JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = assignment.tag_id
+    CROSS JOIN activecampaign_registration_tag_policy AS policy
+    WHERE
+        assignment.contact_tag_id != '0'
+        AND assignment.is_deleted = false
+        AND tag.is_deleted = false
+        AND (
+            (policy.tag_match_operator = 'exact' AND tag.tag_name = policy.tag_match_value)
+            OR (
+                policy.tag_match_operator = 'prefix'
+                AND startsWith(tag.tag_name, policy.tag_match_value)
+            )
+        )
+    GROUP BY contact_tag_id
+
+NODE current_server_form_fact_versions
+SQL >
+    SELECT *
+    FROM (
+        SELECT
+            identity_anchor_key,
+            conversion_id,
+            toUInt64(0) AS row_version,
+            toUInt8(0) AS is_deleted
+        FROM reporting_conversion_facts_v2_current
+        WHERE tenant_id = 'boom' AND startsWith(conversion_id, 'server_form:')
+        UNION ALL
+        SELECT
+            identity_anchor_key,
+            conversion_id,
+            row_version,
+            is_deleted
+        FROM reporting_conversion_fact_deltas
+        WHERE tenant_id = 'boom' AND startsWith(conversion_id, 'server_form:')
+    )
+    QUALIFY
+        row_number() OVER (
+            PARTITION BY identity_anchor_key, conversion_id
+            ORDER BY row_version DESC
+        ) = 1
+
+NODE current_server_form_fact_ids
+SQL >
+    SELECT substring(conversion_id, 13) AS contact_tag_id
+    FROM current_server_form_fact_versions
+    WHERE is_deleted = 0
+    GROUP BY contact_tag_id
+
+NODE relevant_server_form_assignment_ids
+SQL >
+    SELECT contact_tag_id
+    FROM (
+        SELECT contact_tag_id FROM current_registration_form_assignments
+        UNION ALL
+        SELECT contact_tag_id FROM current_server_form_fact_ids
+    )
+    GROUP BY contact_tag_id
+
 NODE changed_server_form_entities
 SQL >
     SELECT
         'server_form' AS entity_kind,
-        assignment.contact_tag_id AS entity_id,
+        relevant.contact_tag_id AS entity_id,
         max(changed.last_ingested_at) AS last_ingested_at
-    FROM activecampaign_contact_tags_adapter AS assignment
+    FROM relevant_server_form_assignment_ids AS relevant
+    INNER JOIN activecampaign_contact_tags_adapter AS assignment
+        ON assignment.contact_tag_id = relevant.contact_tag_id
     INNER JOIN changed_server_form_contact_versions AS changed
         ON changed.contact_id = assignment.contact_id
-    WHERE assignment.contact_tag_id != '0'
     GROUP BY entity_id
 
 NODE changed_server_payment_entities
