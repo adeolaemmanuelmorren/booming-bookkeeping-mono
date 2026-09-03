@@ -141,22 +141,33 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
   private async loadNextWindow(state: FactsState): Promise<void> {
     const windowEnd = tinybirdDateTime64(Date.now() - INGESTION_SETTLE_MS);
 
-    if (state.touchpoint_cursor < windowEnd) {
-      const visitors = await readChangedVisitors(
-        state.touchpoint_cursor,
-        windowEnd,
-        CHANGED_WINDOW_LIMIT,
-        this.tinybirdConfig(),
-      );
-      if (visitors.length > 0) {
-        this.startWindow({ stream: "touchpoints", visitors, windowEnd });
-        await this.ensureAlarm();
-        return;
-      }
-      this.updateState({ touchpoint_cursor: windowEnd });
-    }
+    const streams: FactsStream[] = state.touchpoint_cursor <= state.conversion_cursor
+      ? ["touchpoints", "conversions"]
+      : ["conversions", "touchpoints"];
 
-    if (state.conversion_cursor < windowEnd) {
+    for (const stream of streams) {
+      if (stream === "touchpoints") {
+        if (state.touchpoint_cursor >= windowEnd) continue;
+
+        const visitors = await readChangedVisitors(
+          state.touchpoint_cursor,
+          windowEnd,
+          CHANGED_WINDOW_LIMIT,
+          this.tinybirdConfig(),
+        );
+        if (visitors.length > 0) {
+          this.startWindow({ stream, visitors, windowEnd });
+          await this.ensureAlarm();
+          return;
+        }
+
+        state.touchpoint_cursor = windowEnd;
+        this.updateState({ touchpoint_cursor: windowEnd });
+        continue;
+      }
+
+      if (state.conversion_cursor >= windowEnd) continue;
+
       const entities = await readChangedConversionEntities(
         state.conversion_cursor,
         windowEnd,
@@ -164,10 +175,12 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         this.tinybirdConfig(),
       );
       if (entities.length > 0) {
-        this.startWindow({ stream: "conversions", entities, windowEnd });
+        this.startWindow({ stream, entities, windowEnd });
         await this.ensureAlarm();
         return;
       }
+
+      state.conversion_cursor = windowEnd;
       this.updateState({ conversion_cursor: windowEnd });
     }
 
