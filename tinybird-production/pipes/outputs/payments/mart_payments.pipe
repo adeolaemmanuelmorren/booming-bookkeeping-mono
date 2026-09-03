@@ -1,6 +1,8 @@
 DESCRIPTION >
-    Current payments with profile identity resolved at read time.
+    Current payments from the scheduled replace-mode snapshot. Staleness is
+    bounded by the snapshot copy cadence; write-side consumers that need live
+    payment data must read mart_payments_build instead.
 
 NODE current_payment_mart_rows
 SQL >
-    SELECT * FROM mart_payments_build
+    SELECT * EXCEPT (__tb_sort_payment_id) FROM mart_payments_current

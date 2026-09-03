@@ -9,3 +9,4 @@ SQL >
 TYPE COPY
 TARGET_DATASOURCE mart_payments_current
 COPY_MODE replace
+COPY_SCHEDULE 3-59/10 * * * *

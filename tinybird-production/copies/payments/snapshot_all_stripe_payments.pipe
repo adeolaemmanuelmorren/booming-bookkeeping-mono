@@ -68,3 +68,4 @@ SQL >
 TYPE COPY
 TARGET_DATASOURCE all_stripe_payments_current
 COPY_MODE replace
+COPY_SCHEDULE */10 * * * *

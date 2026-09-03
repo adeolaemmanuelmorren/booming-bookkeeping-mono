@@ -9,12 +9,58 @@ DESCRIPTION >
     seen is computed over the scoped visitors only; journey builds never read
     fbc_fbclid, so cross-visitor drift there is accepted.
 
+NODE cdc_scoped_page_view_keys
+SQL >
+    %
+    SELECT __tb_state_key
+    FROM jitsu_page_view_versions
+    WHERE tenant_id = 'boom'
+        AND (
+            {% if defined(p_anonymous_ids) %}
+            anonymous_id IN {{ Array(p_anonymous_ids, 'String') }}
+            {% elif defined(p_anonymous_id) %}
+            anonymous_id = {{ String(p_anonymous_id) }}
+            {% else %}
+            0
+            {% end %}
+        )
+    UNION ALL
+    SELECT __tb_state_key
+    FROM jitsu_page_view_versions
+    WHERE tenant_id = 'boom'
+        AND anonymous_id IS NULL
+        AND (
+            {% if defined(p_user_ids) %}
+            user_id IN {{ Array(p_user_ids, 'String') }}
+            {% elif defined(p_user_id) %}
+            user_id = {{ String(p_user_id) }}
+            {% else %}
+            0
+            {% end %}
+        )
+    UNION ALL
+    SELECT __tb_state_key
+    FROM jitsu_page_view_versions
+    WHERE tenant_id = 'boom'
+        AND anonymous_id IS NULL
+        AND user_id IS NULL
+        AND (
+            {% if defined(p_page_view_ids) %}
+            __tb_state_key IN {{ Array(p_page_view_ids, 'String') }}
+            {% elif defined(p_page_view_id) %}
+            __tb_state_key = {{ String(p_page_view_id) }}
+            {% else %}
+            0
+            {% end %}
+        )
+
 NODE cdc_scoped_page_view_versions
 SQL >
     %
     SELECT *
     FROM jitsu_page_view_versions
     WHERE tenant_id = 'boom'
+        AND __tb_state_key IN (SELECT __tb_state_key FROM cdc_scoped_page_view_keys)
         AND (
             (
                 {% if defined(p_anonymous_ids) %}

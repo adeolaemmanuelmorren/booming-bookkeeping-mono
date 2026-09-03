@@ -1,6 +1,8 @@
 DESCRIPTION >
-    Current payment-plan timing computed after read-time identity resolution.
+    Current payment-plan timing from the scheduled replace-mode snapshot.
+    Staleness is bounded by the snapshot copy cadence; write-side consumers
+    that need live timing must read int_payment_plan_timing_build instead.
 
 NODE current_payment_plan_timing_rows
 SQL >
-    SELECT * FROM int_payment_plan_timing_build
+    SELECT * EXCEPT (__tb_sort_payment_id) FROM int_payment_plan_timing_current
