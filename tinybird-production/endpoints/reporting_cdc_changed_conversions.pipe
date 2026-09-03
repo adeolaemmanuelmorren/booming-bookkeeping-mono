@@ -39,9 +39,12 @@ SQL >
 NODE changed_conversion_entities
 SQL >
     %
-    SELECT * FROM changed_client_form_entities
-    UNION ALL
-    SELECT * FROM changed_client_order_entities
+    SELECT *
+    FROM (
+        SELECT * FROM changed_client_form_entities
+        UNION ALL
+        SELECT * FROM changed_client_order_entities
+    )
     ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC
     LIMIT {{ UInt64(p_limit, 2000) }}
 

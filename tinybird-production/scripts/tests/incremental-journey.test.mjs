@@ -120,6 +120,17 @@ test("the immutable journey snapshot is the seed instead of a historical recompu
   assert.match(current, /LEFT ANTI JOIN latest_journey_commit_versions/);
 });
 
+test("the conversion change endpoint limits the combined entity streams", async () => {
+  const endpoint = await resource(
+    "endpoints/reporting_cdc_changed_conversions.pipe",
+  );
+
+  assert.match(
+    endpoint,
+    /SELECT \*\s+FROM \(\s+SELECT \* FROM changed_client_form_entities\s+UNION ALL\s+SELECT \* FROM changed_client_order_entities\s+\)\s+ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC\s+LIMIT \{\{ UInt64\(p_limit, 2000\) \}\}/,
+  );
+});
+
 async function resource(relativePath) {
   return readFile(path.join(projectRoot, relativePath), "utf8");
 }
