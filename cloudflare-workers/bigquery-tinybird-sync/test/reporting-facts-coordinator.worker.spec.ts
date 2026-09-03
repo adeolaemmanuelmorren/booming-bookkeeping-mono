@@ -171,6 +171,47 @@ describe("reporting facts coordinator", () => {
     });
   });
 
+  it("loads server conversions from their independent seed cursor", async () => {
+    const stub = env.REPORTING_FACTS_COORDINATOR.getByName("server-facts-cursor-test");
+    const pool = fetchMock.get(tinybirdOrigin);
+
+    pool
+      .intercept({
+        method: "GET",
+        path: (path) => {
+          if (!path.startsWith("/v0/pipes/reporting_cdc_changed_conversions.json")) return false;
+          return new URL(path, tinybirdOrigin).searchParams.get("p_entity_scope") === "server";
+        },
+      })
+      .reply(200, {
+        data: [{
+          entity_kind: "server_form",
+          entity_id: "form-2",
+          last_ingested_at: "2026-08-27 00:00:00.000000",
+        }],
+      });
+
+    await runInDurableObject(stub, async (instance: ReportingFactsCoordinator) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (instance as any).ctx.storage.sql.exec(
+        `
+          UPDATE facts_state
+          SET phase = 'running',
+              touchpoint_cursor = '2026-09-03 00:00:00.000000',
+              conversion_cursor = '2026-09-03 00:00:00.000000'
+          WHERE id = 1
+        `,
+      );
+
+      await instance.alarm();
+
+      const status = await instance.status();
+      expect(status.activeStream).toBe("server_conversions");
+      expect(status.serverConversionCursor).toBe("2026-08-26 23:05:00.000000");
+      expect(status.lastError).toBeNull();
+    });
+  });
+
   it("treats a 429 as backpressure and keeps the window", async () => {
     const stub = env.REPORTING_FACTS_COORDINATOR.getByName("facts-backpressure-test");
     const pool = fetchMock.get(tinybirdOrigin);

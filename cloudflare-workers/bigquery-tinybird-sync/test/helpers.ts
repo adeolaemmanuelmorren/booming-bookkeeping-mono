@@ -78,6 +78,7 @@ export function testReportingFactsCoordinator(): DurableObjectNamespace<Reportin
     phase: "idle",
     touchpointCursor: "2026-08-26 23:05:00.000000",
     conversionCursor: "2026-08-26 23:05:00.000000",
+    serverConversionCursor: "2026-08-26 23:05:00.000000",
     activeStream: null,
     completedItems: 0,
     totalItems: 0,

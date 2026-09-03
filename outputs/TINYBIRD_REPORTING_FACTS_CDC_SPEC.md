@@ -11,7 +11,7 @@ Date: 2026-09-01. This closes the staleness the parity check exposed: journey bu
 
 **A new `ReportingFactsCoordinator` Durable Object keeps the deltas current:**
 
-1. Every cycle it reads *changed entities* from the raw version tables, windowed by `source_ingested_at` cursor: visitors with new page views (`reporting_cdc_changed_visitors`), and client form / client order entities (`reporting_cdc_changed_conversions`).
+1. Every cycle it reads *changed entities* from the raw version tables: visitors with new page views, client form / client order entities, and server form / Stripe payment entities. Server conversions use their own cursor so the production upgrade can replay from the immutable seed cutoff without resetting the already-current client cursors.
 2. It rebuilds **whole entities**: a visitor is fully re-sessionized (`reporting_touchpoint_facts_cdc_build`, scoped by literal anonymous/user ids — bloom indexes added to `jitsu_page_view_versions`; form/order entities rebuilt via `reporting_conversion_facts_cdc_build`, scoped by `__tb_state_key`, which is already the sort key). The journey paging lesson is baked in: an entity's data is never split across builds.
 3. It diffs the rebuild against stored heads (`reporting_touchpoint_fact_heads`, `reporting_conversion_fact_heads`) and **tombstones what the rebuild no longer produces**. This matters twice: `session_id = MD5(visitor_key | session_number)`, so a late page view renumbers a visitor's later sessions and the old ids must die; and a conversion whose anchor changed (new email) gets its old row tombstoned *under the old anchor* — the exact "superseded server form" parity bug.
 4. **Late data triggers journey repair.** Before a window's cursor advances, every affected anchor key is resolved to current profiles and pushed into the journey coordinator's existing repair queue. Fresh facts with stale journeys would just recreate the disease one layer up.
@@ -26,7 +26,7 @@ Date: 2026-09-01. This closes the staleness the parity check exposed: journey bu
 
 1. **Tinybird first**: two delta datasources, bloom indexes on `jitsu_page_view_versions` (anonymous_id, user_id), six new endpoint pipes, the updated `reporting_profile_journey_window_build`. Safe before the Worker: empty deltas change nothing.
 2. **Worker** (`npm run check && npm run deploy`): new DO class (migration v4), cron tick, routes, auto-compaction.
-3. Watch `/reporting-facts/status`: cursors should march from Aug 26 toward now. Journey repairs will flow as windows complete.
+3. Watch `/reporting-facts/status`: all three cursors should march toward now. Journey repairs will flow as windows complete.
 
 ## Verification gates
 
@@ -36,8 +36,7 @@ Date: 2026-09-01. This closes the staleness the parity check exposed: journey bu
 4. Re-check the 1-in-50 outlier profile — likely fixed by the above; if not, diagnose it, don't amnesty it.
 5. Queue: watch one scheduled cycle confirm `raw_backlog_autocompacted` fires if queued > 30 and the queue stays bounded.
 
-## Explicitly not covered yet (extend with the same pattern)
+## Explicitly not covered yet
 
-- **Server-side sources are still frozen**: `mart_form_submissions_server_side_facts_current` (ActiveCampaign registrations) and `all_stripe_payments_current` (Stripe/Kajabi payments) are bootstrap snapshots. If parity still misses *server* payments or forms after client CDC lands, this is why. The extension is mechanical: two more branches in the changed-entities endpoint, two more scoped node groups in the build pipe, reading from the live adapter pipes.
 - Journey versions compaction (unchanged roadmap item).
 - Read-side cutover of the three snapshot Copies (unchanged; gated on parity).

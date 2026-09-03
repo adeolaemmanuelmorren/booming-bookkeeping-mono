@@ -56,9 +56,13 @@ describe("reporting facts paging", () => {
     const page = takeConversionEntityPage([
       { entityKind: "client_form", entityId: "form-1", lastIngestedAt: "t" },
       { entityKind: "client_order", entityId: "order-1", lastIngestedAt: "t" },
+      { entityKind: "server_form", entityId: "server-form-1", lastIngestedAt: "t" },
+      { entityKind: "server_payment", entityId: "stripe:charge-1", lastIngestedAt: "t" },
     ]);
     expect(page.formSubmissionIds).toEqual(["form-1"]);
     expect(page.orderEventIds).toEqual(["order-1"]);
+    expect(page.serverFormSubmissionIds).toEqual(["server-form-1"]);
+    expect(page.serverPaymentKeys).toEqual(["stripe:charge-1"]);
   });
 });
 
@@ -78,6 +82,12 @@ describe("reporting facts anchors and cursors", () => {
     expect(expectedConversionIds(
       { entityKind: "client_order", entityId: "o1", lastIngestedAt: "t" },
     )).toEqual(["client_payment:segment_order_o1"]);
+    expect(expectedConversionIds(
+      { entityKind: "server_form", entityId: "f2", lastIngestedAt: "t" },
+    )).toEqual(["server_form:f2"]);
+    expect(expectedConversionIds(
+      { entityKind: "server_payment", entityId: "stripe:ch_1", lastIngestedAt: "t" },
+    )).toEqual(["server_payment:stripe:ch_1"]);
   });
 
   it("advances the cursor one second before the high-water mark", () => {

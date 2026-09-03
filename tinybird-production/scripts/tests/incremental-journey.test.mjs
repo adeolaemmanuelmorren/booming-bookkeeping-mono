@@ -127,8 +127,28 @@ test("the conversion change endpoint limits the combined entity streams", async 
 
   assert.match(
     endpoint,
-    /SELECT \*\s+FROM \(\s+SELECT \* FROM changed_client_form_entities\s+UNION ALL\s+SELECT \* FROM changed_client_order_entities\s+\)\s+ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC\s+LIMIT \{\{ UInt64\(p_limit, 2000\) \}\}/,
+    /SELECT \*\s+FROM \([\s\S]*SELECT \* FROM changed_client_form_entities[\s\S]*SELECT \* FROM changed_server_payment_entities\s+\)\s+ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC\s+LIMIT \{\{ UInt64\(p_limit, 2000\) \}\}/,
   );
+});
+
+test("server forms and payments use the same bounded conversion CDC path", async () => {
+  const changed = await resource(
+    "endpoints/reporting_cdc_changed_conversions.pipe",
+  );
+  const build = await resource(
+    "endpoints/reporting_conversion_facts_cdc_build.pipe",
+  );
+
+  assert.match(changed, /p_entity_scope/);
+  assert.match(changed, /'server_form' AS entity_kind/);
+  assert.match(changed, /'server_payment' AS entity_kind/);
+  assert.match(changed, /FROM activecampaign_contact_tags_adapter/);
+  assert.match(changed, /FROM stripe_identity_facts_adapter/);
+  assert.match(build, /p_server_form_submission_ids/);
+  assert.match(build, /p_server_payment_keys/);
+  assert.match(build, /FROM all_stripe_payments_build AS payments/);
+  assert.match(build, /SELECT \* FROM cdc_server_form_conversion_facts/);
+  assert.match(build, /SELECT \* FROM cdc_server_payment_conversion_facts/);
 });
 
 async function resource(relativePath) {

@@ -12,7 +12,8 @@ SQL >
         assumeNotNull(form_submission_id) AS entity_id,
         max(source_ingested_at) AS last_ingested_at
     FROM jitsu_form_submission_versions
-    WHERE tenant_id = 'boom'
+    WHERE {{ String(p_entity_scope, 'client') }} = 'client'
+        AND tenant_id = 'boom'
         AND form_submission_id IS NOT NULL
         AND source_ingested_at
             > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
@@ -28,11 +29,72 @@ SQL >
         assumeNotNull(event_row_id) AS entity_id,
         max(source_ingested_at) AS last_ingested_at
     FROM jitsu_order_completed_versions
-    WHERE tenant_id = 'boom'
+    WHERE {{ String(p_entity_scope, 'client') }} = 'client'
+        AND tenant_id = 'boom'
         AND event_row_id IS NOT NULL
         AND source_ingested_at
             > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
         AND source_ingested_at
+            <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    GROUP BY entity_id
+
+NODE changed_server_form_contact_versions
+SQL >
+    %
+    SELECT contact_id, max(changed_at) AS last_ingested_at
+    FROM (
+        SELECT contact_id, source_version AS changed_at
+        FROM activecampaign_contact_tags_adapter
+        WHERE {{ String(p_entity_scope, 'client') }} = 'server'
+            AND source_version
+                > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+            AND source_version
+                <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        UNION ALL
+        SELECT contact_id, contact_updated_at AS changed_at
+        FROM activecampaign_contacts_adapter
+        WHERE {{ String(p_entity_scope, 'client') }} = 'server'
+            AND contact_updated_at
+                > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+            AND contact_updated_at
+                <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        UNION ALL
+        SELECT assignment.contact_id AS contact_id, tag.source_version AS changed_at
+        FROM activecampaign_contact_tags_adapter AS assignment
+        INNER JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = assignment.tag_id
+        WHERE {{ String(p_entity_scope, 'client') }} = 'server'
+            AND tag.source_version
+                > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+            AND tag.source_version
+                <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
+    )
+    WHERE contact_id != ''
+    GROUP BY contact_id
+
+NODE changed_server_form_entities
+SQL >
+    SELECT
+        'server_form' AS entity_kind,
+        assignment.contact_tag_id AS entity_id,
+        max(changed.last_ingested_at) AS last_ingested_at
+    FROM activecampaign_contact_tags_adapter AS assignment
+    INNER JOIN changed_server_form_contact_versions AS changed
+        ON changed.contact_id = assignment.contact_id
+    WHERE assignment.contact_tag_id != '0'
+    GROUP BY entity_id
+
+NODE changed_server_payment_entities
+SQL >
+    %
+    SELECT
+        'server_payment' AS entity_kind,
+        concat(payment_source, ':', payment_id) AS entity_id,
+        max(source_version) AS last_ingested_at
+    FROM stripe_identity_facts_adapter
+    WHERE {{ String(p_entity_scope, 'client') }} = 'server'
+        AND source_version
+            > toDateTime64({{ String(p_ingested_from, '1970-01-01 00:00:00') }}, 6, 'UTC')
+        AND source_version
             <= toDateTime64({{ String(p_ingested_to, '1970-01-01 00:00:00') }}, 6, 'UTC')
     GROUP BY entity_id
 
@@ -44,6 +106,10 @@ SQL >
         SELECT * FROM changed_client_form_entities
         UNION ALL
         SELECT * FROM changed_client_order_entities
+        UNION ALL
+        SELECT * FROM changed_server_form_entities
+        UNION ALL
+        SELECT * FROM changed_server_payment_entities
     )
     ORDER BY last_ingested_at ASC, entity_kind ASC, entity_id ASC
     LIMIT {{ UInt64(p_limit, 2000) }}

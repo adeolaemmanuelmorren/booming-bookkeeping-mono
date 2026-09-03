@@ -19,6 +19,8 @@ export interface ConversionEntityPage {
   entities: ChangedConversionEntity[];
   formSubmissionIds: string[];
   orderEventIds: string[];
+  serverFormSubmissionIds: string[];
+  serverPaymentKeys: string[];
 }
 
 export interface FactDeltaBatch {
@@ -54,13 +56,26 @@ export function takeConversionEntityPage(
   entities: ChangedConversionEntity[],
   limit: number = CDC_ENTITY_PAGE_LIMIT,
 ): ConversionEntityPage {
-  const page: ConversionEntityPage = { entities: [], formSubmissionIds: [], orderEventIds: [] };
+  const page: ConversionEntityPage = {
+    entities: [],
+    formSubmissionIds: [],
+    orderEventIds: [],
+    serverFormSubmissionIds: [],
+    serverPaymentKeys: [],
+  };
 
   for (const entity of entities) {
     if (page.entities.length > 0 && entity.entityId.includes(",")) break;
     page.entities.push(entity);
-    if (entity.entityKind === "client_form") page.formSubmissionIds.push(entity.entityId);
-    else page.orderEventIds.push(entity.entityId);
+    if (entity.entityKind === "client_form") {
+      page.formSubmissionIds.push(entity.entityId);
+    } else if (entity.entityKind === "client_order") {
+      page.orderEventIds.push(entity.entityId);
+    } else if (entity.entityKind === "server_form") {
+      page.serverFormSubmissionIds.push(entity.entityId);
+    } else {
+      page.serverPaymentKeys.push(entity.entityId);
+    }
     if (entity.entityId.includes(",")) break;
     if (page.entities.length >= limit) break;
   }
@@ -91,7 +106,13 @@ export function expectedConversionIds(entity: ChangedConversionEntity): string[]
       `client_payment:historical_form_${entity.entityId}`,
     ];
   }
-  return [`client_payment:segment_order_${entity.entityId}`];
+  if (entity.entityKind === "client_order") {
+    return [`client_payment:segment_order_${entity.entityId}`];
+  }
+  if (entity.entityKind === "server_form") {
+    return [`server_form:${entity.entityId}`];
+  }
+  return [`server_payment:${entity.entityId}`];
 }
 
 export interface TouchpointDeltaDiff {

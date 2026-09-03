@@ -712,7 +712,7 @@ export interface ChangedVisitor {
 }
 
 export interface ChangedConversionEntity {
-  entityKind: "client_form" | "client_order";
+  entityKind: "client_form" | "client_order" | "server_form" | "server_payment";
   entityId: string;
   lastIngestedAt: string;
 }
@@ -761,6 +761,31 @@ export async function readChangedConversionEntities(
   const rows = await readPipeRows(
     "reporting_cdc_changed_conversions",
     {
+      p_ingested_from: ingestedFrom,
+      p_ingested_to: ingestedTo,
+      p_limit: String(limit),
+    },
+    config,
+    fetcher,
+  );
+  return rows.map((row) => ({
+    entityKind: conversionEntityKind(row.entity_kind),
+    entityId: requiredString(row.entity_id, "entity_id"),
+    lastIngestedAt: requiredString(row.last_ingested_at, "last_ingested_at"),
+  }));
+}
+
+export async function readChangedServerConversionEntities(
+  ingestedFrom: string,
+  ingestedTo: string,
+  limit: number,
+  config: TinybirdApiConfig,
+  fetcher: Fetcher = fetch,
+): Promise<ChangedConversionEntity[]> {
+  const rows = await readPipeRows(
+    "reporting_cdc_changed_conversions",
+    {
+      p_entity_scope: "server",
       p_ingested_from: ingestedFrom,
       p_ingested_to: ingestedTo,
       p_limit: String(limit),
@@ -824,6 +849,8 @@ export async function readConversionFactCdcBuild(
   entities: {
     formSubmissionIds: string[];
     orderEventIds: string[];
+    serverFormSubmissionIds: string[];
+    serverPaymentKeys: string[];
   },
   config: TinybirdApiConfig,
   fetcher: Fetcher = fetch,
@@ -835,6 +862,16 @@ export async function readConversionFactCdcBuild(
       entities.formSubmissionIds,
     ),
     ...cdcLiteralParameters("p_order_event_ids", "p_order_event_id", entities.orderEventIds),
+    ...cdcLiteralParameters(
+      "p_server_form_submission_ids",
+      "p_server_form_submission_id",
+      entities.serverFormSubmissionIds,
+    ),
+    ...cdcLiteralParameters(
+      "p_server_payment_keys",
+      "p_server_payment_key",
+      entities.serverPaymentKeys,
+    ),
   };
   if (Object.keys(parameters).length === 0) return [];
 
@@ -909,7 +946,12 @@ function visitorKind(value: unknown): ChangedVisitor["visitorKind"] {
 }
 
 function conversionEntityKind(value: unknown): ChangedConversionEntity["entityKind"] {
-  if (value === "client_form" || value === "client_order") return value;
+  if (
+    value === "client_form"
+    || value === "client_order"
+    || value === "server_form"
+    || value === "server_payment"
+  ) return value;
   throw new Error("Tinybird entity_kind value is invalid.");
 }
 

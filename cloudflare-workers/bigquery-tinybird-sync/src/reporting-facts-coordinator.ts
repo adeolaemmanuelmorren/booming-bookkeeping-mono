@@ -5,6 +5,7 @@ import {
   appendConversionFactDeltas,
   appendTouchpointFactDeltas,
   readChangedConversionEntities,
+  readChangedServerConversionEntities,
   readChangedVisitors,
   readConversionFactCdcBuild,
   readConversionFactHeads,
@@ -34,19 +35,20 @@ const DEFAULT_BACKPRESSURE_MS = 60_000;
 const CHANGED_WINDOW_LIMIT = 2_000;
 const JOURNEY_REPAIR_PROFILE_LIMIT = 200;
 const INGESTION_SETTLE_MS = 60_000;
-// The frozen fact seeds were exported at this cutoff; starting both cursors
+// The frozen fact seeds were exported at this cutoff; starting every cursor
 // here makes the first pass through the CDC loop double as the catch-up
 // backfill, with no separate tooling.
 const CDC_EPOCH = "2026-08-26 23:05:00.000000";
 
 type FactsPhase = "idle" | "running" | "failed";
-type FactsStream = "touchpoints" | "conversions";
+type FactsStream = "touchpoints" | "conversions" | "server_conversions";
 
 interface FactsState {
   [key: string]: string | number | null;
   phase: FactsPhase;
   touchpoint_cursor: string;
   conversion_cursor: string;
+  server_conversion_cursor: string;
   active_window_json: string;
   window_index: number;
   page_number: number;
@@ -67,6 +69,7 @@ export interface ReportingFactsStatus {
   phase: FactsPhase;
   touchpointCursor: string;
   conversionCursor: string;
+  serverConversionCursor: string;
   activeStream: FactsStream | null;
   completedItems: number;
   totalItems: number;
@@ -104,6 +107,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
       phase: state.phase,
       touchpointCursor: state.touchpoint_cursor,
       conversionCursor: state.conversion_cursor,
+      serverConversionCursor: state.server_conversion_cursor,
       activeStream: window?.stream ?? null,
       completedItems: state.window_index,
       totalItems: window ? windowItems(window).length : 0,
@@ -141,9 +145,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
   private async loadNextWindow(state: FactsState): Promise<void> {
     const windowEnd = tinybirdDateTime64(Date.now() - INGESTION_SETTLE_MS);
 
-    const streams: FactsStream[] = state.touchpoint_cursor <= state.conversion_cursor
-      ? ["touchpoints", "conversions"]
-      : ["conversions", "touchpoints"];
+    const streams = factsStreamsByOldestCursor(state);
 
     for (const stream of streams) {
       if (stream === "touchpoints") {
@@ -166,10 +168,16 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         continue;
       }
 
-      if (state.conversion_cursor >= windowEnd) continue;
+      const cursor = stream === "conversions"
+        ? state.conversion_cursor
+        : state.server_conversion_cursor;
+      if (cursor >= windowEnd) continue;
 
-      const entities = await readChangedConversionEntities(
-        state.conversion_cursor,
+      const readEntities = stream === "conversions"
+        ? readChangedConversionEntities
+        : readChangedServerConversionEntities;
+      const entities = await readEntities(
+        cursor,
         windowEnd,
         CHANGED_WINDOW_LIMIT,
         this.tinybirdConfig(),
@@ -180,8 +188,13 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         return;
       }
 
-      state.conversion_cursor = windowEnd;
-      this.updateState({ conversion_cursor: windowEnd });
+      if (stream === "conversions") {
+        state.conversion_cursor = windowEnd;
+        this.updateState({ conversion_cursor: windowEnd });
+      } else {
+        state.server_conversion_cursor = windowEnd;
+        this.updateState({ server_conversion_cursor: windowEnd });
+      }
     }
 
     this.updateState({ phase: "idle", next_attempt_at_ms: 0, last_error: null });
@@ -255,7 +268,9 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
     this.updateState({
       ...(window.stream === "touchpoints"
         ? { touchpoint_cursor: cursor }
-        : { conversion_cursor: cursor }),
+        : window.stream === "conversions"
+          ? { conversion_cursor: cursor }
+          : { server_conversion_cursor: cursor }),
       active_window_json: "",
       window_index: 0,
       repair_anchor_keys_json: "[]",
@@ -330,6 +345,7 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         phase TEXT NOT NULL,
         touchpoint_cursor TEXT NOT NULL,
         conversion_cursor TEXT NOT NULL,
+        server_conversion_cursor TEXT NOT NULL,
         active_window_json TEXT NOT NULL,
         window_index INTEGER NOT NULL,
         page_number INTEGER NOT NULL,
@@ -339,12 +355,25 @@ export class ReportingFactsCoordinator extends DurableObject<WorkerEnv> {
         updated_at_ms INTEGER NOT NULL
       );
     `);
+    this.ensureColumn(
+      "server_conversion_cursor",
+      `TEXT NOT NULL DEFAULT '${CDC_EPOCH}'`,
+    );
     this.ctx.storage.sql.exec(
-      `INSERT OR IGNORE INTO facts_state VALUES (1, 'idle', ?, ?, '', 0, 0, '[]', NULL, 0, ?)`,
+      `INSERT OR IGNORE INTO facts_state VALUES (1, 'idle', ?, ?, ?, '', 0, 0, '[]', NULL, 0, ?)`,
+      CDC_EPOCH,
       CDC_EPOCH,
       CDC_EPOCH,
       Date.now(),
     );
+  }
+
+  private ensureColumn(name: string, definition: string): void {
+    const columns = this.ctx.storage.sql.exec<{ name: string }>(
+      "SELECT name FROM pragma_table_info('facts_state')",
+    ).toArray();
+    if (columns.some((column) => column.name === name)) return;
+    this.ctx.storage.sql.exec(`ALTER TABLE facts_state ADD COLUMN ${name} ${definition}`);
   }
 
   private state(): FactsState {
@@ -406,10 +435,24 @@ function windowItems(window: ActiveWindow): { lastIngestedAt: string }[] {
     : (window.entities ?? []);
 }
 
+function factsStreamsByOldestCursor(state: FactsState): FactsStream[] {
+  return [
+    { stream: "touchpoints" as const, cursor: state.touchpoint_cursor },
+    { stream: "conversions" as const, cursor: state.conversion_cursor },
+    { stream: "server_conversions" as const, cursor: state.server_conversion_cursor },
+  ]
+    .sort((left, right) => left.cursor.localeCompare(right.cursor))
+    .map(({ stream }) => stream);
+}
+
 function parseActiveWindow(value: string): ActiveWindow | null {
   if (!value) return null;
   const parsed = JSON.parse(value) as ActiveWindow;
-  if (parsed.stream !== "touchpoints" && parsed.stream !== "conversions") return null;
+  if (
+    parsed.stream !== "touchpoints"
+    && parsed.stream !== "conversions"
+    && parsed.stream !== "server_conversions"
+  ) return null;
   if (!parsed.windowEnd) return null;
   return parsed;
 }
