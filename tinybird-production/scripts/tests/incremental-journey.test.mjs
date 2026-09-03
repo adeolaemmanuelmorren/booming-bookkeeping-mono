@@ -143,9 +143,12 @@ test("server forms and payments use the same bounded conversion CDC path", async
   assert.match(changed, /'server_form' AS entity_kind/);
   assert.match(changed, /'server_payment' AS entity_kind/);
   assert.match(changed, /FROM activecampaign_contact_tags_adapter/);
-  assert.match(changed, /activecampaign_registration_tag_policy/);
-  assert.match(changed, /current_server_form_fact_ids/);
-  assert.match(changed, /current_registration_form_assignments/);
+  assert.match(changed, /FROM activecampaign_registration_build/);
+  assert.match(changed, /current_server_form_fact_heads/);
+  assert.match(changed, /current_registration_form_facts/);
+  assert.match(changed, /changed_or_new_server_form_ids/);
+  assert.match(changed, /removed_or_superseded_server_form_ids/);
+  assert.match(changed, /LEFT ANTI JOIN current_server_form_fact_heads/);
   assert.match(changed, /FROM stripe_identity_facts_adapter/);
   assert.match(build, /p_server_form_submission_ids/);
   assert.match(build, /p_server_payment_keys/);

@@ -71,27 +71,44 @@ SQL >
     WHERE contact_id != ''
     GROUP BY contact_id
 
-NODE current_registration_form_assignments
+NODE current_registration_form_facts
 SQL >
+    WITH
+        replaceRegexpAll(trimBoth(ifNull(form.phone, '')), '[^0-9]', '') AS phone_digits,
+        multiIf(
+            length(phone_digits) = 10,
+            phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'),
+            substring(phone_digits, 2),
+            ''
+        ) AS national_phone
     SELECT
-        assignment.contact_tag_id AS contact_tag_id
-    FROM activecampaign_contact_tags_adapter AS assignment
+        form.form_submission_id AS contact_tag_id,
+        concat('server_form:', form.form_submission_id) AS conversion_id,
+        form.submitted_at AS conversion_time,
+        coalesce(
+            if(form.email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', form.email)),
+            if(
+                match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+                AND substring(national_phone, 4, 3) != '555'
+                AND NOT match(
+                    national_phone,
+                    '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$'
+                )
+                AND NOT match(
+                    national_phone,
+                    '^(0123456789|1234567890|234567890[0-9]|9876543210)$'
+                ),
+                concat('phone:+1', national_phone),
+                CAST(NULL AS Nullable(String))
+            ),
+            ''
+        ) AS identity_anchor_key,
+        form.registration_type AS registration_type
+    FROM activecampaign_registration_build AS form
     INNER JOIN changed_server_form_contact_versions AS changed
-        ON changed.contact_id = assignment.contact_id
-    INNER JOIN activecampaign_tags_adapter AS tag ON tag.tag_id = assignment.tag_id
-    CROSS JOIN activecampaign_registration_tag_policy AS policy
-    WHERE
-        assignment.contact_tag_id != '0'
-        AND assignment.is_deleted = false
-        AND tag.is_deleted = false
-        AND (
-            (policy.tag_match_operator = 'exact' AND tag.tag_name = policy.tag_match_value)
-            OR (
-                policy.tag_match_operator = 'prefix'
-                AND startsWith(tag.tag_name, policy.tag_match_value)
-            )
-        )
-    GROUP BY contact_tag_id
+        ON changed.contact_id = assumeNotNull(form.contact_id)
+    WHERE form.submitted_at IS NOT NULL
 
 NODE current_server_form_fact_versions
 SQL >
@@ -100,6 +117,8 @@ SQL >
         SELECT
             identity_anchor_key,
             conversion_id,
+            conversion_time,
+            registration_type,
             toUInt64(0) AS row_version,
             toUInt8(0) AS is_deleted
         FROM reporting_conversion_facts_v2_current
@@ -108,6 +127,8 @@ SQL >
         SELECT
             identity_anchor_key,
             conversion_id,
+            conversion_time,
+            registration_type,
             row_version,
             is_deleted
         FROM reporting_conversion_fact_deltas
@@ -119,20 +140,48 @@ SQL >
             ORDER BY row_version DESC
         ) = 1
 
-NODE current_server_form_fact_ids
+NODE current_server_form_fact_heads
 SQL >
-    SELECT substring(conversion_id, 13) AS contact_tag_id
-    FROM current_server_form_fact_versions
-    WHERE is_deleted = 0
-    GROUP BY contact_tag_id
+    SELECT
+        substring(fact.conversion_id, 13) AS contact_tag_id,
+        fact.conversion_id AS conversion_id,
+        fact.conversion_time AS conversion_time,
+        fact.identity_anchor_key AS identity_anchor_key,
+        fact.registration_type AS registration_type
+    FROM current_server_form_fact_versions AS fact
+    INNER JOIN activecampaign_contact_tags_adapter AS assignment
+        ON assignment.contact_tag_id = substring(fact.conversion_id, 13)
+    INNER JOIN changed_server_form_contact_versions AS changed
+        ON changed.contact_id = assignment.contact_id
+    WHERE fact.is_deleted = 0
+
+NODE changed_or_new_server_form_ids
+SQL >
+    SELECT current.contact_tag_id AS contact_tag_id
+    FROM current_registration_form_facts AS current
+    LEFT ANTI JOIN current_server_form_fact_heads AS published
+        ON published.conversion_id = current.conversion_id
+        AND published.identity_anchor_key = current.identity_anchor_key
+        AND published.conversion_time = current.conversion_time
+        AND published.registration_type = current.registration_type
+
+NODE removed_or_superseded_server_form_ids
+SQL >
+    SELECT published.contact_tag_id AS contact_tag_id
+    FROM current_server_form_fact_heads AS published
+    LEFT ANTI JOIN current_registration_form_facts AS current
+        ON current.conversion_id = published.conversion_id
+        AND current.identity_anchor_key = published.identity_anchor_key
+        AND current.conversion_time = published.conversion_time
+        AND current.registration_type = published.registration_type
 
 NODE relevant_server_form_assignment_ids
 SQL >
     SELECT contact_tag_id
     FROM (
-        SELECT contact_tag_id FROM current_registration_form_assignments
+        SELECT contact_tag_id FROM changed_or_new_server_form_ids
         UNION ALL
-        SELECT contact_tag_id FROM current_server_form_fact_ids
+        SELECT contact_tag_id FROM removed_or_superseded_server_form_ids
     )
     GROUP BY contact_tag_id
 
