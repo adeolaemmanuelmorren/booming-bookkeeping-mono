@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Web identify observations projected into the canonical identity contract.
+
+NODE web_identify_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        source_system AS source_connection_id,
+        concat(source_system, ':identify') AS source_system,
+        observation_id AS source_record_id,
+        observations.observed_at AS source_version,
+        observations.source_version AS source_changed_at,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        CAST(NULL AS Nullable(String)) AS last_name,
+        toUInt8(0) AS source_deleted
+    FROM web_identity_observation_adapter AS observations

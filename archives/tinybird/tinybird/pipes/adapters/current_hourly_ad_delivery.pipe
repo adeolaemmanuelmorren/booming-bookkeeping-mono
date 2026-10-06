@@ -1,0 +1,28 @@
+DESCRIPTION >
+    GENERATED from the source registry and canonical contracts. Hourly ad delivery
+    keeps provider connection lineage while exposing one reusable shape.
+
+NODE registered_current_hourly_ad_delivery_rows
+SQL >
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.report_generation AS String) AS report_generation,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source AS String) AS source,
+        CAST(rows.hour_start AS DateTime64(6)) AS hour_start,
+        CAST(rows.account_id AS String) AS account_id,
+        CAST(rows.campaign_id AS Nullable(String)) AS campaign_id,
+        CAST(rows.adset_id AS Nullable(String)) AS adset_id,
+        CAST(rows.ad_id AS String) AS ad_id,
+        CAST(rows.campaign_name AS Nullable(String)) AS campaign_name,
+        CAST(rows.adset_name AS Nullable(String)) AS adset_name,
+        CAST(rows.ad_name AS Nullable(String)) AS ad_name,
+        CAST(rows.impressions AS Int64) AS impressions,
+        CAST(rows.clicks AS Int64) AS clicks,
+        CAST(rows.spend AS Decimal(38,9)) AS spend,
+        CAST(rows.currency AS String) AS currency,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version
+    FROM meta_hourly_ad_delivery_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('meta-primary')

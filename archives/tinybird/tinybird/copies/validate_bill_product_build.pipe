@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Persist one validation result for every required Bill product after all product
+    Copies have completed. This Copy is on-demand and must run before approval.
+
+NODE bill_product_build_validation_copy_rows
+SQL >
+    SELECT * FROM bill_product_build_validation
+
+TYPE COPY
+TARGET_DATASOURCE report_build_validations
+COPY_MODE append

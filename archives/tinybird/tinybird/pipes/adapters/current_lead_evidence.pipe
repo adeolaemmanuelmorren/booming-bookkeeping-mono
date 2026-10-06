@@ -1,0 +1,47 @@
+DESCRIPTION >
+    GENERATED from the source registry and canonical contracts. Typed lead evidence
+    preserves tenant and source-connection lineage.
+
+NODE registered_current_lead_rows
+SQL >
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.report_generation AS String) AS report_generation,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.lead_id AS String) AS lead_id,
+        CAST(rows.contact_id AS Nullable(String)) AS contact_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.occurred_at AS DateTime64(6)) AS occurred_at,
+        CAST(rows.lead_type AS String) AS lead_type,
+        CAST(rows.form_id AS Nullable(String)) AS form_id,
+        CAST(rows.form_name AS Nullable(String)) AS form_name,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version
+    FROM activecampaign_lead_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('activecampaign-primary')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.report_generation AS String) AS report_generation,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.lead_id AS String) AS lead_id,
+        CAST(rows.contact_id AS Nullable(String)) AS contact_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.occurred_at AS DateTime64(6)) AS occurred_at,
+        CAST(rows.lead_type AS String) AS lead_type,
+        CAST(rows.form_id AS Nullable(String)) AS form_id,
+        CAST(rows.form_name AS Nullable(String)) AS form_name,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version
+    FROM web_form_lead_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')

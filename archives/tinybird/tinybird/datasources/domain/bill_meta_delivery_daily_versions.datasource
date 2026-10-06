@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Versioned daily Meta delivery at each source-owned hierarchy level. Reach and
+    frequency are never reconstructed from hourly rows or summed across levels.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `date` Date `json:$.date`,
+    `level` LowCardinality(String) `json:$.level`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `impressions` Int64 `json:$.impressions`,
+    `reach` Int64 `json:$.reach`,
+    `frequency` Nullable(Float64) `json:$.frequency`,
+    `materialized_at` DateTime64(6) `json:$.materialized_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, date, level"

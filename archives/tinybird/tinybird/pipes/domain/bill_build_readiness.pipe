@@ -1,0 +1,101 @@
+DESCRIPTION >
+    Single fail-closed build gate for source manifest, compatibility policy, and every
+    required adapter validation. Missing validations count as failures.
+
+NODE bill_build_readiness_row
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        generation.report_generation,
+        generation.version AS source_manifest_version,
+        generation.identity_stable_batch_version,
+        generation.source_manifest_digest,
+        generation.connection_inventory_digest,
+        cutoff_readiness.cutoff_set_digest,
+        generation.semantic_policy_version,
+        generation.policy_digest,
+        policy.compatibility_mode,
+        count() AS required_validation_count,
+        countIf(
+            coverage.adapter_id IS NOT NULL
+            AND coverage.is_covered = 1
+            AND coverage.invalid_row_count = 0
+        ) AS passed_validation_count,
+        groupArrayIf(
+            concat(
+                requirements.adapter_id,
+                ':',
+                requirements.validation_name,
+                if(
+                    coverage.adapter_id IS NULL,
+                    ':missing',
+                    concat(':', coverage.blocking_reason)
+                )
+            ),
+            coverage.adapter_id IS NULL
+            OR coverage.is_covered = 0
+            OR coverage.invalid_row_count != 0
+        ) AS blocking_validations,
+        toUInt8(
+            policy.compatibility_mode = 'dataform_compat_v1'
+            AND cutoff_readiness.is_ready = 1
+            AND cutoff_readiness.connection_inventory_digest = generation.connection_inventory_digest
+            AND policy.semantic_policy_version = generation.semantic_policy_version
+            AND policy.policy_digest = generation.policy_digest
+            AND policy.report_timezone = 'America/Los_Angeles'
+            AND policy.range_mode = 'start_inclusive_end_exclusive'
+            AND policy.click_identity_mode = 'first_party_only'
+            AND policy.preserve_generic_row_presence = 1
+            AND policy.immediate_vip_requires_positive_net = 0
+            AND policy.five_k_net_threshold = toDecimal128(900, 9)
+            AND policy.five_k_reported_value = 4997
+            AND policy.daily_delivery_mode = 'daily_own_level'
+            AND count() = countIf(
+                coverage.adapter_id IS NOT NULL
+                AND coverage.is_covered = 1
+                AND coverage.invalid_row_count = 0
+            )
+        ) AS is_ready
+    FROM current_source_generation AS generation
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON generation.tenant_id = cutoff_readiness.tenant_id
+       AND generation.source_generation_id = cutoff_readiness.source_generation_id
+       AND generation.version = cutoff_readiness.source_manifest_version
+       AND generation.source_manifest_digest = cutoff_readiness.source_manifest_digest
+    CROSS JOIN current_report_policy AS policy
+    CROSS JOIN bill_adapter_coverage_requirements AS requirements
+    LEFT JOIN current_adapter_coverage AS coverage
+        ON coverage.tenant_id = generation.tenant_id
+       AND coverage.source_generation_id = generation.source_generation_id
+       AND coverage.source_manifest_version = generation.version
+       AND coverage.source_manifest_digest = generation.source_manifest_digest
+       AND coverage.connection_inventory_digest = generation.connection_inventory_digest
+       AND coverage.cutoff_set_digest = cutoff_readiness.cutoff_set_digest
+       AND coverage.adapter_id = requirements.adapter_id
+       AND coverage.contract_name = requirements.contract_name
+       AND coverage.validation_name = requirements.validation_name
+    GROUP BY
+        generation.tenant_id,
+        generation.source_generation_id,
+        generation.report_generation,
+        generation.version,
+        generation.identity_stable_batch_version,
+        generation.source_manifest_digest,
+        generation.connection_inventory_digest,
+        cutoff_readiness.cutoff_set_digest,
+        cutoff_readiness.connection_inventory_digest,
+        cutoff_readiness.is_ready,
+        generation.semantic_policy_version,
+        generation.policy_digest,
+        policy.compatibility_mode,
+        policy.semantic_policy_version,
+        policy.policy_digest,
+        policy.report_timezone,
+        policy.range_mode,
+        policy.click_identity_mode,
+        policy.preserve_generic_row_presence,
+        policy.immediate_vip_requires_positive_net,
+        policy.five_k_net_threshold,
+        policy.five_k_reported_value,
+        policy.daily_delivery_mode

@@ -1,0 +1,57 @@
+DESCRIPTION >
+    Latest manual payment-to-profile decision. A later unlink suppresses every older link;
+    the join key intentionally remains payment_id without payment-source qualification.
+
+NODE ranked_manual_profile_link_events
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        nullIf(trim(source.payment_id), '') AS payment_id,
+        nullIf(trim(source.profile_id), '') AS manual_profile_id,
+        lowerUTF8(nullIf(trim(source.action), '')) AS action,
+        source.created_at AS manual_link_created_at,
+        nullIf(trim(source.created_by), '') AS manual_link_created_by,
+        row_number() OVER (
+            PARTITION BY nullIf(trim(source.payment_id), '')
+            ORDER BY source.created_at DESC, source.link_event_id DESC
+        ) AS event_rank
+    FROM raw_manual_attribution_manual_payment_profile_link_events AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source.created_at <= generation.manual_cutoff
+      AND nullIf(trim(source.payment_id), '') IS NOT NULL
+
+NODE current_manual_payment_profile_links
+SQL >
+    SELECT
+        links.source_generation_id,
+        links.report_generation,
+        links.tenant_id,
+        coalesce(connections.source_connection_id, '') AS source_connection_id,
+        toUInt64(coalesce(connections.source_connection_count, 0)) AS source_connection_count,
+        links.payment_id,
+        links.manual_profile_id,
+        links.manual_link_created_at,
+        links.manual_link_created_by
+    FROM ranked_manual_profile_link_events AS links
+    LEFT JOIN (
+        SELECT
+            source_generation_id,
+            tenant_id,
+            payment_id,
+            if(
+                uniqExact(source_connection_id) = 1,
+                any(source_connection_id),
+                ''
+            ) AS source_connection_id,
+            toUInt64(uniqExact(source_connection_id)) AS source_connection_count
+        FROM current_payment_evidence
+        GROUP BY source_generation_id, tenant_id, payment_id
+    ) AS connections
+        ON links.source_generation_id = connections.source_generation_id
+       AND links.tenant_id = connections.tenant_id
+       AND links.payment_id = connections.payment_id
+    WHERE links.event_rank = 1
+      AND links.action = 'link'
+      AND links.manual_profile_id IS NOT NULL

@@ -32,6 +32,7 @@ import {
 } from './stripe/routes';
 
 export { ConsentShard, PurchaseState };
+export { StripeSource } from '../../source-gateways/stripe';
 
 function isPublicPath(path: string): boolean {
 	return isJitsuWorkerPath(path) ||

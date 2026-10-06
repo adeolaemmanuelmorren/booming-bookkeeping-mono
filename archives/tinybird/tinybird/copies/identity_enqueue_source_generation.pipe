@@ -1,0 +1,10 @@
+DESCRIPTION >
+    On-demand enqueue of one validated source generation into replay-safe sequenced identity input.
+
+NODE generation_events_to_enqueue
+SQL >
+    SELECT * FROM source_generation_identity_events
+
+TYPE COPY
+TARGET_DATASOURCE identity_events_raw
+COPY_MODE append

@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Append one complete validated shadow generation of the shared hourly Bill product.
+
+NODE validated_hourly_product_copy_rows
+SQL >
+    SELECT product.*
+    FROM bill_hourly_product AS product
+    INNER JOIN bill_build_readiness AS readiness
+        ON product.report_generation = readiness.report_generation
+       AND readiness.is_ready = 1
+
+TYPE COPY
+TARGET_DATASOURCE bill_hourly_product_versions
+COPY_MODE append

@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "tenant": "boom",
+  "offline_validation": {
+    "command": "node tinybird/scripts/report-oracle.mjs",
+    "dependencies": "node-builtins-only",
+    "fixture_policy": "synthetic-no-pii",
+    "covered_behaviors": [
+      "raw-url-parameter-compatibility",
+      "null-event-id-collapse",
+      "pacific-half-open-bounds",
+      "strict-invalid-date-rejection",
+      "latest-generation-lifecycle-state",
+      "latest-applicable-registration",
+      "refunded-immediate-vip",
+      "strict-net-amount-threshold",
+      "fixed-4997-reported-value",
+      "pre-registration-paid-touch-only",
+      "generic-conversion-row-presence",
+      "daily-own-level-reach-frequency",
+      "exact-endpoint-column-order",
+      "fail-closed-adapter-readiness",
+      "registry-generated-explicit-contract-fan-ins",
+      "registry-source-ownership-and-connection-fences",
+      "registry-generated-contract-coverage-and-readiness",
+      "canonical-lead-fan-in-to-boom-registration-policy",
+      "daily-meta-name-enrichment-through-canonical-ad-delivery",
+      "cross-connection-payment-grain",
+      "exact-four-named-product-stages",
+      "immutable-materialization-attempt-pins",
+      "policy-content-digest-pinning",
+      "connection-inventory-digest-pinning",
+      "cutoff-set-digest-pinning",
+      "manifest-versioned-adapter-coverage",
+      "approved-generation-activation-barrier"
+    ]
+  },
+  "tinybird_validation": {
+    "status": "unverified_tinybird_branch",
+    "required_gates": [
+      "all-datafiles-compile",
+      "copy-target-projection-types",
+      "endpoint-invalid-parameter-http-behavior",
+      "fixture-query-results",
+      "copy-idempotence-and-generation-activation",
+      "production-scale-query-cost"
+    ]
+  }
+}

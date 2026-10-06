@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Named, versioned coverage checks for every adapter required by the Bill products.
+    Missing or failed rows block publication instead of silently producing partial data.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` String `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `adapter_id` LowCardinality(String) `json:$.adapter_id`,
+    `contract_name` LowCardinality(String) `json:$.contract_name`,
+    `validation_name` String `json:$.validation_name`,
+    `is_covered` UInt8 `json:$.is_covered`,
+    `invalid_row_count` UInt64 `json:$.invalid_row_count`,
+    `blocking_reason` String `json:$.blocking_reason`,
+    `checked_at` DateTime64(6) `json:$.checked_at`,
+    `version` UInt64 `json:$.version`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, source_generation_id, source_manifest_version, adapter_id, validation_name, version"

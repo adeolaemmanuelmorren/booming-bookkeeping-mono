@@ -1,0 +1,47 @@
+{
+  "baselineId": "boom-browser-20260905-v1",
+  "tenantId": "boom",
+  "algorithmVersion": "browser-facts-session-identity-v1",
+  "workspaceId": "00c04079-d0b4-4d8b-8de6-6fa8072b85af",
+  "workspaceName": "booming_bookkeeping",
+  "startedAt": "2026-09-05T22:28:00.000000Z",
+  "region": "us-east4",
+  "importMode": "one-object-per-content",
+  "landingTables": {
+    "raw_boom_domains_attr": "v1_history_boom_domains_attr",
+    "raw_boom_domains_form_submitted": "v1_history_boom_domains_form_submitted",
+    "raw_boom_domains_identifies": "v1_history_boom_domains_identifies",
+    "raw_boom_domains_order_completed": "v1_history_boom_domains_order_completed",
+    "raw_boom_domains_pages": "v1_history_boom_domains_pages",
+    "raw_jitsu_data_attr": "v1_history_jitsu_data_attr",
+    "raw_jitsu_data_form_submitted": "v1_history_jitsu_data_form_submitted",
+    "raw_jitsu_data_identifies": "v1_history_jitsu_data_identifies",
+    "raw_jitsu_data_order_completed": "v1_history_jitsu_data_order_completed",
+    "raw_jitsu_data_pages": "v1_history_jitsu_data_pages"
+  },
+  "landingRecordIdColumns": {
+    "raw_boom_domains_attr": "__tb_sort_1",
+    "raw_boom_domains_form_submitted": "__tb_sort_1",
+    "raw_boom_domains_identifies": "__tb_sort_1",
+    "raw_boom_domains_order_completed": "__tb_sort_1",
+    "raw_boom_domains_pages": "__tb_sort_1",
+    "raw_jitsu_data_attr": "__tb_sort_1",
+    "raw_jitsu_data_form_submitted": "__tb_sort_1",
+    "raw_jitsu_data_identifies": "__tb_sort_1",
+    "raw_jitsu_data_order_completed": "__tb_sort_1",
+    "raw_jitsu_data_pages": "__tb_sort_1"
+  },
+  "live": {
+    "table": "v1_history_live_jitsu",
+    "cutoff": "2026-09-05 21:41:23.124153",
+    "expectedPhysicalRows": 793170
+  },
+  "pageSize": 1000,
+  "batchSize": 5000,
+  "maxVisitorsPerChunk": 5000,
+  "maxSessionRecordsPerChunk": 10000,
+  "maxIdentityFactsPerBatch": 10000,
+  "maxIdentityFactsPerComponent": 500000,
+  "maxIdentifiers": 30000000,
+  "bulk": true
+}

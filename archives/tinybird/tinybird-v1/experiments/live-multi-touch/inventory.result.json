@@ -1,0 +1,105 @@
+{
+  "checkedAt": "2026-09-08T02:08:42.150Z",
+  "workspace": "booming_bookkeeping",
+  "sqlFile": "tinybird-v1/experiments/live-multi-touch/inventory.sql",
+  "wallMs": 6168,
+  "httpStatus": 200,
+  "statistics": {
+    "elapsed": 5.70114633,
+    "rows_read": 7872233,
+    "bytes_read": 538881442
+  },
+  "rows": 10,
+  "data": [
+    {
+      "dataset": "orders",
+      "kind": "jitsu",
+      "detail": "",
+      "rows": 5851,
+      "fields": "",
+      "earliest": "2026-07-19 13:36:16.536000",
+      "latest": "2026-09-05 05:01:09.723000"
+    },
+    {
+      "dataset": "pages",
+      "kind": "jitsu",
+      "detail": "",
+      "rows": 2311083,
+      "fields": "",
+      "earliest": "1970-01-02 01:38:26.325000",
+      "latest": "2117-01-01 08:38:56.372000"
+    },
+    {
+      "dataset": "forms",
+      "kind": "jitsu",
+      "detail": "",
+      "rows": 101845,
+      "fields": "",
+      "earliest": "2025-11-16 04:43:53.999000",
+      "latest": "2117-01-01 08:26:10.571000"
+    },
+    {
+      "dataset": "source_records",
+      "kind": "stripe",
+      "detail": "evidence",
+      "rows": 175000,
+      "fields": "evidence_inbox_ids,observed_at",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "source_records",
+      "kind": "stripe",
+      "detail": "conversion",
+      "rows": 35000,
+      "fields": "amount_captured_minor,amount_minor,amount_refunded_minor,balance_transaction_id,billing_details,calculated_statement_descriptor,captured,charge_id,currency,customer_id,description,email,has_refund,invoice_id,is_deleted,is_fully_refunded,livemode,metadata,name,net_amount_minor,occurred_at,payment_intent_id,payment_method_id,payment_method_type,phone,provider_event_created_at,provider_event_id,provider_event_key,provider_event_type,provider_refunded,provider_source_version_at,raw_evidence,receipt_email,receipt_number,receipt_url,received_at,refund_ids,replacement_scope_id,replacement_version_id,shipping,source,source_account,source_adapter,source_fact_id,source_observation_sequence,source_version_at,source_version_id,statement_descriptor,statement_descriptor_suffix,tombstone_reason,transfer_id",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "identifiers",
+      "kind": "user_id",
+      "detail": "",
+      "rows": 903527,
+      "fields": "",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "identifiers",
+      "kind": "phone",
+      "detail": "",
+      "rows": 839857,
+      "fields": "",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "identifiers",
+      "kind": "email",
+      "detail": "",
+      "rows": 903543,
+      "fields": "",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "identifiers",
+      "kind": "canonical_email",
+      "detail": "",
+      "rows": 902054,
+      "fields": "",
+      "earliest": "",
+      "latest": ""
+    },
+    {
+      "dataset": "identifiers",
+      "kind": "anonymous_id",
+      "detail": "",
+      "rows": 1694473,
+      "fields": "",
+      "earliest": "",
+      "latest": ""
+    }
+  ]
+}

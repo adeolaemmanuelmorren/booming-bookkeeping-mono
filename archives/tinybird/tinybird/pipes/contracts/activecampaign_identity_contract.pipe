@@ -1,0 +1,22 @@
+DESCRIPTION >
+    ActiveCampaign registration evidence projected into the canonical identity contract.
+
+NODE activecampaign_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        'activecampaign-primary' AS source_connection_id,
+        'activecampaign:registration' AS source_system,
+        registration_id AS source_record_id,
+        registrations.submitted_at AS source_version,
+        registrations.source_version AS source_changed_at,
+        submitted_at AS observed_at,
+        CAST(NULL AS Nullable(String)) AS anonymous_id,
+        email AS user_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        toUInt8(0) AS source_deleted
+    FROM activecampaign_registration_adapter AS registrations

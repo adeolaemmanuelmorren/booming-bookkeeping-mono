@@ -1,0 +1,146 @@
+DESCRIPTION >
+    Native daily Meta campaign, ad-set, and ad delivery. Reach and frequency stay on the
+    source-owned hierarchy row and are never added across levels.
+
+NODE current_meta_campaign_delivery_source
+SQL >
+    SELECT source.*
+    FROM raw_facebook_ads_basic_campaign AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source._fivetran_synced <= generation.meta_cutoff
+      AND source.date <= toDate(generation.meta_cutoff, 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY source.date, source.account_id, source.campaign_id, source._fivetran_id
+        ORDER BY source._fivetran_synced DESC
+    ) = 1
+
+NODE current_meta_adset_delivery_source
+SQL >
+    SELECT source.*
+    FROM raw_facebook_ads_basic_ad_set AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source._fivetran_synced <= generation.meta_cutoff
+      AND source.date <= toDate(generation.meta_cutoff, 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY source.date, source.account_id, source.adset_id, source._fivetran_id
+        ORDER BY source._fivetran_synced DESC
+    ) = 1
+
+NODE current_meta_ad_delivery_source
+SQL >
+    SELECT source.*
+    FROM raw_facebook_ads_basic_ad AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source._fivetran_synced <= generation.meta_cutoff
+      AND source.date <= toDate(generation.meta_cutoff, 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY source.date, source.account_id, source.ad_id, source._fivetran_id
+        ORDER BY source._fivetran_synced DESC
+    ) = 1
+
+NODE meta_campaign_delivery_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        source.date,
+        'campaign' AS level,
+        toString(source.account_id) AS account_id,
+        toString(source.campaign_id) AS campaign_id,
+        CAST(NULL AS Nullable(String)) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        coalesce(dimensions.campaign_name, nullIf(trim(source.campaign_name), ''), 'unknown') AS campaign_name,
+        CAST(NULL AS Nullable(String)) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        coalesce(source.impressions, toInt64(0)) AS impressions,
+        toDecimal128(coalesce(source.spend, 0), 9) AS spend,
+        coalesce(source.reach, toInt64(0)) AS reach,
+        if(
+            coalesce(source.reach, toInt64(0)) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            coalesce(source.impressions, toInt64(0)) / toFloat64(source.reach)
+        ) AS frequency,
+        'USD' AS currency,
+        source._fivetran_synced AS source_version
+    FROM current_meta_campaign_delivery_source AS source
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN meta_ad_dimension_adapter AS dimensions
+        ON dimensions.dimension_level = 'campaign'
+       AND toString(source.campaign_id) = dimensions.campaign_id
+    WHERE coalesce(source.impressions, 0) > 0
+       OR coalesce(source.spend, 0) > 0
+
+NODE meta_adset_delivery_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        source.date,
+        'adset' AS level,
+        toString(source.account_id) AS account_id,
+        dimensions.campaign_id AS campaign_id,
+        toString(source.adset_id) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        coalesce(dimensions.campaign_name, nullIf(trim(source.campaign_name), ''), 'unknown') AS campaign_name,
+        coalesce(dimensions.adset_name, nullIf(trim(source.adset_name), '')) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        coalesce(source.impressions, toInt64(0)) AS impressions,
+        toDecimal128(coalesce(source.spend, 0), 9) AS spend,
+        coalesce(source.reach, toInt64(0)) AS reach,
+        if(
+            coalesce(source.reach, toInt64(0)) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            coalesce(source.impressions, toInt64(0)) / toFloat64(source.reach)
+        ) AS frequency,
+        'USD' AS currency,
+        source._fivetran_synced AS source_version
+    FROM current_meta_adset_delivery_source AS source
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN meta_ad_dimension_adapter AS dimensions
+        ON dimensions.dimension_level = 'adset'
+       AND toString(source.adset_id) = dimensions.adset_id
+    WHERE coalesce(source.impressions, 0) > 0
+       OR coalesce(source.spend, 0) > 0
+
+NODE meta_ad_delivery_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        source.date,
+        'ad' AS level,
+        toString(source.account_id) AS account_id,
+        coalesce(dimensions.campaign_id, toString(source.campaign_id)) AS campaign_id,
+        dimensions.adset_id AS adset_id,
+        toString(source.ad_id) AS ad_id,
+        coalesce(dimensions.campaign_name, 'unknown') AS campaign_name,
+        coalesce(dimensions.adset_name, nullIf(trim(source.adset_name), '')) AS adset_name,
+        coalesce(dimensions.ad_name, nullIf(trim(source.ad_name), '')) AS ad_name,
+        coalesce(source.impressions, toInt64(0)) AS impressions,
+        toDecimal128(coalesce(source.spend, 0), 9) AS spend,
+        coalesce(source.reach, toInt64(0)) AS reach,
+        if(
+            coalesce(source.reach, toInt64(0)) = 0,
+            CAST(NULL AS Nullable(Float64)),
+            coalesce(source.impressions, toInt64(0)) / toFloat64(source.reach)
+        ) AS frequency,
+        'USD' AS currency,
+        source._fivetran_synced AS source_version
+    FROM current_meta_ad_delivery_source AS source
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN meta_ad_dimension_adapter AS dimensions
+        ON dimensions.dimension_level = 'ad'
+       AND toString(source.ad_id) = dimensions.ad_id
+    WHERE coalesce(source.impressions, 0) > 0
+       OR coalesce(source.spend, 0) > 0
+
+NODE current_meta_daily_delivery_rows
+SQL >
+    SELECT * FROM meta_campaign_delivery_contract_rows
+    UNION ALL
+    SELECT * FROM meta_adset_delivery_contract_rows
+    UNION ALL
+    SELECT * FROM meta_ad_delivery_contract_rows

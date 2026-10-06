@@ -18,6 +18,7 @@ __pycache__/
 !.dev.vars.*.example
 
 # Dataform
+/dataform/
 .dataform/
 .df-credentials.json
 
@@ -70,3 +71,6 @@ temp/
 
 # Tinybird CLI local credentials (contains the workspace admin token)
 .tinyb
+
+# Google Cloud Platform credentials
+boomingbookkeeping-key.json

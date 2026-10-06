@@ -1,0 +1,43 @@
+{
+  "verified": true,
+  "scenario": "scale:c2c18826-47b6-4673-a2fd-9e7deecf7481",
+  "profiles": 1000,
+  "touches": 100000,
+  "conversions": 150000,
+  "distinctConversionTimes": true,
+  "chunks": 1000,
+  "contributionRows": 24000,
+  "reportRows": 2400,
+  "prepareIncludingReferenceMs": 13125.577125,
+  "publicationMs": null,
+  "runs": [
+    {
+      "wallMs": 856.9778340000012,
+      "statistics": {
+        "elapsed": 0.63300804,
+        "rows_read": 1041,
+        "bytes_read": 64233826
+      },
+      "maxDifference": 8.009374141693115e-8
+    },
+    {
+      "wallMs": 844.4182920000021,
+      "statistics": {
+        "elapsed": 0.625091204,
+        "rows_read": 1041,
+        "bytes_read": 64233826
+      },
+      "maxDifference": 7.82310962677002e-8
+    },
+    {
+      "wallMs": 875.021041,
+      "statistics": {
+        "elapsed": 0.66138252,
+        "rows_read": 1041,
+        "bytes_read": 64233826
+      },
+      "maxDifference": 8.009374141693115e-8
+    }
+  ],
+  "reader": "single-commit-scan"
+}

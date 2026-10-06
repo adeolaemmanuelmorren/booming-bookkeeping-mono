@@ -1,0 +1,64 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.facebook_ads.campaign_history.
+    Source role: meta_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_time` Nullable(DateTime64(6)) `json:$.updated_time`,
+    `account_id` Nullable(Int64) `json:$.account_id`,
+    `source_campaign_id` Nullable(Int64) `json:$.source_campaign_id`,
+    `bid_strategy` Nullable(String) `json:$.bid_strategy`,
+    `boosted_object_id` Nullable(Int64) `json:$.boosted_object_id`,
+    `budget_rebalance_flag` Nullable(Bool) `json:$.budget_rebalance_flag`,
+    `budget_remaining` Nullable(Float64) `json:$.budget_remaining`,
+    `buying_type` Nullable(String) `json:$.buying_type`,
+    `can_create_brand_lift_study` Nullable(Bool) `json:$.can_create_brand_lift_study`,
+    `can_use_spend_cap` Nullable(Bool) `json:$.can_use_spend_cap`,
+    `configured_status` Nullable(String) `json:$.configured_status`,
+    `created_time` Nullable(DateTime64(6)) `json:$.created_time`,
+    `daily_budget` Nullable(Int64) `json:$.daily_budget`,
+    `effective_status` Nullable(String) `json:$.effective_status`,
+    `is_skadnetwork_attribution` Nullable(Bool) `json:$.is_skadnetwork_attribution`,
+    `last_budget_toggling_time` Nullable(DateTime64(6)) `json:$.last_budget_toggling_time`,
+    `lifetime_budget` Nullable(Int64) `json:$.lifetime_budget`,
+    `name` Nullable(String) `json:$.name`,
+    `objective` Nullable(String) `json:$.objective`,
+    `smart_promotion_type` Nullable(String) `json:$.smart_promotion_type`,
+    `special_ad_category` Nullable(String) `json:$.special_ad_category`,
+    `spend_cap` Nullable(Int64) `json:$.spend_cap`,
+    `start_time` Nullable(DateTime64(6)) `json:$.start_time`,
+    `status` Nullable(String) `json:$.status`,
+    `stop_time` Nullable(DateTime64(6)) `json:$.stop_time`,
+    `topline_id` Nullable(Int64) `json:$.topline_id`,
+    `pacing_type` Nullable(String) `json:$.pacing_type`,
+    `special_ad_categories` Nullable(String) `json:$.special_ad_categories`,
+    `special_ad_category_country` Nullable(String) `json:$.special_ad_category_country`,
+    `promoted_object_application_id` Nullable(Int64) `json:$.promoted_object_application_id`,
+    `promoted_object_custom_conversion_id` Nullable(Int64) `json:$.promoted_object_custom_conversion_id`,
+    `promoted_object_custom_event_str` Nullable(String) `json:$.promoted_object_custom_event_str`,
+    `promoted_object_custom_event_type` Nullable(String) `json:$.promoted_object_custom_event_type`,
+    `promoted_object_event_id` Nullable(Int64) `json:$.promoted_object_event_id`,
+    `promoted_object_object_store_url` Nullable(String) `json:$.promoted_object_object_store_url`,
+    `promoted_object_offer_id` Nullable(Int64) `json:$.promoted_object_offer_id`,
+    `promoted_object_offline_conversion_data_set_id` Nullable(Int64) `json:$.promoted_object_offline_conversion_data_set_id`,
+    `promoted_object_page_id` Nullable(Int64) `json:$.promoted_object_page_id`,
+    `promoted_object_pixel_aggregation_rule` Nullable(String) `json:$.promoted_object_pixel_aggregation_rule`,
+    `promoted_object_pixel_id` Nullable(Int64) `json:$.promoted_object_pixel_id`,
+    `promoted_object_pixel_rule` Nullable(String) `json:$.promoted_object_pixel_rule`,
+    `promoted_object_place_page_set_id` Nullable(Int64) `json:$.promoted_object_place_page_set_id`,
+    `promoted_object_product_catalog_id` Nullable(Int64) `json:$.promoted_object_product_catalog_id`,
+    `promoted_object_product_set_id` Nullable(Int64) `json:$.promoted_object_product_set_id`,
+    `promoted_object_retention_days` Nullable(String) `json:$.promoted_object_retention_days`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(updated_time, toDateTime64(0, 6)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/facebook_ads/campaign_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

@@ -1,0 +1,53 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "boom-tinybird-facts-v1",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "vars": {
+    "TENANT_ID": "boom",
+    "TINYBIRD_URL": "https://api.us-east.tinybird.co",
+    "INGESTION_ENABLED": "false",
+    "IDENTITY_INGESTION_ENABLED": "false",
+    "IDENTITY_BASELINE_ID": "boom-identity-20260905-v1",
+    "BROWSER_INGRESS_MODE": "collect",
+    "FIVETRAN_SNAPSHOT_AT": "2026-09-05T22:28:00.000000Z",
+    "SESSION_FLUSH_DELAY_MS": "1000"
+  },
+  "services": [
+    { "binding": "SESSION_PUBLISHER", "service": "boom-tinybird-facts-v1", "entrypoint": "SessionSnapshotPublisher" },
+    { "binding": "SOURCE_PUBLISHER", "service": "boom-tinybird-facts-v1", "entrypoint": "SourceReplacementPublisher" },
+    { "binding": "BROWSER_SOURCE_PUBLISHER", "service": "boom-tinybird-facts-v1", "entrypoint": "BrowserSourcePublisher" },
+    { "binding": "GROUP_PUBLISHER", "service": "boom-tinybird-facts-v1", "entrypoint": "BrowserGroupPublisher" },
+    { "binding": "BROWSER_INGRESS", "service": "boom-tinybird-facts-v1", "entrypoint": "BrowserIngress" },
+    { "binding": "IDENTITY_BASELINE", "service": "boom-tinybird-facts-v1", "entrypoint": "IdentityBaseline" },
+    { "binding": "BROWSER_BASELINE", "service": "boom-tinybird-facts-v1", "entrypoint": "BootstrapBaseline" },
+    { "binding": "SESSION_BASELINE", "service": "boom-tinybird-facts-v1", "entrypoint": "BootstrapBaseline" }
+  ],
+  "r2_buckets": [
+    { "binding": "BROWSER_BUFFER", "bucket_name": "boom-tinybird-v1-browser-buffer" }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "IDENTITY", "class_name": "IdentityCoordinator" },
+      { "name": "VISITORS", "class_name": "VisitorSessions" },
+      { "name": "SOURCE_COORDINATOR", "class_name": "SourceCoordinator" },
+      { "name": "BROWSER_ROUTER", "class_name": "BrowserRouter" },
+      { "name": "BROWSER_REPLAY", "class_name": "BrowserBufferReplay" },
+      { "name": "BROWSER_RAW_REPLAY", "class_name": "RawTouchpointReplay" },
+      { "name": "BROWSER_IDENTITY_REPLAY", "class_name": "IdentityTouchpointReplay" },
+      { "name": "FIVETRAN_FACTS", "class_name": "FivetranFactCoordinator" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1-facts", "new_sqlite_classes": ["IdentityCoordinator", "VisitorSessions"] },
+    { "tag": "v1-sources", "new_sqlite_classes": ["SourceCoordinator"] },
+    { "tag": "v1-browser", "new_sqlite_classes": ["BrowserRouter"] },
+    { "tag": "v1-browser-replay", "new_sqlite_classes": ["BrowserBufferReplay"] },
+    { "tag": "v1-fivetran-facts", "new_sqlite_classes": ["FivetranFactCoordinator"] },
+    { "tag": "v1-browser-raw-replay", "new_sqlite_classes": ["RawTouchpointReplay"] },
+    { "tag": "v1-identity-touchpoint-replay", "new_sqlite_classes": ["IdentityTouchpointReplay"] }
+  ]
+}

@@ -1,0 +1,40 @@
+DESCRIPTION >
+    Generation-scoped nodes, edges, iterative labels, and status for an on-demand shadow rebuild.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `shadow_generation` UInt64 `json:$.shadow_generation`,
+    `record_kind` LowCardinality(String) `json:$.record_kind`,
+    `record_key` String `json:$.record_key`,
+    `iteration` UInt16 `json:$.iteration`,
+    `node_key` String `json:$.node_key`,
+    `left_node_key` String `json:$.left_node_key`,
+    `right_node_key` String `json:$.right_node_key`,
+    `label_key` String `json:$.label_key`,
+    `prior_label_key` String `json:$.prior_label_key`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`,
+    `changed` UInt8 `json:$.changed`,
+    `run_status` LowCardinality(String) `json:$.run_status`,
+    `node_count` UInt64 `json:$.node_count`,
+    `edge_count` UInt64 `json:$.edge_count`,
+    `change_count` UInt64 `json:$.change_count`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` FixedString(64) `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `source_cutoff` DateTime64(6) `json:$.source_cutoff`,
+    `policy_version` UInt64 `json:$.policy_version`,
+    `request_hash` FixedString(64) `json:$.request_hash`,
+    `computed_at` DateTime64(6) `json:$.computed_at`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, shadow_generation, source_generation_id, request_hash, record_kind, record_key, iteration"
+ENGINE_VER "computed_at"

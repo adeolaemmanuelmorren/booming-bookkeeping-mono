@@ -1,0 +1,23 @@
+DESCRIPTION >
+    Immutable conversion identity inputs for the one-time V1 identity build.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `snapshot_id` String `json:$.snapshot_id`,
+    `fact_kind` String `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `event_id` String `json:$.event_id`,
+    `producer_id` String `json:$.producer_id`,
+    `observed_at` Nullable(DateTime64(6)) `json:$.observed_at`,
+    `ingested_at` DateTime64(6) `json:$.ingested_at`,
+    `source_priority` UInt8 `json:$.source_priority`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_deleted` Bool `json:$.fact_deleted`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`,
+    `evidence_keys` Array(String) `json:$.evidence_keys[:]`,
+    `canonical_fact_json` String `json:$.canonical_fact_json`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, snapshot_id, fact_kind, fact_key"

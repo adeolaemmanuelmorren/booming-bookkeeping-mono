@@ -1,0 +1,878 @@
+DESCRIPTION >
+    Publish one completed shadow generation atomically into the live journal, including split and removal tombstones.
+
+NODE completed_shadow_generations
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        request_hash,
+        argMax(row_hash, tuple(built_at, row_hash)) AS shadow_hash,
+        max(built_at) AS built_at
+    FROM identity_shadow_state_versions
+    WHERE tenant_id = 'boom'
+      AND state_kind = 'shadow_audit'
+    GROUP BY
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        request_hash
+
+NODE current_shadow_request_versions
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        argMax(
+            tuple(
+                source_generation_id,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                request_hash
+            ),
+            tuple(requested_at, request_hash)
+        ) AS current_request
+    FROM identity_shadow_requests
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, shadow_generation
+
+NODE last_published_shadow_generation
+SQL >
+    SELECT
+        tenant_id,
+        coalesce(max(source_fact_version), toUInt64(0)) AS shadow_generation
+    FROM identity_state_versions
+    WHERE tenant_id = 'boom'
+      AND state_kind = 'shadow_publish_audit'
+    GROUP BY tenant_id
+
+NODE selected_shadow_generation
+SQL >
+    SELECT * EXCEPT generation_rank
+    FROM (
+        SELECT
+            completed.tenant_id,
+            completed.shadow_generation,
+            completed.source_generation_id,
+            completed.source_manifest_version,
+            completed.source_manifest_digest,
+            completed.connection_inventory_digest,
+            completed.cutoff_set_digest,
+            completed.request_hash,
+            completed.shadow_hash,
+            completed.built_at,
+            row_number() OVER (
+                ORDER BY completed.shadow_generation DESC, completed.built_at DESC
+            ) AS generation_rank
+        FROM completed_shadow_generations AS completed
+        LEFT JOIN last_published_shadow_generation AS published
+            ON completed.tenant_id = published.tenant_id
+        INNER JOIN current_source_generation AS source_generation
+           ON completed.tenant_id = source_generation.tenant_id
+           AND completed.source_generation_id = source_generation.source_generation_id
+           AND completed.source_manifest_version = source_generation.version
+           AND completed.source_manifest_digest = source_generation.source_manifest_digest
+           AND completed.connection_inventory_digest = source_generation.connection_inventory_digest
+        INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+            ON completed.tenant_id = cutoff_readiness.tenant_id
+           AND completed.source_generation_id = cutoff_readiness.source_generation_id
+           AND completed.source_manifest_version = cutoff_readiness.source_manifest_version
+           AND completed.source_manifest_digest = cutoff_readiness.source_manifest_digest
+           AND completed.connection_inventory_digest = cutoff_readiness.connection_inventory_digest
+           AND completed.cutoff_set_digest = cutoff_readiness.cutoff_set_digest
+           AND cutoff_readiness.is_ready = 1
+        INNER JOIN current_shadow_request_versions AS request
+            ON completed.tenant_id = request.tenant_id
+           AND completed.shadow_generation = request.shadow_generation
+           AND completed.source_generation_id = tupleElement(request.current_request, 1)
+           AND completed.source_manifest_version = tupleElement(request.current_request, 2)
+           AND completed.source_manifest_digest = tupleElement(request.current_request, 3)
+           AND completed.connection_inventory_digest = tupleElement(request.current_request, 4)
+           AND completed.cutoff_set_digest = tupleElement(request.current_request, 5)
+           AND completed.request_hash = tupleElement(request.current_request, 6)
+        WHERE completed.shadow_generation
+            > coalesce(published.shadow_generation, toUInt64(0))
+    )
+    WHERE generation_rank = 1
+
+NODE selected_shadow_versions
+SQL >
+    SELECT
+        source.tenant_id,
+        source.shadow_generation,
+        source.source_generation_id,
+        source.source_manifest_version,
+        source.source_manifest_digest,
+        source.connection_inventory_digest,
+        source.cutoff_set_digest,
+        source.request_hash,
+        source.state_kind,
+        source.state_key,
+        argMax(
+            tuple(
+                source.identifier_type,
+                source.identifier_value,
+                source.identifier_key,
+                source.profile_id,
+                source.profile_key,
+                source.winner_identifier_key,
+                source.member_identifier_keys,
+                source.anonymous_ids,
+                source.user_ids,
+                source.emails,
+                source.phones,
+                source.first_name,
+                source.last_name,
+                source.first_seen_at,
+                source.last_seen_at,
+                source.row_hash
+            ),
+            tuple(source.built_at, source.row_hash)
+        ) AS current_row
+    FROM identity_shadow_state_versions AS source
+    INNER JOIN selected_shadow_generation AS selected
+        ON source.tenant_id = selected.tenant_id
+       AND source.shadow_generation = selected.shadow_generation
+       AND source.source_generation_id = selected.source_generation_id
+       AND source.source_manifest_version = selected.source_manifest_version
+       AND source.source_manifest_digest = selected.source_manifest_digest
+       AND source.connection_inventory_digest = selected.connection_inventory_digest
+       AND source.cutoff_set_digest = selected.cutoff_set_digest
+       AND source.request_hash = selected.request_hash
+    WHERE source.state_kind IN ('mapping', 'profile')
+    GROUP BY
+        source.tenant_id,
+        source.shadow_generation,
+        source.source_generation_id,
+        source.source_manifest_version,
+        source.source_manifest_digest,
+        source.connection_inventory_digest,
+        source.cutoff_set_digest,
+        source.request_hash,
+        source.state_kind,
+        source.state_key
+
+NODE selected_shadow_rows
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        request_hash,
+        state_kind,
+        state_key,
+        tupleElement(current_row, 1) AS identifier_type,
+        tupleElement(current_row, 2) AS identifier_value,
+        tupleElement(current_row, 3) AS identifier_key,
+        tupleElement(current_row, 4) AS profile_id,
+        tupleElement(current_row, 5) AS profile_key,
+        tupleElement(current_row, 6) AS winner_identifier_key,
+        tupleElement(current_row, 7) AS member_identifier_keys,
+        tupleElement(current_row, 8) AS anonymous_ids,
+        tupleElement(current_row, 9) AS user_ids,
+        tupleElement(current_row, 10) AS emails,
+        tupleElement(current_row, 11) AS phones,
+        tupleElement(current_row, 12) AS first_name,
+        tupleElement(current_row, 13) AS last_name,
+        tupleElement(current_row, 14) AS first_seen_at,
+        tupleElement(current_row, 15) AS last_seen_at,
+        tupleElement(current_row, 16) AS shadow_row_hash
+    FROM selected_shadow_versions
+
+NODE shadow_prior_profile_targets
+SQL >
+    SELECT
+        shadow.tenant_id,
+        current.profile_id AS prior_profile_id,
+        arraySort(groupUniqArray(shadow.profile_id)) AS target_profile_ids
+    FROM selected_shadow_rows AS shadow
+    INNER JOIN current_identity_mappings AS current
+        ON shadow.tenant_id = current.tenant_id
+       AND shadow.identifier_key = current.identifier_key
+    WHERE shadow.state_kind = 'mapping'
+      AND current.profile_id != ''
+    GROUP BY shadow.tenant_id, current.profile_id
+
+NODE shadow_current_profile_tokens
+SQL >
+    SELECT DISTINCT
+        targets.tenant_id,
+        input_profile_id,
+        targets.target_profile_ids
+    FROM shadow_prior_profile_targets AS targets
+    INNER JOIN current_identity_profiles AS profile
+        ON targets.tenant_id = profile.tenant_id
+       AND targets.prior_profile_id = profile.profile_id
+    ARRAY JOIN arraySort(arrayDistinct(arrayConcat(
+        profile.historical_profile_ids,
+        [targets.prior_profile_id]
+    ))) AS input_profile_id
+    WHERE input_profile_id != ''
+
+NODE shadow_profile_token_target_sets
+SQL >
+    SELECT
+        tenant_id,
+        input_profile_id,
+        arraySort(groupUniqArray(target_profile_id)) AS target_profile_ids,
+        toUInt64(uniqExact(target_profile_id)) AS target_profile_count
+    FROM shadow_current_profile_tokens
+    ARRAY JOIN target_profile_ids AS target_profile_id
+    GROUP BY tenant_id, input_profile_id
+
+NODE unambiguous_shadow_profile_tokens
+SQL >
+    SELECT
+        tenant_id,
+        input_profile_id,
+        arrayElement(target_profile_ids, 1) AS target_profile_id
+    FROM shadow_profile_token_target_sets
+    WHERE target_profile_count = 1
+
+NODE desired_shadow_alias_candidates
+SQL >
+    SELECT
+        tenant_id,
+        input_profile_id,
+        target_profile_id
+    FROM unambiguous_shadow_profile_tokens
+    WHERE input_profile_id != target_profile_id
+
+NODE shadow_profile_alias_tokens
+SQL >
+    SELECT
+        tenant_id,
+        target_profile_id,
+        arraySort(groupUniqArray(input_profile_id)) AS historical_profile_ids
+    FROM unambiguous_shadow_profile_tokens
+    GROUP BY tenant_id, target_profile_id
+
+NODE shadow_manual_link_blockers
+SQL >
+    SELECT
+        selected.tenant_id,
+        toUInt64(countIf(
+            manual.manual_profile_id IS NOT NULL
+            AND coalesce(targets.target_profile_count, toUInt64(0)) != 1
+        )) AS blocking_manual_link_count
+    FROM selected_shadow_generation AS selected
+    LEFT JOIN manual_payment_profile_link_adapter AS manual
+        ON selected.tenant_id = manual.tenant_id
+    LEFT JOIN shadow_profile_token_target_sets AS targets
+        ON manual.tenant_id = targets.tenant_id
+       AND manual.manual_profile_id = targets.input_profile_id
+    GROUP BY selected.tenant_id
+
+NODE publication_metadata
+SQL >
+    SELECT
+        selected.tenant_id,
+        selected.shadow_generation,
+        selected.source_generation_id,
+        selected.source_manifest_version,
+        selected.source_manifest_digest,
+        selected.connection_inventory_digest,
+        selected.cutoff_set_digest,
+        selected.request_hash,
+        coalesce(maximum.batch_version, toUInt64(0)) + 1 AS batch_version,
+        hex(MD5(concat(
+            'shadow:',
+            toString(selected.shadow_generation),
+            ':',
+            selected.source_generation_id,
+            ':',
+            selected.request_hash,
+            ':',
+            selected.shadow_hash
+        ))) AS batch_id,
+        now64(6) AS committed_at,
+        toUInt64(countIf(rows.state_kind = 'mapping')) AS input_event_count,
+        selected.shadow_hash AS input_hash
+    FROM selected_shadow_generation AS selected
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS batch_version
+        FROM identity_state_versions
+        WHERE tenant_id = 'boom'
+        GROUP BY tenant_id
+    ) AS maximum
+        ON selected.tenant_id = maximum.tenant_id
+    LEFT JOIN selected_shadow_rows AS rows
+        ON selected.tenant_id = rows.tenant_id
+       AND selected.shadow_generation = rows.shadow_generation
+    INNER JOIN shadow_manual_link_blockers AS blockers
+        ON selected.tenant_id = blockers.tenant_id
+       AND blockers.blocking_manual_link_count = 0
+    GROUP BY
+        selected.tenant_id,
+        selected.shadow_generation,
+        selected.source_generation_id,
+        selected.source_manifest_version,
+        selected.source_manifest_digest,
+        selected.connection_inventory_digest,
+        selected.cutoff_set_digest,
+        selected.request_hash,
+        maximum.batch_version,
+        selected.shadow_hash
+
+NODE shadow_profile_prior_ids
+SQL >
+    SELECT
+        shadow.tenant_id,
+        shadow.profile_id,
+        arraySort(groupUniqArrayIf(current.profile_id, current.profile_id != '')) AS prior_profile_ids
+    FROM selected_shadow_rows AS shadow
+    LEFT JOIN current_identity_mappings AS current
+        ON shadow.tenant_id = current.tenant_id
+       AND shadow.identifier_key = current.identifier_key
+    WHERE shadow.state_kind = 'mapping'
+    GROUP BY shadow.tenant_id, shadow.profile_id
+
+NODE published_mapping_rows
+SQL >
+    SELECT
+        shadow.tenant_id,
+        'mapping' AS state_kind,
+        shadow.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(shadow.shadow_row_hash, ':', metadata.batch_id))) AS row_hash,
+        shadow.identifier_type,
+        shadow.identifier_value,
+        shadow.identifier_key,
+        shadow.profile_id,
+        shadow.profile_key,
+        shadow.winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        shadow.first_seen_at,
+        shadow.last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM selected_shadow_rows AS shadow
+    INNER JOIN publication_metadata AS metadata
+        ON shadow.tenant_id = metadata.tenant_id
+       AND shadow.shadow_generation = metadata.shadow_generation
+    WHERE shadow.state_kind = 'mapping'
+
+NODE published_profile_rows
+SQL >
+    SELECT
+        shadow.tenant_id,
+        'profile' AS state_kind,
+        shadow.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(shadow.shadow_row_hash, ':', metadata.batch_id))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        shadow.profile_id,
+        shadow.profile_key,
+        shadow.winner_identifier_key,
+        shadow.member_identifier_keys,
+        shadow.anonymous_ids,
+        shadow.user_ids,
+        shadow.emails,
+        shadow.phones,
+        arraySort(arrayDistinct(arrayConcat(
+            aliases.historical_profile_ids,
+            [shadow.profile_id]
+        ))) AS historical_profile_ids,
+        shadow.first_name,
+        shadow.last_name,
+        shadow.first_seen_at,
+        shadow.last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        prior.prior_profile_ids,
+        arraySort(arrayDistinct(arrayConcat(prior.prior_profile_ids, [shadow.profile_id]))) AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM selected_shadow_rows AS shadow
+    INNER JOIN publication_metadata AS metadata
+        ON shadow.tenant_id = metadata.tenant_id
+       AND shadow.shadow_generation = metadata.shadow_generation
+    LEFT JOIN shadow_profile_prior_ids AS prior
+        ON shadow.tenant_id = prior.tenant_id
+       AND shadow.profile_id = prior.profile_id
+    LEFT JOIN shadow_profile_alias_tokens AS aliases
+        ON shadow.tenant_id = aliases.tenant_id
+       AND shadow.profile_id = aliases.target_profile_id
+    WHERE shadow.state_kind = 'profile'
+
+NODE published_component_changes
+SQL >
+    SELECT
+        profiles.tenant_id,
+        'component_change' AS state_kind,
+        concat(
+            'component_change:',
+            leftPad(toString(profiles.batch_version), 20, '0'),
+            ':',
+            profiles.profile_id
+        ) AS state_key,
+        profiles.batch_version,
+        profiles.batch_id,
+        profiles.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(
+            arrayStringConcat(profiles.prior_profile_ids, '|'),
+            ':',
+            profiles.profile_id,
+            ':',
+            profiles.batch_id
+        ))) AS row_hash,
+        profiles.identifier_type,
+        profiles.identifier_value,
+        profiles.identifier_key,
+        profiles.profile_id,
+        profiles.profile_key,
+        profiles.winner_identifier_key,
+        profiles.member_identifier_keys,
+        profiles.anonymous_ids,
+        profiles.user_ids,
+        profiles.emails,
+        profiles.phones,
+        profiles.historical_profile_ids,
+        profiles.first_name,
+        profiles.last_name,
+        profiles.first_seen_at,
+        profiles.last_seen_at,
+        profiles.fact_kind,
+        profiles.fact_key,
+        profiles.source_fact_version,
+        profiles.fact_deleted,
+        profiles.fact_observed_at,
+        profiles.fact_payload_hash,
+        profiles.fact_payload,
+        profiles.evidence_keys,
+        profiles.producer_id,
+        profiles.checkpoint_sequence,
+        profiles.prior_profile_ids,
+        profiles.dirty_profile_ids,
+        profiles.input_event_count,
+        profiles.input_hash
+    FROM published_profile_rows AS profiles
+
+NODE published_alias_rows
+SQL >
+    SELECT
+        aliases.tenant_id,
+        'alias' AS state_kind,
+        concat(
+            'alias:',
+            toString(length(aliases.input_profile_id)),
+            ':',
+            aliases.input_profile_id
+        ) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(
+            aliases.input_profile_id,
+            ':',
+            aliases.target_profile_id,
+            ':',
+            metadata.batch_id
+        ))) AS row_hash,
+        'profile_id' AS identifier_type,
+        aliases.input_profile_id AS identifier_value,
+        aliases.input_profile_id AS identifier_key,
+        aliases.target_profile_id AS profile_id,
+        aliases.target_profile_id AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        [aliases.input_profile_id] AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        [aliases.input_profile_id] AS prior_profile_ids,
+        [aliases.target_profile_id] AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM desired_shadow_alias_candidates AS aliases
+    INNER JOIN publication_metadata AS metadata
+        ON aliases.tenant_id = metadata.tenant_id
+
+NODE removed_alias_tombstones
+SQL >
+    SELECT
+        current.tenant_id,
+        current.state_kind,
+        current.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('delete:', current.state_key, ':', metadata.batch_id))) AS row_hash,
+        current.identifier_type,
+        current.identifier_value,
+        current.identifier_key,
+        current.profile_id,
+        current.profile_key,
+        current.winner_identifier_key,
+        current.member_identifier_keys,
+        current.anonymous_ids,
+        current.user_ids,
+        current.emails,
+        current.phones,
+        current.historical_profile_ids,
+        current.first_name,
+        current.last_name,
+        current.first_seen_at,
+        current.last_seen_at,
+        current.fact_kind,
+        current.fact_key,
+        current.source_fact_version,
+        current.fact_deleted,
+        current.fact_observed_at,
+        current.fact_payload_hash,
+        current.fact_payload,
+        current.evidence_keys,
+        current.producer_id,
+        current.checkpoint_sequence,
+        [current.identifier_value] AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM candidate_identity_state AS current
+    INNER JOIN publication_metadata AS metadata
+        ON current.tenant_id = metadata.tenant_id
+    WHERE current.state_kind = 'alias'
+      AND current.state_key NOT IN (
+          SELECT concat(
+              'alias:',
+              toString(length(input_profile_id)),
+              ':',
+              input_profile_id
+          )
+          FROM desired_shadow_alias_candidates
+      )
+
+NODE removed_mapping_tombstones
+SQL >
+    SELECT
+        current.tenant_id,
+        'mapping' AS state_kind,
+        current.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('delete:', current.state_key, ':', metadata.batch_id))) AS row_hash,
+        current.identifier_type,
+        current.identifier_value,
+        current.identifier_key,
+        current.profile_id,
+        current.profile_key,
+        current.winner_identifier_key,
+        current.member_identifier_keys,
+        current.anonymous_ids,
+        current.user_ids,
+        current.emails,
+        current.phones,
+        current.historical_profile_ids,
+        current.first_name,
+        current.last_name,
+        current.first_seen_at,
+        current.last_seen_at,
+        current.fact_kind,
+        current.fact_key,
+        current.source_fact_version,
+        current.fact_deleted,
+        current.fact_observed_at,
+        current.fact_payload_hash,
+        current.fact_payload,
+        current.evidence_keys,
+        current.producer_id,
+        current.checkpoint_sequence,
+        [current.profile_id] AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM candidate_identity_state AS current
+    INNER JOIN publication_metadata AS metadata
+        ON current.tenant_id = metadata.tenant_id
+    WHERE current.state_kind = 'mapping'
+      AND current.identifier_key NOT IN (
+          SELECT identifier_key
+          FROM selected_shadow_rows
+          WHERE state_kind = 'mapping'
+      )
+
+NODE removed_profile_tombstones
+SQL >
+    SELECT
+        current.tenant_id,
+        'profile' AS state_kind,
+        current.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('delete:', current.state_key, ':', metadata.batch_id))) AS row_hash,
+        current.identifier_type,
+        current.identifier_value,
+        current.identifier_key,
+        current.profile_id,
+        current.profile_key,
+        current.winner_identifier_key,
+        current.member_identifier_keys,
+        current.anonymous_ids,
+        current.user_ids,
+        current.emails,
+        current.phones,
+        current.historical_profile_ids,
+        current.first_name,
+        current.last_name,
+        current.first_seen_at,
+        current.last_seen_at,
+        current.fact_kind,
+        current.fact_key,
+        current.source_fact_version,
+        current.fact_deleted,
+        current.fact_observed_at,
+        current.fact_payload_hash,
+        current.fact_payload,
+        current.evidence_keys,
+        current.producer_id,
+        current.checkpoint_sequence,
+        [current.profile_id] AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM candidate_identity_state AS current
+    INNER JOIN publication_metadata AS metadata
+        ON current.tenant_id = metadata.tenant_id
+    WHERE current.state_kind = 'profile'
+      AND current.profile_id NOT IN (
+          SELECT profile_id
+          FROM selected_shadow_rows
+          WHERE state_kind = 'profile'
+      )
+
+NODE resolved_correction_tombstones
+SQL >
+    SELECT
+        current.tenant_id,
+        current.state_kind,
+        current.state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('resolved:', current.state_key, ':', metadata.batch_id))) AS row_hash,
+        current.identifier_type,
+        current.identifier_value,
+        current.identifier_key,
+        current.profile_id,
+        current.profile_key,
+        current.winner_identifier_key,
+        current.member_identifier_keys,
+        current.anonymous_ids,
+        current.user_ids,
+        current.emails,
+        current.phones,
+        current.historical_profile_ids,
+        current.first_name,
+        current.last_name,
+        current.first_seen_at,
+        current.last_seen_at,
+        current.fact_kind,
+        current.fact_key,
+        current.source_fact_version,
+        current.fact_deleted,
+        current.fact_observed_at,
+        current.fact_payload_hash,
+        current.fact_payload,
+        current.evidence_keys,
+        current.producer_id,
+        current.checkpoint_sequence,
+        current.prior_profile_ids,
+        current.dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM candidate_identity_state AS current
+    INNER JOIN publication_metadata AS metadata
+        ON current.tenant_id = metadata.tenant_id
+    WHERE current.state_kind = 'correction_required'
+
+NODE shadow_publish_audit_row
+SQL >
+    SELECT
+        tenant_id,
+        'shadow_publish_audit' AS state_kind,
+        concat('shadow_publish_audit:', leftPad(toString(shadow_generation), 20, '0')) AS state_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(batch_id, ':', input_hash, ':shadow_publish'))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        shadow_generation AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        toJSONString(map(
+            'source_generation_id', source_generation_id,
+            'source_manifest_version', toString(source_manifest_version),
+            'source_manifest_digest', source_manifest_digest,
+            'connection_inventory_digest', connection_inventory_digest,
+            'cutoff_set_digest', cutoff_set_digest,
+            'request_hash', request_hash,
+            'shadow_generation', toString(shadow_generation)
+        )) AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM publication_metadata
+
+NODE shadow_batch_audit_row
+SQL >
+    SELECT
+        tenant_id,
+        'batch_audit' AS state_kind,
+        concat('batch_audit:', leftPad(toString(batch_version), 20, '0')) AS state_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(batch_id, ':', input_hash))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        toJSONString(map(
+            'source_generation_id', source_generation_id,
+            'source_manifest_version', toString(source_manifest_version),
+            'source_manifest_digest', source_manifest_digest,
+            'connection_inventory_digest', connection_inventory_digest,
+            'cutoff_set_digest', cutoff_set_digest,
+            'request_hash', request_hash,
+            'shadow_generation', toString(shadow_generation)
+        )) AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM publication_metadata
+
+NODE published_shadow_identity_rows
+SQL >
+    SELECT * FROM published_mapping_rows
+    UNION ALL SELECT * FROM published_profile_rows
+    UNION ALL SELECT * FROM published_component_changes
+    UNION ALL SELECT * FROM published_alias_rows
+    UNION ALL SELECT * FROM removed_mapping_tombstones
+    UNION ALL SELECT * FROM removed_profile_tombstones
+    UNION ALL SELECT * FROM removed_alias_tombstones
+    UNION ALL SELECT * FROM resolved_correction_tombstones
+    UNION ALL SELECT * FROM shadow_publish_audit_row
+    UNION ALL SELECT * FROM shadow_batch_audit_row
+
+TYPE COPY
+TARGET_DATASOURCE identity_state_versions
+COPY_MODE append

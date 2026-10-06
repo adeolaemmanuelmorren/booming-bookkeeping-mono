@@ -1,0 +1,709 @@
+DESCRIPTION >
+    Successful primary-Stripe payment contract. This adapter owns latest-state selection,
+    documented product-evidence priority, Boom product rules, and repeat classification.
+
+NODE primary_charge_state_rows
+SQL >
+    SELECT
+        id AS payment_id,
+        created AS payment_time,
+        lowerUTF8(currency) AS currency,
+        coalesce(amount, toInt64(0)) AS amount_cents,
+        coalesce(amount_refunded, toInt64(0)) AS amount_refunded_cents,
+        paid,
+        status,
+        customer_id,
+        invoice_id,
+        payment_intent_id,
+        payment_method_id,
+        receipt_email,
+        receipt_url,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        billing_detail_address_line_1,
+        billing_detail_address_city,
+        billing_detail_address_state,
+        billing_detail_address_postal_code,
+        billing_detail_address_country,
+        shipping_address_line_1,
+        shipping_address_city,
+        shipping_address_state,
+        shipping_address_postal_code,
+        shipping_address_country,
+        description AS charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        nullIf(trim(JSONExtractString(ifNull(metadata, '{}'), 'products')), '') AS metadata_products,
+        nullIf(trim(JSONExtractString(ifNull(metadata, '{}'), 'phone')), '') AS metadata_phone,
+        livemode,
+        _fivetran_synced
+    FROM raw_stripe_charge
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE successful_primary_charges
+SQL >
+    SELECT *
+    FROM primary_charge_state_rows
+    WHERE paid = true
+      AND status = 'succeeded'
+      AND payment_id IS NOT NULL
+      AND payment_time IS NOT NULL
+
+NODE primary_customer_state_rows
+SQL >
+    SELECT
+        id AS customer_id,
+        nullIf(lowerUTF8(trim(email)), '') AS email,
+        nullIf(trim(name), '') AS name,
+        nullIf(trim(phone), '') AS phone,
+        address_line_1,
+        address_city,
+        address_state,
+        address_postal_code,
+        address_country,
+        shipping_address_line_1,
+        shipping_address_city,
+        shipping_address_state,
+        shipping_address_postal_code,
+        shipping_address_country,
+        _fivetran_synced AS source_changed_at
+    FROM raw_stripe_customer
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_intent_state_rows
+SQL >
+    SELECT
+        id AS payment_intent_id,
+        nullIf(lowerUTF8(trim(receipt_email)), '') AS receipt_email,
+        description,
+        _fivetran_synced AS source_changed_at
+    FROM raw_stripe_payment_intent
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_invoice_state_rows
+SQL >
+    SELECT
+        id AS invoice_id,
+        subscription_id,
+        billing_reason,
+        description
+    FROM raw_stripe_invoice
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_checkout_state_rows
+SQL >
+    SELECT
+        id AS checkout_session_id,
+        payment_intent_id,
+        subscription_id,
+        payment_link AS payment_link_id,
+        mode,
+        payment_status
+    FROM raw_stripe_checkout_session
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_checkout_summary_rows
+SQL >
+    SELECT
+        payment_intent_id,
+        argMin(
+            tuple(
+                checkout_session_id,
+                subscription_id,
+                payment_link_id,
+                mode,
+                payment_status
+            ),
+            checkout_session_id
+        ) AS checkout
+    FROM primary_checkout_state_rows
+    WHERE payment_intent_id IS NOT NULL
+    GROUP BY payment_intent_id
+
+NODE primary_checkout_line_state_rows
+SQL >
+    SELECT
+        id AS line_item_id,
+        checkout_session_id,
+        price_id,
+        description,
+        quantity,
+        amount_total AS line_amount_cents
+    FROM raw_stripe_checkout_session_line_item
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_invoice_line_state_rows
+SQL >
+    SELECT
+        coalesce(nullIf(unique_id, ''), id) AS line_item_id,
+        invoice_id,
+        subscription_id,
+        price_id,
+        plan_id,
+        description,
+        quantity,
+        amount AS line_amount_cents
+    FROM raw_stripe_invoice_line_item
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY coalesce(nullIf(unique_id, ''), id)
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_subscription_item_state_rows
+SQL >
+    SELECT
+        id AS line_item_id,
+        subscription_id,
+        plan_id,
+        quantity
+    FROM raw_stripe_subscription_item
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_payment_link_line_state_rows
+SQL >
+    SELECT
+        id AS line_item_id,
+        payment_link_id,
+        price_id,
+        description,
+        quantity,
+        amount_total AS line_amount_cents
+    FROM raw_stripe_payment_link_line_item
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_price_state_rows
+SQL >
+    SELECT
+        id AS price_id,
+        product_id,
+        nickname,
+        unit_amount
+    FROM raw_stripe_price
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_plan_state_rows
+SQL >
+    SELECT
+        id AS plan_id,
+        product_id,
+        nickname,
+        amount
+    FROM raw_stripe_plan
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_product_state_rows
+SQL >
+    SELECT
+        id AS product_id,
+        nullIf(trim(name), '') AS product_name
+    FROM raw_stripe_product
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE primary_checkout_product_candidates
+SQL >
+    SELECT
+        charges.payment_id,
+        'checkout_line_item' AS candidate_source,
+        toUInt8(2) AS candidate_priority,
+        sessions.checkout_session_id,
+        sessions.subscription_id,
+        sessions.payment_link_id,
+        lines.line_item_id,
+        lines.price_id,
+        CAST(NULL AS Nullable(String)) AS plan_id,
+        prices.product_id,
+        products.product_name,
+        lines.description AS line_item_description,
+        lines.quantity,
+        lines.line_amount_cents
+    FROM successful_primary_charges AS charges
+    INNER JOIN primary_checkout_state_rows AS sessions
+        ON charges.payment_intent_id = sessions.payment_intent_id
+    INNER JOIN primary_checkout_line_state_rows AS lines
+        ON sessions.checkout_session_id = lines.checkout_session_id
+    LEFT JOIN primary_price_state_rows AS prices
+        ON lines.price_id = prices.price_id
+    LEFT JOIN primary_product_state_rows AS products
+        ON prices.product_id = products.product_id
+
+NODE primary_invoice_product_candidates
+SQL >
+    SELECT
+        charges.payment_id,
+        'invoice_line_item' AS candidate_source,
+        toUInt8(3) AS candidate_priority,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        coalesce(lines.subscription_id, invoices.subscription_id) AS subscription_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        lines.line_item_id,
+        lines.price_id,
+        lines.plan_id,
+        coalesce(prices.product_id, plans.product_id) AS product_id,
+        products.product_name,
+        lines.description AS line_item_description,
+        lines.quantity,
+        lines.line_amount_cents
+    FROM successful_primary_charges AS charges
+    INNER JOIN primary_invoice_state_rows AS invoices
+        ON charges.invoice_id = invoices.invoice_id
+    INNER JOIN primary_invoice_line_state_rows AS lines
+        ON invoices.invoice_id = lines.invoice_id
+    LEFT JOIN primary_price_state_rows AS prices
+        ON lines.price_id = prices.price_id
+    LEFT JOIN primary_plan_state_rows AS plans
+        ON lines.plan_id = plans.plan_id
+    LEFT JOIN primary_product_state_rows AS products
+        ON coalesce(prices.product_id, plans.product_id) = products.product_id
+
+NODE primary_subscription_product_candidates
+SQL >
+    SELECT
+        charges.payment_id,
+        'subscription_item' AS candidate_source,
+        toUInt8(4) AS candidate_priority,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        invoices.subscription_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        items.line_item_id,
+        if(prices.price_id IS NULL, CAST(NULL AS Nullable(String)), prices.price_id) AS price_id,
+        items.plan_id,
+        coalesce(prices.product_id, plans.product_id) AS product_id,
+        products.product_name,
+        coalesce(products.product_name, prices.nickname, plans.nickname) AS line_item_description,
+        items.quantity,
+        coalesce(prices.unit_amount, plans.amount) AS line_amount_cents
+    FROM successful_primary_charges AS charges
+    INNER JOIN primary_invoice_state_rows AS invoices
+        ON charges.invoice_id = invoices.invoice_id
+    INNER JOIN primary_subscription_item_state_rows AS items
+        ON invoices.subscription_id = items.subscription_id
+    LEFT JOIN primary_price_state_rows AS prices
+        ON items.plan_id = prices.price_id
+    LEFT JOIN primary_plan_state_rows AS plans
+        ON items.plan_id = plans.plan_id
+    LEFT JOIN primary_product_state_rows AS products
+        ON coalesce(prices.product_id, plans.product_id) = products.product_id
+
+NODE primary_payment_link_product_candidates
+SQL >
+    SELECT
+        charges.payment_id,
+        'payment_link_line_item' AS candidate_source,
+        toUInt8(5) AS candidate_priority,
+        sessions.checkout_session_id,
+        sessions.subscription_id,
+        sessions.payment_link_id,
+        lines.line_item_id,
+        lines.price_id,
+        CAST(NULL AS Nullable(String)) AS plan_id,
+        prices.product_id,
+        products.product_name,
+        lines.description AS line_item_description,
+        lines.quantity,
+        lines.line_amount_cents
+    FROM successful_primary_charges AS charges
+    INNER JOIN primary_checkout_state_rows AS sessions
+        ON charges.payment_intent_id = sessions.payment_intent_id
+    INNER JOIN primary_payment_link_line_state_rows AS lines
+        ON sessions.payment_link_id = lines.payment_link_id
+    LEFT JOIN primary_price_state_rows AS prices
+        ON lines.price_id = prices.price_id
+    LEFT JOIN primary_product_state_rows AS products
+        ON prices.product_id = products.product_id
+
+NODE all_primary_product_candidates
+SQL >
+    SELECT * FROM primary_checkout_product_candidates
+    UNION ALL
+    SELECT * FROM primary_invoice_product_candidates
+    UNION ALL
+    SELECT * FROM primary_subscription_product_candidates
+    UNION ALL
+    SELECT * FROM primary_payment_link_product_candidates
+
+NODE primary_product_candidate_rollups
+SQL >
+    SELECT
+        payment_id,
+        argMin(
+            tuple(
+                candidate_source,
+                checkout_session_id,
+                subscription_id,
+                payment_link_id,
+                line_item_id,
+                product_id,
+                product_name,
+                price_id,
+                plan_id,
+                line_item_description
+            ),
+            tuple(if(product_id IS NULL, 1, 0), candidate_priority, line_item_id)
+        ) AS best_candidate,
+        arrayStringConcat(
+            arraySort(arrayFilter(value -> value != '', groupUniqArray(ifNull(line_item_description, '')))),
+            ' | '
+        ) AS line_item_signal,
+        max(product_id = 'prod_RtWRamfeN5cGXG') AS has_basic_vip_product,
+        max(price_id = 'price_1QzjOMBf6i84vTZEJziq3pN7') AS has_basic_vip_price,
+        max(payment_link_id = 'plink_1QzjOqBf6i84vTZEkOOwnbNJ') AS has_basic_vip_payment_link,
+        max(product_id = 'prod_RL2UJfDpmvCvRx') AS has_krc_product,
+        max(price_id = 'price_1QSMPLBf6i84vTZEbLsCt1b7') AS has_krc_price,
+        max(product_id = 'prod_RlhQH6wdxzjZeZ') AS has_full_payment_product,
+        max(price_id = 'price_1QsA1wBf6i84vTZEca307VRJ') AS has_full_payment_price,
+        max(product_id = 'prod_PtzEmmHhC1K9Xi') AS has_3x1997_product,
+        max(plan_id = 'BBB3X1997' OR price_id = 'BBB3X1997') AS has_3x1997_plan,
+        max(product_id = 'prod_RtWNqT9xux5CI7') AS has_balance_product,
+        max(price_id = 'price_1QzjKMBf6i84vTZE2WPd5Rh7') AS has_balance_price,
+        max(
+            product_id IN (
+                'prod_RtWTQcXFL5PCoP',
+                'prod_P5jeaXOTRDRYb3',
+                'prod_P8O68hxEgWfW2G',
+                'prod_OtknE7wwsCWpIQ'
+            )
+            OR price_id IN (
+                'price_1QzjQSBf6i84vTZEHPfW7AFx',
+                'price_1OHYB4Bf6i84vTZEHRHagkb2',
+                'price_1OK7KMBf6i84vTZEHgHrnSGj',
+                'price_1O5xI0Bf6i84vTZEoFWnW066'
+            )
+            OR payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+        ) AS has_bbb_installment_catalog_signal
+    FROM all_primary_product_candidates
+    GROUP BY payment_id
+
+NODE enriched_primary_payments
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'stripe' AS payment_source,
+        charges.payment_id,
+        charges.payment_time,
+        toDate(charges.payment_time, 'America/Los_Angeles') AS payment_date,
+        charges.customer_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(charges.billing_detail_email)), ''),
+            nullIf(lowerUTF8(trim(charges.receipt_email)), ''),
+            customers.email,
+            intents.receipt_email
+        ) AS payment_email,
+        coalesce(nullIf(trim(charges.billing_detail_name), ''), customers.name) AS payment_name,
+        coalesce(
+            nullIf(trim(charges.billing_detail_phone), ''),
+            customers.phone,
+            charges.metadata_phone
+        ) AS payment_phone,
+        charges.currency,
+        toDecimal128(charges.amount_cents, 9) / 100 AS amount_paid,
+        toDecimal128(charges.amount_refunded_cents, 9) / 100 AS refund_amount,
+        toDecimal128(charges.amount_cents - charges.amount_refunded_cents, 9) / 100 AS net_amount,
+        toUInt8(charges.amount_refunded_cents > 0) AS has_refund,
+        charges.payment_intent_id,
+        charges.payment_method_id,
+        charges.invoice_id,
+        coalesce(invoices.subscription_id, tupleElement(checkouts.checkout, 2)) AS subscription_id,
+        tupleElement(checkouts.checkout, 1) AS checkout_session_id,
+        coalesce(tupleElement(checkouts.checkout, 3), tupleElement(candidates.best_candidate, 4)) AS payment_link_id,
+        invoices.billing_reason AS invoice_billing_reason,
+        tupleElement(checkouts.checkout, 4) AS checkout_mode,
+        tupleElement(candidates.best_candidate, 1) AS catalog_source,
+        tupleElement(candidates.best_candidate, 6) AS catalog_product_id,
+        tupleElement(candidates.best_candidate, 7) AS catalog_product_name,
+        tupleElement(candidates.best_candidate, 8) AS catalog_price_id,
+        tupleElement(candidates.best_candidate, 9) AS catalog_plan_id,
+        candidates.line_item_signal,
+        coalesce(candidates.has_basic_vip_product, toUInt8(0)) AS has_basic_vip_product,
+        coalesce(candidates.has_basic_vip_price, toUInt8(0)) AS has_basic_vip_price,
+        coalesce(candidates.has_basic_vip_payment_link, toUInt8(0)) AS has_basic_vip_payment_link,
+        coalesce(candidates.has_krc_product, toUInt8(0)) AS has_krc_product,
+        coalesce(candidates.has_krc_price, toUInt8(0)) AS has_krc_price,
+        coalesce(candidates.has_full_payment_product, toUInt8(0)) AS has_full_payment_product,
+        coalesce(candidates.has_full_payment_price, toUInt8(0)) AS has_full_payment_price,
+        coalesce(candidates.has_3x1997_product, toUInt8(0)) AS has_3x1997_product,
+        coalesce(candidates.has_3x1997_plan, toUInt8(0)) AS has_3x1997_plan,
+        coalesce(candidates.has_balance_product, toUInt8(0)) AS has_balance_product,
+        coalesce(candidates.has_balance_price, toUInt8(0)) AS has_balance_price,
+        coalesce(candidates.has_bbb_installment_catalog_signal, toUInt8(0)) AS has_bbb_installment_catalog_signal,
+        charges.charge_description,
+        charges.calculated_statement_descriptor,
+        charges.statement_descriptor,
+        intents.description AS payment_intent_description,
+        invoices.description AS invoice_description,
+        charges.metadata_products,
+        charges.receipt_url,
+        charges.livemode,
+        greatest(
+            charges._fivetran_synced,
+            coalesce(customers.source_changed_at, toDateTime64(0, 6)),
+            coalesce(intents.source_changed_at, toDateTime64(0, 6))
+        ) AS source_changed_at
+    FROM successful_primary_charges AS charges
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN primary_customer_state_rows AS customers
+        ON charges.customer_id = customers.customer_id
+    LEFT JOIN primary_intent_state_rows AS intents
+        ON charges.payment_intent_id = intents.payment_intent_id
+    LEFT JOIN primary_invoice_state_rows AS invoices
+        ON charges.invoice_id = invoices.invoice_id
+    LEFT JOIN primary_checkout_summary_rows AS checkouts
+        ON charges.payment_intent_id = checkouts.payment_intent_id
+    LEFT JOIN primary_product_candidate_rollups AS candidates
+        ON charges.payment_id = candidates.payment_id
+
+NODE primary_payment_classification_signal
+SQL >
+    SELECT
+        *,
+        lowerUTF8(concat(
+            ifNull(charge_description, ''), ' ',
+            ifNull(calculated_statement_descriptor, ''), ' ',
+            ifNull(statement_descriptor, ''), ' ',
+            ifNull(payment_intent_description, ''), ' ',
+            ifNull(invoice_description, ''), ' ',
+            ifNull(line_item_signal, '')
+        )) AS classification_signal
+    FROM enriched_primary_payments
+
+NODE primary_payment_rule_signals
+SQL >
+    SELECT
+        *,
+        toUInt8(match(
+            lowerUTF8(concat(
+                ifNull(calculated_statement_descriptor, ''), ' ',
+                ifNull(statement_descriptor, '')
+            )),
+            'keyboard rich book'
+        )) AS is_keyboard_rich_book,
+        toUInt8(lowerUTF8(trim(ifNull(metadata_products, ''))) =
+            'top tax loopholes for bookkeeping business owners') AS is_top_tax_loopholes,
+        toUInt8(lowerUTF8(trim(ifNull(metadata_products, ''))) =
+            'booming bookkeeping mentorship program (one-time payment - save $994)') AS is_full_payment_metadata,
+        toUInt8(
+            amount_paid = toDecimal128(47, 9)
+            AND match(classification_signal, '(keyboard rich|keyboardrich|krc)')
+            AND match(classification_signal, '(vip|backstage|basic package|platinum)')
+        ) AS is_47_vip,
+        toUInt8(
+            amount_paid IN (toDecimal128(997, 9), toDecimal128(497, 9))
+            AND match(lowerUTF8(ifNull(charge_description, '')), 'mentorship program \\(deposit\\)')
+        ) AS is_mentorship_deposit,
+        toUInt8(
+            has_bbb_installment_catalog_signal = 1
+            OR lowerUTF8(trim(ifNull(charge_description, ''))) = 'bbb installment'
+        ) AS is_bbb_mentorship_installment
+    FROM primary_payment_classification_signal
+
+NODE classified_primary_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            is_keyboard_rich_book = 1, 'keyboard_rich_book',
+            is_top_tax_loopholes = 1, 'top_tax_loopholes',
+            has_basic_vip_product = 1 OR has_basic_vip_price = 1 OR has_basic_vip_payment_link = 1, 'structured_basic_vip',
+            has_krc_product = 1 OR has_krc_price = 1, 'structured_keyboard_rich_challenge',
+            is_47_vip = 1, 'keyboard_rich_challenge_vip',
+            is_mentorship_deposit = 1, 'mentorship_deposit',
+            is_full_payment_metadata = 1, 'mentorship_full_payment',
+            has_full_payment_product = 1 OR has_full_payment_price = 1, 'mentorship_full_payment',
+            has_3x1997_product = 1 OR has_3x1997_plan = 1, 'mentorship_3x1997',
+            has_balance_product = 1 OR has_balance_price = 1, 'mentorship_balance',
+            catalog_product_name IS NOT NULL, 'catalog_product',
+            'unclassified'
+        ) AS product_rule
+    FROM primary_payment_rule_signals
+
+NODE named_primary_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            product_rule = 'structured_basic_vip', 'prod_RtWRamfeN5cGXG',
+            product_rule = 'structured_keyboard_rich_challenge', 'prod_RL2UJfDpmvCvRx',
+            product_rule = 'mentorship_full_payment' AND is_full_payment_metadata = 1,
+                coalesce(catalog_product_id, 'mentorship_full_payment'),
+            product_rule = 'mentorship_full_payment', 'prod_RlhQH6wdxzjZeZ',
+            product_rule = 'mentorship_3x1997', 'prod_PtzEmmHhC1K9Xi',
+            product_rule = 'mentorship_balance', 'prod_RtWNqT9xux5CI7',
+            catalog_product_id
+        ) AS product_id,
+        multiIf(
+            product_rule = 'keyboard_rich_book', 'Keyboard Rich book',
+            product_rule = 'top_tax_loopholes', 'Top Tax Loopholes for Bookkeeping Business Owners',
+            product_rule = 'structured_basic_vip', 'KRC - Basic VIP',
+            product_rule = 'structured_keyboard_rich_challenge', 'Keyboard Rich Challenge',
+            product_rule = 'keyboard_rich_challenge_vip', '$47 Keyboard Rich Challenge VIP',
+            product_rule = 'mentorship_deposit', 'Booming Bookkeeping Mentorship Program deposit',
+            product_rule = 'mentorship_full_payment', 'Booming Bookkeeping Mentorship Program',
+            product_rule = 'mentorship_3x1997', 'Booming Bookkeeping Mentorship Program (3 payments of $1,997)',
+            product_rule = 'mentorship_balance', 'Booming Bookkeeping Balance payment',
+            product_rule = 'catalog_product', catalog_product_name,
+            'unclassified'
+        ) AS product_name
+    FROM classified_primary_payments
+
+NODE sequenced_primary_payments
+SQL >
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY multiIf(
+                subscription_id IS NOT NULL, concat('subscription:', subscription_id),
+                is_bbb_mentorship_installment = 1
+                    AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P',
+                    concat(
+                        coalesce(
+                            if(customer_id IS NULL, CAST(NULL AS Nullable(String)), concat('customer:', customer_id)),
+                            if(payment_email IS NULL, CAST(NULL AS Nullable(String)), concat('email:', lowerUTF8(payment_email))),
+                            concat('payment:', payment_id)
+                        ),
+                        '|',
+                        payment_link_id
+                    ),
+                concat('payment:', payment_id)
+            )
+            ORDER BY payment_time, payment_id
+        ) AS sequence_number
+    FROM named_primary_payments
+
+NODE current_primary_payment_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        catalog_price_id AS price_id,
+        catalog_plan_id AS plan_id,
+        product_rule,
+        is_bbb_mentorship_installment,
+        if(
+            subscription_id IS NOT NULL
+            OR (
+                is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+            ),
+            toInt64(sequence_number),
+            CAST(NULL AS Nullable(Int64))
+        ) AS payment_sequence_number,
+        multiIf(
+            product_rule = 'mentorship_balance', 'balance',
+            is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+                AND sequence_number = 1, 'initial',
+            is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P', 'installment',
+            subscription_id IS NULL, 'one_time',
+            invoice_billing_reason = 'subscription_create', 'initial',
+            product_rule = 'mentorship_3x1997' OR is_bbb_mentorship_installment = 1, 'installment',
+            'renewal'
+        ) AS payment_occurrence_type,
+        toUInt8(
+            product_rule = 'mentorship_balance'
+            OR (
+                is_bbb_mentorship_installment = 1
+                AND payment_link_id = 'plink_1QzjQSBf6i84vTZEk9as4F5P'
+                AND sequence_number > 1
+            )
+            OR (
+                subscription_id IS NOT NULL
+                AND coalesce(invoice_billing_reason != 'subscription_create', true)
+            )
+        ) AS is_repeat_payment,
+        multiIf(
+            is_bbb_mentorship_installment = 1, 'mentorship',
+            product_rule IN ('structured_basic_vip', 'structured_keyboard_rich_challenge', 'keyboard_rich_challenge_vip'), 'vip',
+            product_rule IN ('keyboard_rich_book', 'top_tax_loopholes'), 'book',
+            product_rule IN ('mentorship_deposit', 'mentorship_full_payment', 'mentorship_3x1997', 'mentorship_balance'), 'mentorship',
+            product_rule = 'catalog_product', 'catalog',
+            'unknown'
+        ) AS payment_category,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        checkout_session_id,
+        payment_link_id,
+        invoice_billing_reason,
+        checkout_mode,
+        charge_description,
+        receipt_url,
+        livemode,
+        source_changed_at
+    FROM sequenced_primary_payments

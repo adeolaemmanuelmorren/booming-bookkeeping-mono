@@ -1,0 +1,158 @@
+DESCRIPTION >
+    Fail-closed input gate for every source connection registered in this project.
+    Cutoffs must belong to the exact manifest and continue from the active generation.
+
+NODE source_generation_cutoff_row_set_audit
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        toUInt64(countIf(
+            ifNull(expected.source_connection_id, '') = ''
+            OR cutoffs.source_manifest_version != generation.version
+            OR cutoffs.source_manifest_digest != generation.source_manifest_digest
+        )) AS extra_or_mismatched_cutoff_row_count
+    FROM current_source_generation AS generation
+    INNER JOIN source_generation_connection_cutoffs AS cutoffs
+        ON generation.tenant_id = cutoffs.tenant_id
+       AND generation.source_generation_id = cutoffs.source_generation_id
+    LEFT JOIN registered_source_connections AS expected
+        ON cutoffs.tenant_id = expected.tenant_id
+       AND cutoffs.source_connection_id = expected.source_connection_id
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE registered_connection_cutoff_rows
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        generation.version AS expected_source_manifest_version,
+        generation.source_manifest_digest AS expected_source_manifest_digest,
+        generation.connection_inventory_digest AS expected_connection_inventory_digest,
+        expected.source_id,
+        expected.source_connection_id,
+        expected.connection_inventory_digest AS registered_connection_inventory_digest,
+        cutoff.source_generation_id AS cutoff_source_generation_id,
+        cutoff.source_manifest_version,
+        cutoff.source_manifest_digest,
+        cutoff.declared_previous_cutoff,
+        cutoff.previous_cutoff,
+        cutoff.current_cutoff,
+        cutoff.is_complete,
+        cutoff.object_count,
+        cutoff.row_count,
+        cutoff.content_digest,
+        cutoff.recorded_at,
+        cutoff.version,
+        cutoff.selected_revision_count,
+        multiIf(
+            expected.source_connection_id = 'boom_domains', generation.legacy_event_cutoff,
+            expected.source_connection_id = 'jitsu_data', generation.jitsu_event_cutoff,
+            expected.source_connection_id = 'jitsu_events_api', generation.jitsu_event_cutoff,
+            expected.source_connection_id = 'activecampaign-primary', generation.activecampaign_cutoff,
+            expected.source_connection_id = 'stripe-primary', generation.stripe_cutoff,
+            expected.source_connection_id = 'stripe-kajabi', generation.stripe_kajabi_cutoff,
+            expected.source_connection_id = 'meta-primary', generation.meta_cutoff,
+            expected.source_connection_id = 'google-primary', generation.google_cutoff,
+            expected.source_connection_id = 'manual-attribution', generation.manual_cutoff,
+            cutoff.current_cutoff
+        ) AS compatibility_manifest_cutoff
+    FROM current_source_generation AS generation
+    INNER JOIN registered_source_connections AS expected
+        ON generation.tenant_id = expected.tenant_id
+    LEFT JOIN current_source_connection_cutoffs AS cutoff
+        ON generation.tenant_id = cutoff.tenant_id
+       AND generation.source_generation_id = cutoff.source_generation_id
+       AND expected.source_connection_id = cutoff.source_connection_id
+
+NODE validated_registered_connection_cutoffs
+SQL >
+    SELECT
+        *,
+        toUInt8(
+            cutoff_source_generation_id != ''
+            AND source_manifest_version = expected_source_manifest_version
+            AND source_manifest_digest = expected_source_manifest_digest
+            AND match(source_manifest_digest, '^[0-9A-Fa-f]{64}$')
+            AND source_manifest_digest != repeat('0', 64)
+            AND match(expected_connection_inventory_digest, '^[0-9A-Fa-f]{64}$')
+            AND expected_connection_inventory_digest != repeat('0', 64)
+            AND registered_connection_inventory_digest = expected_connection_inventory_digest
+            AND is_complete = 1
+            AND match(content_digest, '^[0-9A-Fa-f]{64}$')
+            AND content_digest != repeat('0', 64)
+            AND version = 1
+            AND selected_revision_count = 1
+            AND current_cutoff >= previous_cutoff
+            AND declared_previous_cutoff = previous_cutoff
+            AND current_cutoff = compatibility_manifest_cutoff
+        ) AS is_valid
+    FROM registered_connection_cutoff_rows
+
+NODE registered_connection_cutoff_readiness
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        expected_source_manifest_version AS source_manifest_version,
+        expected_source_manifest_digest AS source_manifest_digest,
+        expected_connection_inventory_digest AS connection_inventory_digest,
+        upper(hex(SHA256(arrayStringConcat(
+            arraySort(groupArray(toJSONString(tuple(
+                source_id,
+                source_connection_id,
+                expected_source_manifest_version,
+                expected_source_manifest_digest,
+                expected_connection_inventory_digest,
+                declared_previous_cutoff,
+                previous_cutoff,
+                current_cutoff,
+                is_complete,
+                object_count,
+                row_count,
+                content_digest,
+                recorded_at,
+                version,
+                selected_revision_count
+            )))),
+            '\n'
+        )))) AS cutoff_set_digest,
+        count() AS expected_connection_count,
+        countIf(is_valid = 1) AS valid_connection_count,
+        arraySort(groupArrayIf(
+            concat(source_id, ':', source_connection_id),
+            is_valid = 0
+        )) AS invalid_source_connections,
+        toUInt8(count() > 0 AND count() = countIf(is_valid = 1)) AS registered_connections_ready
+    FROM validated_registered_connection_cutoffs
+    GROUP BY
+        tenant_id,
+        source_generation_id,
+        expected_source_manifest_version,
+        expected_source_manifest_digest,
+        expected_connection_inventory_digest
+
+NODE source_generation_cutoff_readiness_row
+SQL >
+    SELECT
+        readiness.tenant_id,
+        readiness.source_generation_id,
+        readiness.source_manifest_version,
+        readiness.source_manifest_digest,
+        readiness.connection_inventory_digest,
+        readiness.cutoff_set_digest,
+        readiness.expected_connection_count,
+        readiness.valid_connection_count,
+        coalesce(
+            audit.extra_or_mismatched_cutoff_row_count,
+            toUInt64(0)
+        ) AS extra_or_mismatched_cutoff_row_count,
+        readiness.invalid_source_connections,
+        toUInt8(
+            readiness.registered_connections_ready = 1
+            AND coalesce(audit.extra_or_mismatched_cutoff_row_count, toUInt64(0)) = 0
+        ) AS is_ready
+    FROM registered_connection_cutoff_readiness AS readiness
+    LEFT JOIN source_generation_cutoff_row_set_audit AS audit
+        ON readiness.tenant_id = audit.tenant_id
+       AND readiness.source_generation_id = audit.source_generation_id

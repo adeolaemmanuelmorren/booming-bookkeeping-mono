@@ -1,0 +1,3 @@
+will be rotated eventually fine for now:
+TINYBIRD_TOKEN=p.eyJ1IjogIjAwYzA0MDc5LWQwYjQtNGQ4Yi04ZGU2LTZmYTgwNzJiODVhZiIsICJpZCI6ICJkNGY2OTg5MC1iMTczLTQ2MWYtOGY5NS0yZTNlMDMxYTIyOWMiLCAiaG9zdCI6ICJ1c19lYXN0In0.S_awBWwzgQtJYWBs_SOT2qAJ7aZJfE3ywfxtdYilUhg
+TINYBIRD_URL=https://api.us-east.tinybird.co

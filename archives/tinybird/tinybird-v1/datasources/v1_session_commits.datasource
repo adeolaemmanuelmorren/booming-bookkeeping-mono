@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Verified visitor snapshots, including zero-row snapshots after deletions.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `visitor_key` String `json:$.visitor_key`,
+    `revision` UInt64 `json:$.revision`,
+    `publication_id` String `json:$.publication_id`,
+    `row_count` UInt64 `json:$.row_count`,
+    `content_hash` FixedString(64) `json:$.content_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, visitor_key, revision

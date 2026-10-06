@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.manual_attribution.manual_payment_profile_link_events.
+    Source role: manual_identity_override_event.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `link_event_id` String `json:$.link_event_id`,
+    `payment_id` String `json:$.payment_id`,
+    `profile_id` Nullable(String) `json:$.profile_id`,
+    `action` String `json:$.action`,
+    `created_at` DateTime64(6) `json:$.created_at`,
+    `created_by` Nullable(String) `json:$.created_by`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "payment_id, created_at, link_event_id"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/manual_attribution/manual_payment_profile_link_events/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

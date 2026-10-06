@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Append-only operator approvals for one complete report generation. The same request
+    authorizes a hidden identity candidate during correction rebuilds and the final
+    report pointer after every build and parity gate succeeds.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `identity_batch_version` UInt64 `json:$.identity_batch_version`,
+    `identity_batch_id` String `json:$.identity_batch_id`,
+    `session_batch_version` UInt64 `json:$.session_batch_version`,
+    `semantic_policy_version` String `json:$.semantic_policy_version`,
+    `policy_digest` FixedString(64) `json:$.policy_digest`,
+    `source_manifest_digest` String `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `build_digest` FixedString(64) `json:$.build_digest`,
+    `identity_parity_hash` FixedString(64) `json:$.identity_parity_hash`,
+    `session_parity_hash` FixedString(64) `json:$.session_parity_hash`,
+    `report_parity_hash` FixedString(64) `json:$.report_parity_hash`,
+    `approved` UInt8 `json:$.approved`,
+    `requested_by` String `json:$.requested_by`,
+    `version` UInt64 `json:$.version`,
+    `requested_at` DateTime64(6) `json:$.requested_at`,
+    `request_hash` FixedString(64) `json:$.request_hash`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, version, requested_at"

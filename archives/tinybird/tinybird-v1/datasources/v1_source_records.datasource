@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Source evidence and conversion facts, grouped into complete scope replacements.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `source` LowCardinality(String) `json:$.source`,
+    `source_account` LowCardinality(String) `json:$.source_account`,
+    `scope_id` String `json:$.scope_id`,
+    `replacement_id` String `json:$.replacement_id`,
+    `observation_sequence` UInt64 `json:$.observation_sequence`,
+    `record_kind` LowCardinality(String) `json:$.record_kind`,
+    `record_id` String `json:$.record_id`,
+    `payload_json` String `json:$.payload_json`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, source, source_account, scope_id, observation_sequence, record_kind, record_id

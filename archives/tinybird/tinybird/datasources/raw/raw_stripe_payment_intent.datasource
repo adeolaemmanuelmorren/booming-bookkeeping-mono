@@ -1,0 +1,53 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.stripe.payment_intent.
+    Source role: payment_state_evidence.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(String) `json:$.id`,
+    `connected_account_id` Nullable(String) `json:$.connected_account_id`,
+    `payment_method_types` Nullable(String) `json:$.payment_method_types`,
+    `amount` Nullable(Int64) `json:$.amount`,
+    `amount_capturable` Nullable(Int64) `json:$.amount_capturable`,
+    `amount_received` Nullable(Int64) `json:$.amount_received`,
+    `application` Nullable(String) `json:$.application`,
+    `application_fee_amount` Nullable(Int64) `json:$.application_fee_amount`,
+    `canceled_at` Nullable(DateTime64(6)) `json:$.canceled_at`,
+    `cancellation_reason` Nullable(String) `json:$.cancellation_reason`,
+    `capture_method` Nullable(String) `json:$.capture_method`,
+    `confirmation_method` Nullable(String) `json:$.confirmation_method`,
+    `created` Nullable(DateTime64(6)) `json:$.created`,
+    `currency` Nullable(String) `json:$.currency`,
+    `description` Nullable(String) `json:$.description`,
+    `last_payment_error_type` Nullable(String) `json:$.last_payment_error_type`,
+    `last_payment_error_code` Nullable(String) `json:$.last_payment_error_code`,
+    `last_payment_error_decline_code` Nullable(String) `json:$.last_payment_error_decline_code`,
+    `last_payment_error_network_decline_code` Nullable(String) `json:$.last_payment_error_network_decline_code`,
+    `last_payment_error_doc_url` Nullable(String) `json:$.last_payment_error_doc_url`,
+    `last_payment_error_message` Nullable(String) `json:$.last_payment_error_message`,
+    `last_payment_error_param` Nullable(String) `json:$.last_payment_error_param`,
+    `last_payment_error_source_id` Nullable(String) `json:$.last_payment_error_source_id`,
+    `last_payment_error_charge_id` Nullable(String) `json:$.last_payment_error_charge_id`,
+    `livemode` Nullable(Bool) `json:$.livemode`,
+    `metadata` Nullable(String) `json:$.metadata`,
+    `on_behalf_of` Nullable(String) `json:$.on_behalf_of`,
+    `receipt_email` Nullable(String) `json:$.receipt_email`,
+    `statement_descriptor` Nullable(String) `json:$.statement_descriptor`,
+    `status` Nullable(String) `json:$.status`,
+    `transfer_data_destination` Nullable(String) `json:$.transfer_data_destination`,
+    `transfer_group` Nullable(String) `json:$.transfer_group`,
+    `payment_method_id` Nullable(String) `json:$.payment_method_id`,
+    `customer_id` Nullable(String) `json:$.customer_id`,
+    `source_id` Nullable(String) `json:$.source_id`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `latest_charge_id` Nullable(String) `json:$.latest_charge_id`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(id, ''),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/stripe/payment_intent/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

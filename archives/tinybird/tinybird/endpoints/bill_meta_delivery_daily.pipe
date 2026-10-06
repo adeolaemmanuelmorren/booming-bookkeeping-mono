@@ -1,0 +1,79 @@
+DESCRIPTION >
+    Pinned Pacific date-slice Meta delivery with native daily reach and frequency.
+
+NODE daily_requested_generation
+SQL >
+    %
+    SELECT
+        tenant_id,
+        report_generation,
+        product_materialized_at AS daily_materialized_at
+    FROM published_report_build_stages
+    WHERE tenant_id = 'boom'
+      AND report_generation = {{ String(p_report_generation) }}
+      AND stage_id = 'meta_delivery_daily'
+
+NODE daily_pinned_meta_bounds
+SQL >
+    SELECT
+        bounds.report_generation,
+        bounds.available_start,
+        least(
+            bounds.max_hour_start + INTERVAL 1 HOUR,
+            toStartOfHour(now64(6), 'America/Los_Angeles')
+        ) AS data_through
+    FROM bill_meta_hour_bounds_versions AS bounds
+    INNER JOIN daily_requested_generation AS requested
+        ON bounds.tenant_id = requested.tenant_id
+       AND bounds.report_generation = requested.report_generation
+    INNER JOIN published_report_build_stages AS pin
+        ON bounds.tenant_id = pin.tenant_id
+       AND bounds.report_generation = pin.report_generation
+       AND bounds.materialized_at = pin.product_materialized_at
+       AND pin.stage_id = 'meta_hour_bounds'
+
+NODE daily_current_product_rows
+SQL >
+    SELECT
+        product.*
+    FROM bill_meta_delivery_daily_versions AS product
+    INNER JOIN daily_requested_generation AS requested
+        ON product.tenant_id = requested.tenant_id
+       AND product.report_generation = requested.report_generation
+       AND product.materialized_at = requested.daily_materialized_at
+
+NODE daily_endpoint_output
+SQL >
+    %
+    SELECT
+        toString(product.date) AS date,
+        product.level,
+        product.campaign_id,
+        product.adset_id,
+        product.ad_id,
+        product.impressions,
+        product.reach,
+        product.frequency
+    FROM daily_current_product_rows AS product
+    INNER JOIN daily_pinned_meta_bounds AS bounds
+        ON product.report_generation = bounds.report_generation
+    WHERE product.date >= toDate(bounds.available_start, 'America/Los_Angeles')
+      AND product.date >= toDate(parseDateTime64BestEffort(
+          {{ String(p_range_start_pacific) }},
+          6,
+          'America/Los_Angeles'
+      ), 'America/Los_Angeles')
+      AND product.date < toDate(parseDateTime64BestEffort(
+          {{ String(p_range_end_pacific) }},
+          6,
+          'America/Los_Angeles'
+      ), 'America/Los_Angeles')
+      AND product.date < toDate(bounds.data_through, 'America/Los_Angeles')
+    ORDER BY
+        date,
+        level,
+        campaign_id ASC NULLS FIRST,
+        adset_id ASC NULLS FIRST,
+        ad_id ASC NULLS FIRST
+
+TYPE endpoint

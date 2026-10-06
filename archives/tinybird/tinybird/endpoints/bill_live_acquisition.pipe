@@ -1,0 +1,87 @@
+DESCRIPTION >
+    Pinned Pacific half-open hourly acquisition report with the exact current Bill columns.
+
+NODE live_requested_generation
+SQL >
+    %
+    SELECT
+        tenant_id,
+        report_generation,
+        product_materialized_at AS hourly_materialized_at
+    FROM published_report_build_stages
+    WHERE tenant_id = 'boom'
+      AND report_generation = {{ String(p_report_generation) }}
+      AND stage_id = 'hourly_performance'
+
+NODE live_pinned_meta_bounds
+SQL >
+    SELECT
+        bounds.report_generation,
+        bounds.available_start,
+        least(
+            bounds.max_hour_start + INTERVAL 1 HOUR,
+            toStartOfHour(now64(6), 'America/Los_Angeles')
+        ) AS data_through
+    FROM bill_meta_hour_bounds_versions AS bounds
+    INNER JOIN live_requested_generation AS requested
+        ON bounds.tenant_id = requested.tenant_id
+       AND bounds.report_generation = requested.report_generation
+    INNER JOIN published_report_build_stages AS pin
+        ON bounds.tenant_id = pin.tenant_id
+       AND bounds.report_generation = pin.report_generation
+       AND bounds.materialized_at = pin.product_materialized_at
+       AND pin.stage_id = 'meta_hour_bounds'
+
+NODE live_current_product_rows
+SQL >
+    SELECT
+        product.*
+    FROM bill_hourly_product_versions AS product
+    INNER JOIN live_requested_generation AS requested
+        ON product.tenant_id = requested.tenant_id
+       AND product.report_generation = requested.report_generation
+       AND product.materialized_at = requested.hourly_materialized_at
+
+NODE live_endpoint_output
+SQL >
+    %
+    SELECT
+        formatDateTime(product.hour_start, '%Y-%m-%dT%H:%M', 'America/Los_Angeles') AS hour_start_pacific,
+        product.campaign_id,
+        product.adset_id,
+        product.ad_id,
+        product.campaign_name,
+        product.adset_name,
+        product.ad_name,
+        product.spend,
+        product.impressions,
+        product.clicks,
+        product.last_touch_registrations,
+        product.last_touch_immediate_vips,
+        product.first_touch_registrations,
+        product.first_touch_immediate_vips,
+        product.solo_touch_registrations,
+        product.solo_touch_immediate_vips
+    FROM live_current_product_rows AS product
+    INNER JOIN live_pinned_meta_bounds AS bounds
+        ON product.report_generation = bounds.report_generation
+    WHERE product.source = 'meta'
+      AND product.hour_start >= bounds.available_start
+      AND product.hour_start >= parseDateTime64BestEffort(
+          {{ String(p_range_start_pacific) }},
+          6,
+          'America/Los_Angeles'
+      )
+      AND product.hour_start < parseDateTime64BestEffort(
+          {{ String(p_range_end_pacific) }},
+          6,
+          'America/Los_Angeles'
+      )
+      AND product.hour_start < bounds.data_through
+    ORDER BY
+        hour_start_pacific,
+        campaign_name ASC NULLS FIRST,
+        adset_name ASC NULLS FIRST,
+        ad_name ASC NULLS FIRST
+
+TYPE endpoint

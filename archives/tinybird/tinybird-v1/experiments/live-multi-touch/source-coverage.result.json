@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-09-08T02:09:27.130Z",
+  "workspace": "booming_bookkeeping",
+  "sqlFile": "tinybird-v1/experiments/live-multi-touch/source-coverage.sql",
+  "wallMs": 811,
+  "httpStatus": 200,
+  "statistics": {
+    "elapsed": 0.356696358,
+    "rows_read": 210000,
+    "bytes_read": 353061257
+  },
+  "rows": 1,
+  "data": [
+    {
+      "source": "stripe",
+      "source_account": "main",
+      "record_kind": "conversion",
+      "rows": 35000,
+      "first_conversion": "2019-07-02T11:27:56.000Z",
+      "last_conversion": "2024-01-04T17:03:00.000Z",
+      "rows_with_email": 35000,
+      "deleted_rows": 0
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "contractVersion": 1,
+  "exports": [
+    {
+      "resourceName": "raw_stripe_auxiliary",
+      "exportKind": "typed_union",
+      "source": {
+        "project": "able-folio-499722",
+        "dataset": "stripe_combined",
+        "table": "auxiliary"
+      },
+      "unionSources": [
+        {
+          "recordType": "subscription_history",
+          "paymentSource": "stripe",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe",
+            "table": "subscription_history"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "subscription_id": "id",
+            "subscription_created_at": "created",
+            "start_date": "start_date",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "subscription_history",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "subscription_history"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "subscription_id": "id",
+            "subscription_created_at": "created",
+            "subscription_started_at": "start",
+            "start_date": "start_date",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "checkout_session",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "checkout_session"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "checkout_session_id": "id",
+            "payment_intent_id": "payment_intent_id",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "checkout_session_line_item",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "checkout_session_line_item"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "checkout_line_item_id": "id",
+            "checkout_session_id": "checkout_session_id",
+            "price_id": "price_id",
+            "line_item_description": "description",
+            "quantity": "quantity",
+            "amount_total_cents": "amount_total",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "price",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "price"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "price_id": "id",
+            "product_id": "product_id",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "plan",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "plan"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "plan_id": "id",
+            "product_id": "product_id",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        },
+        {
+          "recordType": "product",
+          "paymentSource": "stripe_kajabi",
+          "source": {
+            "project": "able-folio-499722",
+            "dataset": "stripe_kajabi",
+            "table": "product"
+          },
+          "watermarkColumn": "_fivetran_synced",
+          "columnMappings": {
+            "record_id": "id",
+            "product_id": "id",
+            "product_name": "name",
+            "_fivetran_synced": "_fivetran_synced"
+          }
+        }
+      ],
+      "versionColumns": [
+        "_fivetran_synced"
+      ],
+      "fields": [
+        { "name": "record_type", "bigqueryType": "STRING" },
+        { "name": "payment_source", "bigqueryType": "STRING" },
+        { "name": "record_id", "bigqueryType": "STRING" },
+        { "name": "subscription_id", "bigqueryType": "STRING" },
+        { "name": "subscription_created_at", "bigqueryType": "TIMESTAMP" },
+        { "name": "subscription_started_at", "bigqueryType": "TIMESTAMP" },
+        { "name": "start_date", "bigqueryType": "TIMESTAMP" },
+        { "name": "checkout_session_id", "bigqueryType": "STRING" },
+        { "name": "checkout_line_item_id", "bigqueryType": "STRING" },
+        { "name": "payment_intent_id", "bigqueryType": "STRING" },
+        { "name": "price_id", "bigqueryType": "STRING" },
+        { "name": "plan_id", "bigqueryType": "STRING" },
+        { "name": "product_id", "bigqueryType": "STRING" },
+        { "name": "line_item_description", "bigqueryType": "STRING" },
+        { "name": "product_name", "bigqueryType": "STRING" },
+        { "name": "quantity", "bigqueryType": "INTEGER" },
+        { "name": "amount_total_cents", "bigqueryType": "FLOAT64" },
+        { "name": "_fivetran_synced", "bigqueryType": "TIMESTAMP" }
+      ]
+    }
+  ]
+}

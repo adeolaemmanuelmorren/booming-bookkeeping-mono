@@ -1,0 +1,21 @@
+DESCRIPTION >
+    Immutable per-connection input bounds for one source generation. A generation is
+    publishable only when every registered connection has one complete, digest-pinned row.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` FixedString(64) `json:$.source_manifest_digest`,
+    `source_connection_id` String `json:$.source_connection_id`,
+    `previous_cutoff` DateTime64(6) `json:$.previous_cutoff`,
+    `current_cutoff` DateTime64(6) `json:$.current_cutoff`,
+    `is_complete` UInt8 `json:$.is_complete`,
+    `object_count` UInt64 `json:$.object_count`,
+    `row_count` UInt64 `json:$.row_count`,
+    `content_digest` FixedString(64) `json:$.content_digest`,
+    `version` UInt64 `json:$.version`,
+    `recorded_at` DateTime64(6) `json:$.recorded_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, source_generation_id, source_connection_id, version"

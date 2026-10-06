@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Google ad-grain daily rows projected into the reusable ad-delivery contract.
+
+NODE google_daily_ad_delivery_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        'google-primary' AS source_connection_id,
+        source,
+        date,
+        'ad' AS level,
+        account_id,
+        account_name,
+        campaign_id,
+        adset_id,
+        ad_id,
+        campaign_name,
+        adset_name,
+        ad_name,
+        impressions,
+        CAST(clicks AS Nullable(Int64)) AS clicks,
+        spend,
+        CAST(NULL AS Nullable(Int64)) AS reach,
+        CAST(NULL AS Nullable(Float64)) AS frequency,
+        currency,
+        source_version
+    FROM google_ad_row_presence_adapter

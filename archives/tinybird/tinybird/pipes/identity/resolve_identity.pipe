@@ -1,0 +1,250 @@
+DESCRIPTION >
+    Resolve first-party identifiers through the pinned active journal plus the exact pending overlay.
+
+NODE resolve_request_values
+SQL >
+    %
+    SELECT
+        trim({{String(request_anonymous_id, '')}}) AS anonymous_id,
+        lower(trim({{String(request_user_id, '')}})) AS user_id,
+        lower(trim({{String(request_email, '')}})) AS email,
+        replaceRegexpAll(trim({{String(request_phone, '')}}), '[^0-9]', '') AS phone_digits
+
+NODE resolve_request_normalized
+SQL >
+    SELECT
+        *,
+        if(
+            email = '',
+            '',
+            if(
+                splitByChar('@', email)[2] IN ('gmail.com', 'googlemail.com'),
+                concat(
+                    replaceAll(replaceRegexpOne(splitByChar('@', email)[1], '[+].*$', ''), '.', ''),
+                    '@gmail.com'
+                ),
+                email
+            )
+        ) AS canonical_email,
+        if(
+            length(phone_digits) = 10,
+            phone_digits,
+            if(length(phone_digits) = 11 AND startsWith(phone_digits, '1'), substring(phone_digits, 2), '')
+        ) AS national_phone
+    FROM resolve_request_values
+
+NODE resolve_request_exact_phone
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(national_phone, '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$')
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            ''
+        ) AS phone
+    FROM resolve_request_normalized
+
+NODE requested_identifier_candidates
+SQL >
+    SELECT
+        tupleElement(identifier, 1) AS requested_identifier_type,
+        tupleElement(identifier, 2) AS requested_identifier_value,
+        tupleElement(identifier, 3) AS matched_identifier_type,
+        tupleElement(identifier, 4) AS matched_identifier_value,
+        concat(tupleElement(identifier, 3), ':', tupleElement(identifier, 4)) AS identifier_key,
+        tupleElement(identifier, 5) AS candidate_rank
+    FROM resolve_request_exact_phone
+    ARRAY JOIN arrayFilter(
+        item -> tupleElement(item, 4) != '',
+        [
+            tuple('anonymous_id', anonymous_id, 'anonymous_id', anonymous_id, toUInt8(1)),
+            tuple('user_id', user_id, 'user_id', user_id, toUInt8(1)),
+            tuple('email', email, 'email', email, toUInt8(1)),
+            tuple('email', email, 'canonical_email', canonical_email, toUInt8(2)),
+            tuple('phone', phone, 'phone', phone, toUInt8(1))
+        ]
+    ) AS identifier
+
+NODE pending_profile_roots
+SQL >
+    SELECT DISTINCT tenant_id, prior_profile_id, component_label
+    FROM pending_identity_union
+    WHERE prior_profile_id != ''
+
+NODE pending_existing_identifier_members
+SQL >
+    SELECT
+        mappings.tenant_id,
+        roots.component_label,
+        mappings.identifier_type,
+        mappings.identifier_value,
+        mappings.identifier_key,
+        multiIf(
+            mappings.identifier_type = 'email', toUInt8(1),
+            mappings.identifier_type = 'canonical_email', toUInt8(2),
+            mappings.identifier_type = 'user_id', toUInt8(3),
+            mappings.identifier_type = 'anonymous_id', toUInt8(4),
+            toUInt8(5)
+        ) AS winner_priority,
+        mappings.first_seen_at,
+        mappings.last_seen_at,
+        profiles.first_name,
+        profiles.last_name
+    FROM current_identity_state AS mappings
+    INNER JOIN pending_profile_roots AS roots
+        ON mappings.tenant_id = roots.tenant_id
+       AND mappings.profile_id = roots.prior_profile_id
+    LEFT JOIN current_identity_profiles AS profiles
+        ON mappings.tenant_id = profiles.tenant_id
+       AND mappings.profile_id = profiles.profile_id
+    WHERE mappings.state_kind = 'mapping'
+
+NODE pending_new_identifier_members
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        winner_priority,
+        first_seen_at,
+        last_seen_at,
+        first_name,
+        last_name
+    FROM pending_identity_union
+
+NODE all_pending_component_members
+SQL >
+    SELECT * FROM pending_existing_identifier_members
+    UNION ALL
+    SELECT * FROM pending_new_identifier_members
+
+NODE distinct_pending_component_members
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        min(winner_priority) AS winner_priority,
+        min(first_seen_at) AS first_seen_at,
+        max(last_seen_at) AS last_seen_at,
+        argMaxIf(first_name, tuple(last_seen_at, identifier_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(last_seen_at, identifier_key), last_name != '') AS last_name
+    FROM all_pending_component_members
+    GROUP BY tenant_id, component_label, identifier_type, identifier_value, identifier_key
+
+NODE pending_profile_overlay
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        hex(MD5(argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)))) AS profile_id,
+        argMin(identifier_value, tuple(winner_priority, first_seen_at, identifier_value)) AS profile_key,
+        argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)) AS winner_identifier_key,
+        arraySort(groupUniqArray(identifier_key)) AS member_identifier_keys,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'anonymous_id')) AS anonymous_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'user_id')) AS user_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'email')) AS emails,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'phone')) AS phones,
+        argMaxIf(first_name, tuple(last_seen_at, identifier_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(last_seen_at, identifier_key), last_name != '') AS last_name
+    FROM distinct_pending_component_members
+    GROUP BY tenant_id, component_label
+
+NODE pending_mapping_overlay
+SQL >
+    SELECT
+        members.tenant_id,
+        members.identifier_key,
+        profiles.profile_id,
+        profiles.profile_key,
+        profiles.winner_identifier_key,
+        profiles.member_identifier_keys,
+        profiles.anonymous_ids,
+        profiles.user_ids,
+        profiles.emails,
+        profiles.phones,
+        profiles.first_name,
+        profiles.last_name
+    FROM distinct_pending_component_members AS members
+    INNER JOIN pending_profile_overlay AS profiles
+        ON members.tenant_id = profiles.tenant_id
+       AND members.component_label = profiles.component_label
+
+NODE resolution_candidates
+SQL >
+    SELECT
+        requested.*,
+        coalesce(nullIf(pending.profile_id, ''), stable.profile_id, '') AS profile_id,
+        if(pending.profile_id != '', 'pending', if(stable.profile_id != '', 'stable', 'not_found')) AS resolution_status,
+        pending.profile_key AS pending_profile_key,
+        pending.winner_identifier_key AS pending_winner_identifier_key,
+        pending.member_identifier_keys AS pending_member_identifier_keys,
+        pending.anonymous_ids AS pending_anonymous_ids,
+        pending.user_ids AS pending_user_ids,
+        pending.emails AS pending_emails,
+        pending.phones AS pending_phones,
+        pending.first_name AS pending_first_name,
+        pending.last_name AS pending_last_name,
+        stable.profile_key AS stable_profile_key
+    FROM requested_identifier_candidates AS requested
+    LEFT JOIN pending_mapping_overlay AS pending
+        ON pending.tenant_id = 'boom'
+       AND requested.identifier_key = pending.identifier_key
+    LEFT JOIN current_identity_mappings AS stable
+        ON stable.tenant_id = 'boom'
+       AND requested.identifier_key = stable.identifier_key
+
+NODE best_resolution_per_request
+SQL >
+    SELECT * EXCEPT resolution_rank
+    FROM (
+        SELECT
+            *,
+            row_number() OVER (
+                PARTITION BY requested_identifier_type, requested_identifier_value
+                ORDER BY resolution_status = 'not_found', candidate_rank
+            ) AS resolution_rank
+        FROM resolution_candidates
+    )
+    WHERE resolution_rank = 1
+
+NODE resolved_identity_response
+SQL >
+    SELECT
+        resolved.requested_identifier_type,
+        resolved.requested_identifier_value,
+        resolved.matched_identifier_type,
+        resolved.matched_identifier_value,
+        resolved.identifier_key AS matched_identifier_key,
+        resolved.resolution_status,
+        resolved.profile_id,
+        if(resolved.resolution_status = 'pending', resolved.pending_profile_key, profiles.profile_key) AS profile_key,
+        if(resolved.resolution_status = 'pending', resolved.pending_winner_identifier_key, profiles.winner_identifier_key) AS winner_identifier_key,
+        if(resolved.resolution_status = 'pending', resolved.pending_member_identifier_keys, profiles.member_identifier_keys) AS member_identifier_keys,
+        if(resolved.resolution_status = 'pending', resolved.pending_anonymous_ids, profiles.anonymous_ids) AS anonymous_ids,
+        if(resolved.resolution_status = 'pending', resolved.pending_user_ids, profiles.user_ids) AS user_ids,
+        if(resolved.resolution_status = 'pending', resolved.pending_emails, profiles.emails) AS emails,
+        if(resolved.resolution_status = 'pending', resolved.pending_phones, profiles.phones) AS phones,
+        if(resolved.resolution_status = 'pending', resolved.pending_first_name, profiles.first_name) AS first_name,
+        if(resolved.resolution_status = 'pending', resolved.pending_last_name, profiles.last_name) AS last_name,
+        generation.stable_batch_version,
+        generation.stable_batch_id,
+        generation.pending_event_count,
+        generation.pending_digest,
+        generation.visible_cursor_digest,
+        generation.identity_generation,
+        generation.activation_status
+    FROM best_resolution_per_request AS resolved
+    CROSS JOIN identity_generation AS generation
+    LEFT JOIN current_identity_profiles AS profiles
+        ON profiles.tenant_id = generation.tenant_id
+       AND resolved.profile_id = profiles.profile_id
+
+TYPE endpoint

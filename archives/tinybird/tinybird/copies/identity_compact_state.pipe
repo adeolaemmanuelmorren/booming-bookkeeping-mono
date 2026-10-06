@@ -1,0 +1,831 @@
+DESCRIPTION >
+    Compact one bounded contiguous identity batch into the wide journal every ten minutes.
+
+NODE stable_fact_versions_for_compaction
+SQL >
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        argMax(
+            tuple(
+                source_fact_version,
+                fact_deleted,
+                fact_observed_at,
+                fact_payload_hash,
+                fact_payload,
+                evidence_keys,
+                producer_id
+            ),
+            tuple(batch_version, committed_at, row_hash)
+        ) AS current_fact
+    FROM identity_state_versions
+    WHERE tenant_id = 'boom'
+      AND state_kind = 'fact'
+    GROUP BY tenant_id, fact_kind, fact_key
+
+NODE pending_fact_version_integrity_for_compaction
+SQL >
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        countDistinct(tuple(fact_deleted, fact_payload_hash)) AS distinct_fact_variants,
+        any(fact_deleted) AS fact_deleted,
+        any(fact_payload_hash) AS fact_payload_hash
+    FROM normalize_identity_input
+    WHERE record_kind = 'event'
+      AND fact_kind != ''
+      AND fact_key != ''
+    GROUP BY tenant_id, fact_kind, fact_key, source_fact_version
+
+NODE fact_version_conflicts
+SQL >
+    SELECT DISTINCT tenant_id
+    FROM pending_fact_version_integrity_for_compaction
+    WHERE distinct_fact_variants != 1
+
+    UNION DISTINCT
+
+    SELECT DISTINCT pending.tenant_id
+    FROM pending_fact_version_integrity_for_compaction AS pending
+    INNER JOIN stable_fact_versions_for_compaction AS stable
+        ON pending.tenant_id = stable.tenant_id
+       AND pending.fact_kind = stable.fact_kind
+       AND pending.fact_key = stable.fact_key
+       AND pending.source_fact_version = tupleElement(stable.current_fact, 1)
+    WHERE pending.fact_deleted != tupleElement(stable.current_fact, 2)
+       OR pending.fact_payload_hash != tupleElement(stable.current_fact, 4)
+
+NODE single_candidate_barrier
+SQL >
+    SELECT seed.tenant_id
+    FROM (SELECT 'boom' AS tenant_id) AS seed
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS raw_batch_version
+        FROM identity_state_versions
+        WHERE tenant_id = 'boom'
+        GROUP BY tenant_id
+    ) AS raw
+        ON seed.tenant_id = raw.tenant_id
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS active_batch_version
+        FROM identity_state_versions
+        WHERE tenant_id = 'boom'
+          AND state_kind = 'activation_audit'
+          AND is_deleted = 0
+        GROUP BY tenant_id
+    ) AS active
+        ON seed.tenant_id = active.tenant_id
+    WHERE coalesce(raw.raw_batch_version, toUInt64(0))
+        = coalesce(active.active_batch_version, toUInt64(0))
+
+NODE input_summary
+SQL >
+    SELECT
+        events.tenant_id,
+        countDistinct(tuple(producer_id, producer_sequence, event_id)) AS input_event_count,
+        hex(SHA256(arrayStringConcat(arraySort(groupUniqArray(concat(producer_id, ':', toString(producer_sequence), ':', event_id, ':', payload_hash))), '|'))) AS input_hash
+    FROM normalize_identity_input AS events
+    INNER JOIN single_candidate_barrier AS barrier
+        ON events.tenant_id = barrier.tenant_id
+    WHERE events.record_kind = 'event'
+      AND events.tenant_id NOT IN (SELECT tenant_id FROM fact_version_conflicts)
+    GROUP BY events.tenant_id
+
+NODE batch_metadata
+SQL >
+    SELECT
+        input.tenant_id,
+        coalesce(maximum.current_batch_version, toUInt64(0)) + 1 AS batch_version,
+        hex(MD5(concat(toString(coalesce(maximum.current_batch_version, toUInt64(0)) + 1), ':', input.input_hash))) AS batch_id,
+        now64(6) AS committed_at,
+        input.input_event_count,
+        input.input_hash
+    FROM input_summary AS input
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS current_batch_version
+        FROM current_identity_state
+        GROUP BY tenant_id
+    ) AS maximum
+        ON input.tenant_id = maximum.tenant_id
+
+NODE touched_root_labels
+SQL >
+    SELECT DISTINCT
+        tenant_id,
+        prior_profile_id,
+        component_label
+    FROM pending_identity_union
+    WHERE prior_profile_id != ''
+
+NODE existing_component_members
+SQL >
+    SELECT
+        mappings.tenant_id,
+        roots.component_label,
+        mappings.identifier_type,
+        mappings.identifier_value,
+        mappings.identifier_key,
+        multiIf(
+            mappings.identifier_type = 'email', toUInt8(1),
+            mappings.identifier_type = 'canonical_email', toUInt8(2),
+            mappings.identifier_type = 'user_id', toUInt8(3),
+            mappings.identifier_type = 'anonymous_id', toUInt8(4),
+            toUInt8(5)
+        ) AS winner_priority,
+        mappings.first_seen_at,
+        mappings.last_seen_at,
+        profiles.first_name,
+        profiles.last_name,
+        mappings.profile_id AS prior_profile_id,
+        profiles.historical_profile_ids
+    FROM current_identity_state AS mappings
+    INNER JOIN touched_root_labels AS roots
+        ON mappings.tenant_id = roots.tenant_id
+       AND mappings.profile_id = roots.prior_profile_id
+    LEFT JOIN current_identity_profiles AS profiles
+        ON mappings.tenant_id = profiles.tenant_id
+       AND mappings.profile_id = profiles.profile_id
+    WHERE mappings.state_kind = 'mapping'
+
+NODE new_component_members
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        winner_priority,
+        first_seen_at,
+        last_seen_at,
+        first_name,
+        last_name,
+        prior_profile_id,
+        CAST([], 'Array(String)') AS historical_profile_ids
+    FROM pending_identity_union
+
+NODE all_component_members
+SQL >
+    SELECT * FROM existing_component_members
+    UNION ALL
+    SELECT * FROM new_component_members
+
+NODE distinct_component_members
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        min(winner_priority) AS winner_priority,
+        min(first_seen_at) AS first_seen_at,
+        max(last_seen_at) AS last_seen_at,
+        argMaxIf(first_name, tuple(last_seen_at, identifier_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(last_seen_at, identifier_key), last_name != '') AS last_name,
+        min(prior_profile_id) AS prior_profile_id,
+        arrayDistinct(arrayFlatten(groupArray(arrayConcat(historical_profile_ids, if(prior_profile_id = '', CAST([], 'Array(String)'), [prior_profile_id]))))) AS historical_profile_ids
+    FROM all_component_members
+    GROUP BY tenant_id, component_label, identifier_type, identifier_value, identifier_key
+
+NODE component_rollups
+SQL >
+    SELECT
+        tenant_id,
+        component_label,
+        argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)) AS winner_identifier_key,
+        argMin(identifier_value, tuple(winner_priority, first_seen_at, identifier_value)) AS profile_key,
+        hex(MD5(argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)))) AS profile_id,
+        arraySort(groupUniqArray(identifier_key)) AS member_identifier_keys,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'anonymous_id')) AS anonymous_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'user_id')) AS user_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'email')) AS emails,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'phone')) AS phones,
+        arraySort(arrayDistinct(arrayFlatten(groupArray(historical_profile_ids)))) AS historical_profile_ids,
+        argMaxIf(first_name, tuple(last_seen_at, identifier_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(last_seen_at, identifier_key), last_name != '') AS last_name,
+        min(first_seen_at) AS first_seen_at,
+        max(last_seen_at) AS last_seen_at
+    FROM distinct_component_members
+    GROUP BY tenant_id, component_label
+
+NODE mapping_rows
+SQL >
+    SELECT
+        members.tenant_id,
+        'mapping' AS state_kind,
+        concat('mapping:', toString(length(members.identifier_key)), ':', members.identifier_key) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(members.identifier_key, ':', components.profile_id, ':', toString(metadata.batch_version)))) AS row_hash,
+        members.identifier_type,
+        members.identifier_value,
+        members.identifier_key,
+        components.profile_id,
+        components.profile_key,
+        components.winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        members.first_seen_at,
+        members.last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM distinct_component_members AS members
+    INNER JOIN component_rollups AS components
+        ON members.tenant_id = components.tenant_id
+       AND members.component_label = components.component_label
+    INNER JOIN batch_metadata AS metadata
+        ON members.tenant_id = metadata.tenant_id
+
+NODE profile_rows
+SQL >
+    SELECT
+        components.tenant_id,
+        'profile' AS state_kind,
+        concat('profile:', toString(length(components.profile_id)), ':', components.profile_id) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(components.profile_id, ':', arrayStringConcat(components.member_identifier_keys, '|'), ':', toString(metadata.batch_version)))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        components.profile_id,
+        components.profile_key,
+        components.winner_identifier_key,
+        components.member_identifier_keys,
+        components.anonymous_ids,
+        components.user_ids,
+        components.emails,
+        components.phones,
+        arraySort(arrayDistinct(arrayConcat(components.historical_profile_ids, [components.profile_id]))) AS historical_profile_ids,
+        components.first_name,
+        components.last_name,
+        components.first_seen_at,
+        components.last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        components.historical_profile_ids AS prior_profile_ids,
+        [components.profile_id] AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM component_rollups AS components
+    INNER JOIN batch_metadata AS metadata
+        ON components.tenant_id = metadata.tenant_id
+
+NODE component_change_rows
+SQL >
+    SELECT
+        components.tenant_id,
+        'component_change' AS state_kind,
+        concat(
+            'component_change:',
+            leftPad(toString(metadata.batch_version), 20, '0'),
+            ':',
+            toString(components.component_label)
+        ) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(
+            arrayStringConcat(arraySort(components.historical_profile_ids), '|'),
+            ':',
+            components.profile_id,
+            ':',
+            toString(metadata.batch_version)
+        ))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        components.profile_id,
+        components.profile_key,
+        components.winner_identifier_key,
+        components.member_identifier_keys,
+        components.anonymous_ids,
+        components.user_ids,
+        components.emails,
+        components.phones,
+        arraySort(arrayDistinct(arrayConcat(components.historical_profile_ids, [components.profile_id]))) AS historical_profile_ids,
+        components.first_name,
+        components.last_name,
+        components.first_seen_at,
+        components.last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        arraySort(arrayFilter(
+            profile_id -> profile_id != components.profile_id,
+            components.historical_profile_ids
+        )) AS prior_profile_ids,
+        arraySort(arrayDistinct(arrayConcat(components.historical_profile_ids, [components.profile_id]))) AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM component_rollups AS components
+    INNER JOIN batch_metadata AS metadata
+        ON components.tenant_id = metadata.tenant_id
+
+NODE displaced_profile_rows
+SQL >
+    SELECT DISTINCT
+        roots.tenant_id,
+        roots.prior_profile_id,
+        components.profile_id AS next_profile_id,
+        metadata.* EXCEPT (tenant_id)
+    FROM touched_root_labels AS roots
+    INNER JOIN component_rollups AS components
+        ON roots.tenant_id = components.tenant_id
+       AND roots.component_label = components.component_label
+    INNER JOIN batch_metadata AS metadata
+        ON roots.tenant_id = metadata.tenant_id
+    WHERE roots.prior_profile_id != components.profile_id
+
+NODE profile_tombstone_rows
+SQL >
+    SELECT
+        tenant_id,
+        'profile' AS state_kind,
+        concat('profile:', toString(length(prior_profile_id)), ':', prior_profile_id) AS state_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('delete:', prior_profile_id, ':', toString(batch_version)))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        prior_profile_id AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        [prior_profile_id] AS prior_profile_ids,
+        [next_profile_id] AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM displaced_profile_rows
+
+NODE flattened_alias_candidates
+SQL >
+    SELECT DISTINCT
+        components.tenant_id,
+        historical_profile_id AS prior_profile_id,
+        components.profile_id AS next_profile_id,
+        metadata.* EXCEPT (tenant_id)
+    FROM component_rollups AS components
+    ARRAY JOIN components.historical_profile_ids AS historical_profile_id
+    INNER JOIN batch_metadata AS metadata
+        ON components.tenant_id = metadata.tenant_id
+    WHERE historical_profile_id != ''
+      AND historical_profile_id != components.profile_id
+
+NODE alias_rows
+SQL >
+    SELECT
+        tenant_id,
+        'alias' AS state_kind,
+        concat('alias:', toString(length(prior_profile_id)), ':', prior_profile_id) AS state_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(prior_profile_id, ':', next_profile_id, ':', toString(batch_version)))) AS row_hash,
+        'profile_id' AS identifier_type,
+        prior_profile_id AS identifier_value,
+        prior_profile_id AS identifier_key,
+        next_profile_id AS profile_id,
+        next_profile_id AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        [prior_profile_id] AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        [prior_profile_id] AS prior_profile_ids,
+        [next_profile_id] AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM flattened_alias_candidates
+
+NODE pending_fact_evidence
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        event_id,
+        arraySort(groupUniqArray(identifier_key)) AS evidence_keys
+    FROM normalize_identity_input
+    WHERE record_kind = 'identifier'
+    GROUP BY tenant_id, producer_id, event_id
+
+NODE pending_fact_versions
+SQL >
+    SELECT
+        events.tenant_id,
+        events.fact_kind,
+        events.fact_key,
+        argMax(
+            tuple(
+                events.source_fact_version,
+                events.fact_deleted,
+                events.observed_at,
+                events.fact_payload_hash,
+                events.fact_payload,
+                coalesce(evidence.evidence_keys, CAST([], 'Array(String)')),
+                events.producer_id
+            ),
+            tuple(events.source_fact_version, events.producer_sequence, events.event_id)
+        ) AS current_fact
+    FROM normalize_identity_input AS events
+    INNER JOIN pending_fact_version_integrity_for_compaction AS integrity
+        ON events.tenant_id = integrity.tenant_id
+       AND events.fact_kind = integrity.fact_kind
+       AND events.fact_key = integrity.fact_key
+       AND events.source_fact_version = integrity.source_fact_version
+    LEFT JOIN pending_fact_evidence AS evidence
+        ON events.tenant_id = evidence.tenant_id
+       AND events.producer_id = evidence.producer_id
+       AND events.event_id = evidence.event_id
+    WHERE events.record_kind = 'event'
+      AND events.fact_kind != ''
+      AND events.fact_key != ''
+      AND integrity.distinct_fact_variants = 1
+    GROUP BY events.tenant_id, events.fact_kind, events.fact_key
+
+NODE fact_winners
+SQL >
+    SELECT pending.*
+    FROM pending_fact_versions AS pending
+    LEFT JOIN stable_fact_versions_for_compaction AS stable
+        ON pending.tenant_id = stable.tenant_id
+       AND pending.fact_kind = stable.fact_kind
+       AND pending.fact_key = stable.fact_key
+    WHERE stable.fact_key = ''
+       OR tupleElement(pending.current_fact, 1) > tupleElement(stable.current_fact, 1)
+
+NODE fact_correction_candidates
+SQL >
+    SELECT
+        pending.tenant_id,
+        pending.fact_kind,
+        pending.fact_key,
+        pending.current_fact,
+        stable.current_fact AS prior_fact
+    FROM fact_winners AS pending
+    INNER JOIN stable_fact_versions_for_compaction AS stable
+        ON pending.tenant_id = stable.tenant_id
+       AND pending.fact_kind = stable.fact_kind
+       AND pending.fact_key = stable.fact_key
+    WHERE tupleElement(pending.current_fact, 2) = 1
+       OR tupleElement(pending.current_fact, 4) != tupleElement(stable.current_fact, 4)
+       OR tupleElement(pending.current_fact, 6) != tupleElement(stable.current_fact, 6)
+
+NODE fact_rows
+SQL >
+    SELECT
+        facts.tenant_id,
+        'fact' AS state_kind,
+        concat('fact:', toString(length(facts.fact_kind)), ':', facts.fact_kind, ':', toString(length(facts.fact_key)), ':', facts.fact_key) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        tupleElement(facts.current_fact, 2) AS is_deleted,
+        hex(SHA256(concat(facts.fact_kind, ':', facts.fact_key, ':', toString(tupleElement(facts.current_fact, 1)), ':', tupleElement(facts.current_fact, 4)))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        facts.fact_kind,
+        facts.fact_key,
+        tupleElement(facts.current_fact, 1) AS source_fact_version,
+        tupleElement(facts.current_fact, 2) AS fact_deleted,
+        tupleElement(facts.current_fact, 3) AS fact_observed_at,
+        tupleElement(facts.current_fact, 4) AS fact_payload_hash,
+        tupleElement(facts.current_fact, 5) AS fact_payload,
+        tupleElement(facts.current_fact, 6) AS evidence_keys,
+        tupleElement(facts.current_fact, 7) AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM fact_winners AS facts
+    INNER JOIN batch_metadata AS metadata
+        ON facts.tenant_id = metadata.tenant_id
+
+NODE correction_required_rows
+SQL >
+    SELECT
+        corrections.tenant_id,
+        'correction_required' AS state_kind,
+        concat(
+            'correction_required:',
+            toString(length(corrections.fact_kind)),
+            ':',
+            corrections.fact_kind,
+            ':',
+            toString(length(corrections.fact_key)),
+            ':',
+            corrections.fact_key
+        ) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(
+            corrections.fact_kind,
+            ':',
+            corrections.fact_key,
+            ':',
+            tupleElement(corrections.prior_fact, 4),
+            ':',
+            tupleElement(corrections.current_fact, 4),
+            ':correction_required'
+        ))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        corrections.fact_kind,
+        corrections.fact_key,
+        tupleElement(corrections.current_fact, 1) AS source_fact_version,
+        tupleElement(corrections.current_fact, 2) AS fact_deleted,
+        tupleElement(corrections.current_fact, 3) AS fact_observed_at,
+        tupleElement(corrections.current_fact, 4) AS fact_payload_hash,
+        toJSONString(map(
+            'prior_payload', tupleElement(corrections.prior_fact, 5),
+            'current_payload', tupleElement(corrections.current_fact, 5)
+        )) AS fact_payload,
+        arraySort(arrayDistinct(arrayConcat(
+            tupleElement(corrections.prior_fact, 6),
+            tupleElement(corrections.current_fact, 6)
+        ))) AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM fact_correction_candidates AS corrections
+    INNER JOIN batch_metadata AS metadata
+        ON corrections.tenant_id = metadata.tenant_id
+
+NODE checkpoint_rows
+SQL >
+    SELECT
+        events.tenant_id,
+        'checkpoint' AS state_kind,
+        concat('checkpoint:', toString(length(events.producer_id)), ':', events.producer_id) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(events.producer_id, ':', toString(max(events.batch_high_sequence)), ':', toString(metadata.batch_version)))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        events.producer_id,
+        max(events.batch_high_sequence) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM normalize_identity_input AS events
+    INNER JOIN batch_metadata AS metadata
+        ON events.tenant_id = metadata.tenant_id
+    WHERE events.record_kind = 'event'
+    GROUP BY
+        events.tenant_id,
+        events.producer_id,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        metadata.input_event_count,
+        metadata.input_hash
+
+NODE audit_rows
+SQL >
+    SELECT
+        tenant_id,
+        'batch_audit' AS state_kind,
+        concat('batch_audit:', leftPad(toString(batch_version), 20, '0')) AS state_key,
+        batch_version,
+        batch_id,
+        committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(batch_id, ':', input_hash))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM batch_metadata
+
+NODE activation_audit_rows
+SQL >
+    SELECT
+        metadata.tenant_id,
+        'activation_audit' AS state_kind,
+        concat('activation_audit:', leftPad(toString(metadata.batch_version), 20, '0')) AS state_key,
+        metadata.batch_version,
+        metadata.batch_id,
+        metadata.committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(metadata.batch_id, ':', metadata.input_hash, ':activated'))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        toUInt64(0) AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        toDateTime64(0, 6) AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        '' AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        metadata.input_event_count,
+        metadata.input_hash
+    FROM batch_metadata AS metadata
+    LEFT JOIN (
+        SELECT DISTINCT tenant_id
+        FROM fact_correction_candidates
+    ) AS corrections
+        ON metadata.tenant_id = corrections.tenant_id
+    WHERE corrections.tenant_id = ''
+
+NODE compacted_identity_rows
+SQL >
+    SELECT * FROM mapping_rows
+    UNION ALL SELECT * FROM profile_rows
+    UNION ALL SELECT * FROM component_change_rows
+    UNION ALL SELECT * FROM profile_tombstone_rows
+    UNION ALL SELECT * FROM alias_rows
+    UNION ALL SELECT * FROM fact_rows
+    UNION ALL SELECT * FROM correction_required_rows
+    UNION ALL SELECT * FROM checkpoint_rows
+    UNION ALL SELECT * FROM audit_rows
+    UNION ALL SELECT * FROM activation_audit_rows
+
+TYPE COPY
+TARGET_DATASOURCE identity_state_versions
+COPY_SCHEDULE */10 * * * *
+COPY_MODE append

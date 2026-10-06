@@ -1,0 +1,43 @@
+DESCRIPTION >
+    Versioned KRC acquisition outcomes. A new identity or session generation is rebuilt
+    under a new report_generation before publication.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `registration_id` String `json:$.registration_id`,
+    `profile_id` String `json:$.profile_id`,
+    `registration_timestamp` DateTime64(6) `json:$.registration_timestamp`,
+    `registration_date` Date `json:$.registration_date`,
+    `pre_registration_paid_click_count` UInt64 `json:$.pre_registration_paid_click_count`,
+    `is_solo_touch` UInt8 `json:$.is_solo_touch`,
+    `first_touch_touchpoint_id` Nullable(String) `json:$.first_touch_touchpoint_id`,
+    `first_touch_click_timestamp` Nullable(DateTime64(6)) `json:$.first_touch_click_timestamp`,
+    `first_touch_click_hour` Nullable(DateTime64(6)) `json:$.first_touch_click_hour`,
+    `first_touch_campaign_id` Nullable(String) `json:$.first_touch_campaign_id`,
+    `first_touch_adset_id` Nullable(String) `json:$.first_touch_adset_id`,
+    `first_touch_ad_id` Nullable(String) `json:$.first_touch_ad_id`,
+    `first_touch_campaign_name` Nullable(String) `json:$.first_touch_campaign_name`,
+    `first_touch_adset_name` Nullable(String) `json:$.first_touch_adset_name`,
+    `first_touch_ad_name` Nullable(String) `json:$.first_touch_ad_name`,
+    `last_touch_touchpoint_id` Nullable(String) `json:$.last_touch_touchpoint_id`,
+    `last_touch_click_timestamp` Nullable(DateTime64(6)) `json:$.last_touch_click_timestamp`,
+    `last_touch_click_hour` Nullable(DateTime64(6)) `json:$.last_touch_click_hour`,
+    `last_touch_campaign_id` Nullable(String) `json:$.last_touch_campaign_id`,
+    `last_touch_adset_id` Nullable(String) `json:$.last_touch_adset_id`,
+    `last_touch_ad_id` Nullable(String) `json:$.last_touch_ad_id`,
+    `last_touch_campaign_name` Nullable(String) `json:$.last_touch_campaign_name`,
+    `last_touch_adset_name` Nullable(String) `json:$.last_touch_adset_name`,
+    `last_touch_ad_name` Nullable(String) `json:$.last_touch_ad_name`,
+    `immediate_vip_payment_id` Nullable(String) `json:$.immediate_vip_payment_id`,
+    `immediate_vip_payment_timestamp` Nullable(DateTime64(6)) `json:$.immediate_vip_payment_timestamp`,
+    `immediate_vip_revenue` Nullable(Decimal(38,9)) `json:$.immediate_vip_revenue`,
+    `is_immediate_vip` UInt8 `json:$.is_immediate_vip`,
+    `first_5k_payment_id` Nullable(String) `json:$.first_5k_payment_id`,
+    `first_5k_payment_timestamp` Nullable(DateTime64(6)) `json:$.first_5k_payment_timestamp`,
+    `first_5k_revenue` Nullable(Decimal(38,9)) `json:$.first_5k_revenue`,
+    `is_5k_purchaser` UInt8 `json:$.is_5k_purchaser`,
+    `materialized_at` DateTime64(6) `json:$.materialized_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, registration_id"

@@ -1,0 +1,63 @@
+DESCRIPTION >
+    Exact product materialization attempts pinned by each published report token.
+    Later Copy retries and later validations cannot change these stage pointers.
+
+NODE persisted_report_build_stage_versions
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        policy_digest,
+        build_digest,
+        stage_id,
+        argMax(
+            tuple(product_materialized_at, is_valid, validated_at),
+            tuple(validated_at, materialized_digest)
+        ) AS current_stage
+    FROM report_build_validations
+    WHERE tenant_id = 'boom'
+    GROUP BY
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        policy_digest,
+        build_digest,
+        stage_id
+
+NODE published_report_build_stage_rows
+SQL >
+    SELECT
+        published.tenant_id,
+        published.report_generation,
+        published.source_generation_id,
+        published.source_manifest_version,
+        published.source_manifest_digest,
+        published.connection_inventory_digest,
+        published.cutoff_set_digest,
+        published.semantic_policy_version,
+        published.policy_digest,
+        published.build_digest,
+        stages.stage_id,
+        tupleElement(stages.current_stage, 1) AS product_materialized_at,
+        tupleElement(stages.current_stage, 3) AS validated_at
+    FROM published_report_generations AS published
+    INNER JOIN persisted_report_build_stage_versions AS stages
+        ON published.tenant_id = stages.tenant_id
+       AND published.source_generation_id = stages.source_generation_id
+       AND published.report_generation = stages.report_generation
+       AND published.source_manifest_version = stages.source_manifest_version
+       AND published.source_manifest_digest = stages.source_manifest_digest
+       AND published.connection_inventory_digest = stages.connection_inventory_digest
+       AND published.cutoff_set_digest = stages.cutoff_set_digest
+       AND published.policy_digest = stages.policy_digest
+       AND published.build_digest = stages.build_digest
+    WHERE tupleElement(stages.current_stage, 2) = 1

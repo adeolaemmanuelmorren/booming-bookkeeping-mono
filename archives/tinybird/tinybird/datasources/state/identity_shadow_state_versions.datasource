@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Generation-scoped shadow identity rows built from the complete retained current evidence set.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `shadow_generation` UInt64 `json:$.shadow_generation`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` FixedString(64) `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `request_hash` FixedString(64) `json:$.request_hash`,
+    `state_kind` LowCardinality(String) `json:$.state_kind`,
+    `state_key` String `json:$.state_key`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `identifier_value` String `json:$.identifier_value`,
+    `identifier_key` String `json:$.identifier_key`,
+    `profile_id` String `json:$.profile_id`,
+    `profile_key` String `json:$.profile_key`,
+    `winner_identifier_key` String `json:$.winner_identifier_key`,
+    `member_identifier_keys` Array(String) `json:$.member_identifier_keys[:]`,
+    `anonymous_ids` Array(String) `json:$.anonymous_ids[:]`,
+    `user_ids` Array(String) `json:$.user_ids[:]`,
+    `emails` Array(String) `json:$.emails[:]`,
+    `phones` Array(String) `json:$.phones[:]`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `first_seen_at` DateTime64(6) `json:$.first_seen_at`,
+    `last_seen_at` DateTime64(6) `json:$.last_seen_at`,
+    `built_at` DateTime64(6) `json:$.built_at`,
+    `row_hash` FixedString(64) `json:$.row_hash`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, shadow_generation, source_generation_id, request_hash, state_kind, state_key"
+ENGINE_VER "built_at"

@@ -1,0 +1,203 @@
+DESCRIPTION >
+    Activate one hidden correction batch only after its exact source generation,
+    session replay, materialized Bill products, and operator parity approval agree.
+
+NODE candidate_session_audit_versions
+SQL >
+    SELECT
+        tenant_id,
+        batch_version,
+        argMax(
+            tuple(batch_id, committed_at, row_hash),
+            tuple(committed_at, row_hash)
+        ) AS current_audit
+    FROM session_state_versions
+    WHERE tenant_id = 'boom'
+      AND record_kind = 'batch_audit'
+    GROUP BY tenant_id, batch_version
+
+NODE candidate_session_audit_row
+SQL >
+    SELECT
+        tenant_id,
+        batch_version,
+        tupleElement(current_audit, 1) AS batch_id,
+        tupleElement(current_audit, 2) AS committed_at,
+        tupleElement(current_audit, 3) AS row_hash
+    FROM candidate_session_audit_versions
+
+NODE candidate_batch_to_activate
+SQL >
+    SELECT
+        request.*,
+        identity_audit.input_event_count,
+        identity_audit.input_hash,
+        identity_audit.committed_at AS identity_committed_at,
+        session_audit.committed_at AS session_committed_at,
+        build.source_manifest_version,
+        build.validated_at AS report_validated_at
+    FROM current_report_activation_request AS request
+    INNER JOIN candidate_identity_state AS identity_audit
+        ON request.tenant_id = identity_audit.tenant_id
+       AND request.identity_batch_version = identity_audit.batch_version
+       AND request.identity_batch_id = identity_audit.batch_id
+    INNER JOIN candidate_identity_state AS shadow_publish
+        ON request.tenant_id = shadow_publish.tenant_id
+       AND request.identity_batch_version = shadow_publish.batch_version
+       AND request.identity_batch_id = shadow_publish.batch_id
+    INNER JOIN candidate_session_audit_row AS session_audit
+        ON request.tenant_id = session_audit.tenant_id
+       AND request.session_batch_version = session_audit.batch_version
+       AND request.identity_batch_id = session_audit.batch_id
+    INNER JOIN current_report_build_validation AS build
+        ON request.tenant_id = build.tenant_id
+       AND request.source_generation_id = build.source_generation_id
+       AND request.report_generation = build.report_generation
+       AND request.build_digest = build.build_digest
+       AND request.source_manifest_digest = build.source_manifest_digest
+       AND request.connection_inventory_digest = build.connection_inventory_digest
+       AND request.cutoff_set_digest = build.cutoff_set_digest
+       AND request.policy_digest = build.policy_digest
+    INNER JOIN bill_build_readiness AS readiness
+        ON request.tenant_id = readiness.tenant_id
+       AND request.source_generation_id = readiness.source_generation_id
+       AND request.report_generation = readiness.report_generation
+       AND request.identity_batch_version = readiness.identity_stable_batch_version
+       AND request.source_manifest_digest = readiness.source_manifest_digest
+       AND request.connection_inventory_digest = readiness.connection_inventory_digest
+       AND request.cutoff_set_digest = readiness.cutoff_set_digest
+       AND request.policy_digest = readiness.policy_digest
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS active_batch_version
+        FROM current_identity_state
+        WHERE state_kind = 'activation_audit'
+        GROUP BY tenant_id
+    ) AS active
+        ON request.tenant_id = active.tenant_id
+    WHERE identity_audit.state_kind = 'batch_audit'
+      AND shadow_publish.state_kind = 'shadow_publish_audit'
+      AND JSONExtractString(
+          shadow_publish.fact_payload,
+          'source_generation_id'
+      ) = request.source_generation_id
+      AND JSONExtractString(
+          identity_audit.fact_payload,
+          'source_generation_id'
+      ) = request.source_generation_id
+      AND JSONExtractString(
+          shadow_publish.fact_payload,
+          'source_manifest_version'
+      ) = toString(build.source_manifest_version)
+      AND JSONExtractString(
+          shadow_publish.fact_payload,
+          'source_manifest_digest'
+      ) = request.source_manifest_digest
+      AND JSONExtractString(
+          shadow_publish.fact_payload,
+          'connection_inventory_digest'
+      ) = request.connection_inventory_digest
+      AND JSONExtractString(
+          shadow_publish.fact_payload,
+          'cutoff_set_digest'
+      ) = request.cutoff_set_digest
+      AND JSONExtractString(
+          identity_audit.fact_payload,
+          'source_manifest_version'
+      ) = toString(build.source_manifest_version)
+      AND JSONExtractString(
+          identity_audit.fact_payload,
+          'source_manifest_digest'
+      ) = request.source_manifest_digest
+      AND JSONExtractString(
+          identity_audit.fact_payload,
+          'connection_inventory_digest'
+      ) = request.connection_inventory_digest
+      AND JSONExtractString(
+          identity_audit.fact_payload,
+          'cutoff_set_digest'
+      ) = request.cutoff_set_digest
+      AND build.required_stage_count = 4
+      AND build.passed_stage_count = 4
+      AND build.is_valid = 1
+      AND readiness.is_ready = 1
+      AND build.validated_at >= session_audit.committed_at
+      AND request.requested_at >= build.validated_at
+      AND request.identity_batch_version > coalesce(active.active_batch_version, toUInt64(0))
+      AND NOT EXISTS (
+          SELECT 1
+          FROM candidate_identity_state AS correction
+          WHERE correction.tenant_id = request.tenant_id
+            AND correction.state_kind = 'correction_required'
+      )
+
+NODE candidate_activation_row
+SQL >
+    SELECT
+        tenant_id,
+        'activation_audit' AS state_kind,
+        concat('activation_audit:', leftPad(toString(identity_batch_version), 20, '0')) AS state_key,
+        identity_batch_version AS batch_version,
+        identity_batch_id AS batch_id,
+        now64(6) AS committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(
+            identity_batch_id,
+            ':',
+            identity_parity_hash,
+            ':',
+            session_parity_hash,
+            ':',
+            report_parity_hash,
+            ':',
+            build_digest,
+            ':',
+            request_hash
+        ))) AS row_hash,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        CAST([], 'Array(String)') AS historical_profile_ids,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        '' AS fact_kind,
+        '' AS fact_key,
+        identity_batch_version AS source_fact_version,
+        toUInt8(0) AS fact_deleted,
+        requested_at AS fact_observed_at,
+        repeat('0', 64) AS fact_payload_hash,
+        toJSONString(map(
+            'report_generation', report_generation,
+            'source_generation_id', source_generation_id,
+            'source_manifest_version', toString(source_manifest_version),
+            'source_manifest_digest', source_manifest_digest,
+            'build_digest', build_digest,
+            'policy_digest', policy_digest,
+            'connection_inventory_digest', connection_inventory_digest,
+            'cutoff_set_digest', cutoff_set_digest,
+            'identity_parity_hash', identity_parity_hash,
+            'session_parity_hash', session_parity_hash,
+            'report_parity_hash', report_parity_hash,
+            'session_batch_version', toString(session_batch_version)
+        )) AS fact_payload,
+        CAST([], 'Array(String)') AS evidence_keys,
+        '' AS producer_id,
+        toUInt64(0) AS checkpoint_sequence,
+        CAST([], 'Array(String)') AS prior_profile_ids,
+        CAST([], 'Array(String)') AS dirty_profile_ids,
+        input_event_count,
+        input_hash
+    FROM candidate_batch_to_activate
+
+TYPE COPY
+TARGET_DATASOURCE identity_state_versions
+COPY_MODE append

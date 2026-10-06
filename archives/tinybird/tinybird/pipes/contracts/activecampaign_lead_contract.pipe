@@ -1,0 +1,23 @@
+DESCRIPTION >
+    ActiveCampaign registrations projected into the reusable lead-evidence contract.
+
+NODE activecampaign_lead_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        'activecampaign-primary' AS source_connection_id,
+        registration_id AS lead_id,
+        contact_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        submitted_at AS occurred_at,
+        registration_type AS lead_type,
+        CAST(NULL AS Nullable(String)) AS form_id,
+        content_name AS form_name,
+        event_source AS source_system,
+        source_version
+    FROM activecampaign_registration_adapter

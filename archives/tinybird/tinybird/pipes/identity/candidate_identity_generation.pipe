@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Latest hidden-or-active candidate batch used only by replay workers.
+
+NODE candidate_generation_row
+SQL >
+    SELECT
+        tenant_id,
+        max(batch_version) AS stable_batch_version,
+        argMax(batch_id, tuple(batch_version, committed_at, row_hash)) AS stable_batch_id,
+        max(committed_at) AS committed_at
+    FROM candidate_identity_state
+    WHERE state_kind = 'batch_audit'
+    GROUP BY tenant_id

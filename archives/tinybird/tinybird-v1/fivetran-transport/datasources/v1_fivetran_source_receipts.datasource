@@ -1,0 +1,15 @@
+DESCRIPTION >
+    Verified nine-source barriers for the V1 conversion reader.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `receipt_key` String `json:$.receipt_key`,
+    `window_started_at` DateTime64(3) `json:$.window_started_at`,
+    `complete_through_exclusive` DateTime64(3) `json:$.complete_through_exclusive`,
+    `source_count` UInt8 `json:$.source_count`,
+    `manifest_json` String `json:$.manifest_json`,
+    `verified_at` DateTime64(3) `json:$.verified_at`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, receipt_key"
+ENGINE_VER "verified_at"

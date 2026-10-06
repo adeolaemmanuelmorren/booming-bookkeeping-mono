@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Append one validated shadow generation of KRC acquisition outcomes.
+
+NODE validated_krc_acquisition_copy_rows
+SQL >
+    SELECT product.*
+    FROM bill_krc_acquisition_product AS product
+    INNER JOIN bill_build_readiness AS readiness
+        ON product.report_generation = readiness.report_generation
+       AND readiness.is_ready = 1
+
+TYPE COPY
+TARGET_DATASOURCE bill_krc_acquisition_versions
+COPY_MODE append

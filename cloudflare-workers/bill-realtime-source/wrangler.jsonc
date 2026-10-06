@@ -1,0 +1,33 @@
+{
+  "name": "bill-realtime-ondemand-source-d7ef",
+  "main": "index.js",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "compatibility_date": "2026-09-05",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "GOOGLE_ADS_CUSTOMER_ID": "1941192637",
+    "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "3855055503",
+    "GOOGLE_ADS_API_VERSION": "v25",
+    "META_ADS_ACCOUNT_ID": "10151088695453802",
+    "META_ADS_API_VERSION": "v25.0"
+  },
+  "r2_buckets": [
+    {
+      "binding": "BROWSER_BUFFER",
+      "bucket_name": "boom-tinybird-v1-browser-buffer",
+    },
+  ],
+  "services": [
+    {
+      "binding": "STRIPE_SOURCE",
+      "service": "boom-bookkeeping-segment-proxy",
+      "entrypoint": "StripeSource",
+    },
+    {
+      "binding": "ACTIVECAMPAIGN_SOURCE",
+      "service": "marketing-webhooks",
+      "entrypoint": "ActiveCampaignSource",
+    },
+  ],
+}

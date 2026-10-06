@@ -1,0 +1,4022 @@
+{
+  "created_at": "20260905T202513Z",
+  "files": [
+    {
+      "path": "tinybird/ARCHITECTURE.md",
+      "size": 7921,
+      "sha256": "e3d0ef1cd67c358cf16c54e6926ca32da144eddeb1b687b5ebdc5559865d4f48"
+    },
+    {
+      "path": "tinybird/MIGRATION_IMPLEMENTATION_PLAN.md",
+      "size": 2477,
+      "sha256": "72cceb6b8a190231af17c3657ad9481d6811729e81137e0e6a4c5b06c1ad463d"
+    },
+    {
+      "path": "tinybird/ORCHESTRATION.md",
+      "size": 7258,
+      "sha256": "3b9d6955e74584dc33b86a6471175f7b3c62b9b9ab8acb8608d4aad6c47a3ecd"
+    },
+    {
+      "path": "tinybird/PARITY.md",
+      "size": 4144,
+      "sha256": "2c486bdb677d103356491b8588fc9b2883078395aece3e3aba207b5a6b1baebd"
+    },
+    {
+      "path": "tinybird/README.md",
+      "size": 5176,
+      "sha256": "ebe85804406b08a63da67bba4421288908a85110cec4759584b2945eeac977a8"
+    },
+    {
+      "path": "tinybird/REUSE.md",
+      "size": 6052,
+      "sha256": "9f2c85d039d261ded43eb2d868913fdab887d36ce397c436306762667b43134d"
+    },
+    {
+      "path": "tinybird/connection.md",
+      "size": 295,
+      "sha256": "a51b0957f8b43696da01586d851653228b35886229dd889ac6993bdccc0e7102"
+    },
+    {
+      "path": "tinybird/connections/README.md",
+      "size": 992,
+      "sha256": "5716e42c4dbaac46e1f744e3c6006306b80c09aaa26d58f8f40e7b01becb1c5c"
+    },
+    {
+      "path": "tinybird/connections/boom_bigquery_gcs.connection",
+      "size": 111,
+      "sha256": "6528246bb84b8db784a93111093d1990cd7bd9517da5b710f6fffdb8537b57a3"
+    },
+    {
+      "path": "tinybird/contracts/bigquery-oracles.json",
+      "size": 1242,
+      "sha256": "1faf9720e644c7cdc5f6a1bbf96421bce322a1ddca04c23e7bb149f215ff0a17"
+    },
+    {
+      "path": "tinybird/contracts/canonical-contracts.json",
+      "size": 7592,
+      "sha256": "1f8a2ff05784145d96aa70736a49a4da8274d54cdf0187fa80a610b5bac2c15f"
+    },
+    {
+      "path": "tinybird/contracts/derived-bigquery-exports.json",
+      "size": 5493,
+      "sha256": "f72021e49b7a2385694848cebbd42cd7d47ddece97ac509b5acd423626c15021"
+    },
+    {
+      "path": "tinybird/contracts/endpoint-contracts.json",
+      "size": 2332,
+      "sha256": "38be22c2a3a15a9a135fa0cd64954c95a674d3467c6c9d1176567ce2056c5ce7"
+    },
+    {
+      "path": "tinybird/contracts/raw-bigquery-schemas.json",
+      "size": 591992,
+      "sha256": "05af310bc0bf745de86b6b6a513f99d5330fb8ef6e76d6041062262d467d9762"
+    },
+    {
+      "path": "tinybird/copies/activate_report_generation.pipe",
+      "size": 4196,
+      "sha256": "7b3d529be86fe784602d96c8575627d7855ea9c3b3aae585aab8a5ec77fe57aa"
+    },
+    {
+      "path": "tinybird/copies/build_bill_hourly_product.pipe",
+      "size": 434,
+      "sha256": "3d9696f0b65b53f94be0bca887485c1589bdb69bad6c0284c8fc070a9d84786d"
+    },
+    {
+      "path": "tinybird/copies/build_bill_krc_acquisition.pipe",
+      "size": 430,
+      "sha256": "d71b2587a3bf119b6c6442a9579b895f33b0e80606c5ee23bb16f16ac47a97d7"
+    },
+    {
+      "path": "tinybird/copies/build_bill_meta_delivery_daily.pipe",
+      "size": 450,
+      "sha256": "9633bc8eb1b0488106fdddeae8cd2a28178106302c8e30ce2d2897a9c54f6ccd"
+    },
+    {
+      "path": "tinybird/copies/build_bill_meta_hour_bounds.pipe",
+      "size": 440,
+      "sha256": "8ff037486346743b3f3e38e979e3b44fa90d634dd49dd6711e0b07c8d5d3ecea"
+    },
+    {
+      "path": "tinybird/copies/identity_activate_candidate.pipe",
+      "size": 8258,
+      "sha256": "562e3ac1142400641043d1072f733da4f3b550d43c9fb703bba260c2cb20c401"
+    },
+    {
+      "path": "tinybird/copies/identity_compact_state.pipe",
+      "size": 31655,
+      "sha256": "ec6adb03d72d95a03c0b1075af6e813377b39275d62eb1a6338c5f5820419160"
+    },
+    {
+      "path": "tinybird/copies/identity_enqueue_source_generation.pipe",
+      "size": 273,
+      "sha256": "d3dfbda3ebce9725ffbea1ea24f2ee6dffca99509218b4a8aa52edc4b2a82807"
+    },
+    {
+      "path": "tinybird/copies/identity_shadow_label_step.pipe",
+      "size": 12213,
+      "sha256": "213e433b658af65161163cc9411eb02114e34a9cf6fb46f3e312045a55c2d6ac"
+    },
+    {
+      "path": "tinybird/copies/identity_shadow_prepare.pipe",
+      "size": 10160,
+      "sha256": "2398fd4e1d0f4e9a129f3f27da00aeec4c744dbef50e80d1af9960f844d76e08"
+    },
+    {
+      "path": "tinybird/copies/identity_shadow_publish.pipe",
+      "size": 31818,
+      "sha256": "38edc7f1d8683285b27ca76cfdc3d30cbaee3467330a1755c7b55eefc07e830c"
+    },
+    {
+      "path": "tinybird/copies/identity_shadow_rebuild.pipe",
+      "size": 262,
+      "sha256": "474e83587781d304334c5d963c6eb8feb373795e587ae524d37301cbaf954dd4"
+    },
+    {
+      "path": "tinybird/copies/session_resessionize_dirty_visitors.pipe",
+      "size": 22063,
+      "sha256": "f53e883d30c3e51828a02dad3e02b9eb4365b9e84d41dd08a23031460875caeb"
+    },
+    {
+      "path": "tinybird/copies/validate_bill_adapters.pipe",
+      "size": 266,
+      "sha256": "d5ddb15b4e8866cfdf23fc3753eec27ee0c467b81e652ea5d543413e7f39d555"
+    },
+    {
+      "path": "tinybird/copies/validate_bill_product_build.pipe",
+      "size": 349,
+      "sha256": "de1d33caddc1cd3b133397015c5d0a09384d808a2f41cf416f4af170dd20024d"
+    },
+    {
+      "path": "tinybird/datasources/control/adapter_coverage_validations.datasource",
+      "size": 1186,
+      "sha256": "9379605e1c15164b085e000cc809d88fc0026c2cfba4906da6f9520011d43c64"
+    },
+    {
+      "path": "tinybird/datasources/control/report_activation_requests.datasource",
+      "size": 1601,
+      "sha256": "52231dee32dc8361e6c56610665213cb5f86ec6a8759bb7d9a9d63bc4da1fbf0"
+    },
+    {
+      "path": "tinybird/datasources/control/report_build_validations.datasource",
+      "size": 1414,
+      "sha256": "775f4895c954d1a79d0375e29b297c538aeed72456d9bc1b4becdd229fb695c2"
+    },
+    {
+      "path": "tinybird/datasources/control/report_compatibility_policy_versions.datasource",
+      "size": 1219,
+      "sha256": "bb70f87bae3ce5927198258469aab3aa023ee40fa91c3105d676cf614045464c"
+    },
+    {
+      "path": "tinybird/datasources/control/report_product_generations.datasource",
+      "size": 1379,
+      "sha256": "073e1a38683013b47aaa83fe0daff9503a638551f4ca0157f5211ab6c3b0f6da"
+    },
+    {
+      "path": "tinybird/datasources/control/source_generation_connection_cutoffs.datasource",
+      "size": 1056,
+      "sha256": "18e8396b9d6697b517fb52511aba9f0c32c5dde52bd10ffee9af555812dabfe5"
+    },
+    {
+      "path": "tinybird/datasources/control/source_generation_manifests.datasource",
+      "size": 1544,
+      "sha256": "1ddca9a2f05e9086d5d410b15b09f1403059bccbb8733c6f6427cde4819dd6e0"
+    },
+    {
+      "path": "tinybird/datasources/domain/bill_hourly_product_versions.datasource",
+      "size": 1912,
+      "sha256": "50b4645fdaf85889c1680b1650efa21a7c74404c8aeb8cd6db779cb24ba585d9"
+    },
+    {
+      "path": "tinybird/datasources/domain/bill_krc_acquisition_versions.datasource",
+      "size": 2868,
+      "sha256": "6b4f2e2f84b5dc4328988592059792b09d8ac8e4c2569fde1f88b496d2016600"
+    },
+    {
+      "path": "tinybird/datasources/domain/bill_meta_delivery_daily_versions.datasource",
+      "size": 817,
+      "sha256": "f8b4de431b4fa72b80b49382d3a725fabe6bab46e2152b81d5f67d854a46d2ac"
+    },
+    {
+      "path": "tinybird/datasources/domain/bill_meta_hour_bounds_versions.datasource",
+      "size": 554,
+      "sha256": "df038a8529f2c69ef0a261a75c69776154b22373b54538918243c05b0cfe6995"
+    },
+    {
+      "path": "tinybird/datasources/domain/jitsu_events_api_observations.datasource",
+      "size": 2916,
+      "sha256": "2576dfb79dd6d7a1ecbfaa0647c9bf4b0f2b2166cc2341983d7ab75ca64d96e9"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_activecampaign_contact.datasource",
+      "size": 1587,
+      "sha256": "206d85b9af5bd8b1434dfa6c6cfb7808f82e73b177034f664396d134e6b1b771"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_activecampaign_contact_tag.datasource",
+      "size": 1138,
+      "sha256": "4e585e3ca21d98722d415a25a72fdb06e9d3cbf51cebbe0f1ae208bff8dcf156"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_activecampaign_tags.datasource",
+      "size": 1342,
+      "sha256": "e00e0a6c4b76b01f70addff4cc7714a588b306fa282c900a43fe3d41f61adf09"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_boom_domains_attr.datasource",
+      "size": 6675,
+      "sha256": "e3baa5b1235a1a20de2c35fad32026351b98df69bc9e885ec14528fcda0dccba"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_boom_domains_form_submitted.datasource",
+      "size": 10119,
+      "sha256": "60afcc488fa3806951139362f6550b25216b1829fc88164a3c4d641efc901976"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_boom_domains_identifies.datasource",
+      "size": 6228,
+      "sha256": "58b5004948b4ac0244f42eb662fe40979bf0bbc7b18fab50f7c4795bfc5bbda0"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_boom_domains_order_completed.datasource",
+      "size": 7381,
+      "sha256": "553f5fd60374627d0c15ce2556ac1171f20f68b0d5f91a654c2554c2d0d1eb07"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_boom_domains_pages.datasource",
+      "size": 6356,
+      "sha256": "300280cecb6d8549f7a1f2ac2dc5cf8f1e39c3ab845dc7b2bdc2c7651c58664b"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_ad_history.datasource",
+      "size": 2271,
+      "sha256": "fda0536e088969fb96b9971d6bad9e9bdcb8fc5183b3d4af210257224c0ab392"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_ad_set_history.datasource",
+      "size": 10402,
+      "sha256": "dd4d3dbe619a90df89837ab35a83aeb0ae57672c9727675629d2b3e6e7143bdc"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_ad.datasource",
+      "size": 1794,
+      "sha256": "4c1aff460f4a43fb45950e1e9f67a7e2ee4dc772960d4693c951dafdfa52bf3a"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_ad_action_values.datasource",
+      "size": 1477,
+      "sha256": "af0de890a9d0d34466109e4be1e60957ba1d7f4147482ae907b76446bc0fac43"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_ad_actions.datasource",
+      "size": 1465,
+      "sha256": "45cd5240e235f8fb85cace2219d356fc68f934b3c87685db4dc385a0afb000bf"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_ad_hourly.datasource",
+      "size": 1972,
+      "sha256": "530a1ae2623ec080eb64aed10939092925898afa322eab8a59df95337f0d16fb"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_ad_set.datasource",
+      "size": 1777,
+      "sha256": "ecce87b999f3277b7cebe694e105cd54d6b19cbb85667e5ecf724dab662419fa"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_basic_campaign.datasource",
+      "size": 1735,
+      "sha256": "68e053256b0a41026c06a8204cff3f9e46b9e2c27b2a54da2729b270d4978fae"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_campaign_history.datasource",
+      "size": 4344,
+      "sha256": "0d5a160ffb712d5db4b144f2c7fdb51717a24f15c86ad6a00e4f8238eae3f298"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_facebook_ads_creative_history.datasource",
+      "size": 10304,
+      "sha256": "fd71150a90bbbbd2faacfd4d620156f05b534682e93286ce99eb271475b17b7e"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_google_ads_account_history.datasource",
+      "size": 1969,
+      "sha256": "f806b665f8407b4f42f89c3ddd87557448a5d8b4328967d4aadd9440d04b6171"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_google_ads_ad_group_history.datasource",
+      "size": 2052,
+      "sha256": "ba0f361f656a33e52c6c2df37fb135688937c06cdcb8e0b78dad7773801edf65"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_google_ads_ad_history.datasource",
+      "size": 2419,
+      "sha256": "d38645761999188653f93e8d0ca5b3e571224369390d7d0b5174f97c6d3269b9"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_google_ads_ad_stats.datasource",
+      "size": 2767,
+      "sha256": "7043ce9db061473d50d34729941dd059c6964879235f9cc2b211c1008c7390c5"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_google_ads_campaign_history.datasource",
+      "size": 2878,
+      "sha256": "91a44b98f75be5a55af0fe78060c34d26ef49333620dc23773425f4fecbaa081"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_jitsu_data_attr.datasource",
+      "size": 12206,
+      "sha256": "508b98b996c0633b661ab92809ab850f153670f769905bf9012db53dd5442a23"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_jitsu_data_form_submitted.datasource",
+      "size": 21267,
+      "sha256": "aa1ed079c51fc7a06a1ff2623fd0d3febafdced074913683b362f6c722be118b"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_jitsu_data_identifies.datasource",
+      "size": 8693,
+      "sha256": "64a9b5fb310ec5cc784857d2ee133b84e8ee4ca94beba9df29cde723c2156979"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_jitsu_data_order_completed.datasource",
+      "size": 16854,
+      "sha256": "c3fab1fa199d1fec97bcf61d34a986d72bc2b77996587364b54caae137d96884"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_jitsu_data_pages.datasource",
+      "size": 10879,
+      "sha256": "11bddff37aecd7f36f71ba05864d5ab1ac4b2438765857b80f2fb2a3af1aa7db"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_manual_attribution_manual_payment_profile_link_events.datasource",
+      "size": 839,
+      "sha256": "6f818205c8e04d9625d215d9c8bd4ae510ea51ea362c40bbabbd2d6ce85730ad"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_charge.datasource",
+      "size": 5393,
+      "sha256": "93710cf5c652d03617d037765c66952650d98e37f836e441d0785655828ae274"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_checkout_session.datasource",
+      "size": 9557,
+      "sha256": "19ea35ea4976b9666932b5d44721257e69a246cd10cef95201a085d7bed140c4"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_checkout_session_line_item.datasource",
+      "size": 1448,
+      "sha256": "de2653b1543f228c0f78f0d375e833eae726a7ad38d10c23a95c7297336154f1"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_coupon.datasource",
+      "size": 1493,
+      "sha256": "b34b61b5c5e5cc7a4adc539386418eb72b4cdcb41f935756292e2b3016b37e64"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_customer.datasource",
+      "size": 3396,
+      "sha256": "3b0bc86a48265f0b425fa8ff35f4a3dfdf6f70d44a54a214a907e571795bedd2"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_discount.datasource",
+      "size": 1577,
+      "sha256": "1fb8177b9e8518697fa3d5134fcc5b4edc438798e3c08b55617e5d7118b7574d"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_invoice.datasource",
+      "size": 9480,
+      "sha256": "aa67272e5df4100c373264f92f4232137c10fbdf103a5666d261a3e7205df701"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_invoice_line_item.datasource",
+      "size": 2093,
+      "sha256": "112e706a599a1a15d0232ce6793f6c6124a12cb0043233f9322e7cc0e937c9cd"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_kajabi_charge.datasource",
+      "size": 5407,
+      "sha256": "00465d6b8edafafa49a1b25ebd8c64d1de69ed38e7919654ead2569f595957c4"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_kajabi_customer.datasource",
+      "size": 3410,
+      "sha256": "cc9360fc9389dadfc5dedfef6bd6453877678af64810236d3851a9b23fcd58e7"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_kajabi_invoice.datasource",
+      "size": 9494,
+      "sha256": "cf2c37eba6bd50bd56b94b3368f4b9271cd358a43747314e1b8bc6ced12a08a6"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_kajabi_invoice_line_item.datasource",
+      "size": 2107,
+      "sha256": "7c1428dd517a9c80d81f156759c6f46daa0956d6102108af4031c1b69e378652"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_kajabi_payment_intent.datasource",
+      "size": 3210,
+      "sha256": "8d733e70736db28be2ef90cb6a2d4fc39eb3d32ff129a98fcec06863dca87b96"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_payment_intent.datasource",
+      "size": 3196,
+      "sha256": "57ad9d23680920d01520806f797ac402e167334841fa93b3b183ae65a73e927f"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_payment_link_line_item.datasource",
+      "size": 1428,
+      "sha256": "7749ddbe087cb25c71f57ee1af808109d2b41fc04f30970792ca98a005acf76c"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_plan.datasource",
+      "size": 1759,
+      "sha256": "309e1ee1d81d94614301e6a0578eab337194821f95e331be2d7164e66bd8d719"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_price.datasource",
+      "size": 2090,
+      "sha256": "160e94dae34840f9061cab6e7a865dc24a58a88a14c54b93ff476b8a0ca46b55"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_product.datasource",
+      "size": 1794,
+      "sha256": "345d6d5b2c955e1ea11605161e68227f9ed0bd2767fd3a13eff69df84c48b272"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_promotion_code.datasource",
+      "size": 1506,
+      "sha256": "e6ac4067b7a542dca8c4a08cb35d977536ded3f165cddb917ec15ab6ff6531ec"
+    },
+    {
+      "path": "tinybird/datasources/raw/raw_stripe_subscription_item.datasource",
+      "size": 1504,
+      "sha256": "49fa29a47046f06fad4a04dcd888f921706a523dc4e894d2e83b1403192996d5"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_events_raw.datasource",
+      "size": 1231,
+      "sha256": "5b1b476fd22c8f6f2e63c5d956585a77a28e2092b2ad31131fb498c8b0e1adae"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_identifier_type_policy.datasource",
+      "size": 726,
+      "sha256": "45f5114fa090baeca658329e59acb11daf44156efef9393e426cda2e433bfb04"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_shadow_requests.datasource",
+      "size": 1059,
+      "sha256": "5e7de1759714d420acd02d8e7e128b335cb7dbe6a6889d7d009b7ed31a2c4938"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_shadow_state_versions.datasource",
+      "size": 1856,
+      "sha256": "493a8fb159dd39317815275f0fcb5d6fda27fbda0aa8dcab2b78d85faf423c3e"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_shadow_work_versions.datasource",
+      "size": 2074,
+      "sha256": "cc8e96add4e828051f90bae4ccec0ee2359ad60897b29531d2a5342a56c62b72"
+    },
+    {
+      "path": "tinybird/datasources/state/identity_state_versions.datasource",
+      "size": 2362,
+      "sha256": "915ce4214662fd5a946f3ad786254cceba45dda205c1e6f4d975c7cca385ce1c"
+    },
+    {
+      "path": "tinybird/datasources/state/session_state_versions.datasource",
+      "size": 3465,
+      "sha256": "3361d1c474b0a3ab9ba0ed9e680e26f016811792fd57290c97b60b3f02ac4458"
+    },
+    {
+      "path": "tinybird/endpoints/bill_5k_performance.pipe",
+      "size": 3038,
+      "sha256": "f757fa96efad6a257f469ec1d64daf97896578c590b4d10e0a7a0c38f1798e17"
+    },
+    {
+      "path": "tinybird/endpoints/bill_live_acquisition.pipe",
+      "size": 2976,
+      "sha256": "5ef3ad012669658d770e2ba51b48418836f420452e49ff9d59afabc93be23763"
+    },
+    {
+      "path": "tinybird/endpoints/bill_meta_delivery_daily.pipe",
+      "size": 2658,
+      "sha256": "50b01196e97fc8a3f29b351cf3c58fd16074895fc431ba3b3b98d4b700555618"
+    },
+    {
+      "path": "tinybird/endpoints/bill_report_generation.pipe",
+      "size": 540,
+      "sha256": "bafe581ad09f0d3e240ab4645c1cc35dcd6cfdaa9cc8c2d80fda4bd907cac4c7"
+    },
+    {
+      "path": "tinybird/endpoints/bill_report_window.pipe",
+      "size": 2353,
+      "sha256": "38c91e8879e4d0f8f86836d6507ec6312fbaf911c9f300506d27a7ab4daba61b"
+    },
+    {
+      "path": "tinybird/fixtures/identity/deliveries.ndjson",
+      "size": 1316,
+      "sha256": "1cb2550fd37c431824301de960115ea4ffb984f30d7116d6f19caf19d23c7530"
+    },
+    {
+      "path": "tinybird/fixtures/identity/identity_identifier_type_policy.ndjson",
+      "size": 1115,
+      "sha256": "44cf17c3787dc0ad9f5c64cce765f3221a203757f9f9707f32119171346ef067"
+    },
+    {
+      "path": "tinybird/fixtures/identity/observations.ndjson",
+      "size": 1708,
+      "sha256": "ab307870f6ef8d070f49e32cb2839fb28a71524063e097a071d254f7a958e68a"
+    },
+    {
+      "path": "tinybird/fixtures/reports/bill_report_cases.json",
+      "size": 4228,
+      "sha256": "f596407b8c786bccdcba7be04dc7fb5f63ca1eab6c2dd5e209d7b7184e15977b"
+    },
+    {
+      "path": "tinybird/fixtures/sessions/pages_baseline.ndjson",
+      "size": 1108,
+      "sha256": "20da6f3c523c6c3bf52248f566f1fd355641991d4f427cd1c33cce399149666a"
+    },
+    {
+      "path": "tinybird/fixtures/sessions/pages_late_arrival.ndjson",
+      "size": 188,
+      "sha256": "eb9fdc11ddeb33fbb9debbc38a258441fde01bdc0adc01b881be0e225a81959c"
+    },
+    {
+      "path": "tinybird/package.json",
+      "size": 1157,
+      "sha256": "6d30c3f8d111ed696e7721a05c282524227f77c4a8ff27436b4d35a3cd57f9a2"
+    },
+    {
+      "path": "tinybird/pipes/adapters/activecampaign_registration_adapter.pipe",
+      "size": 5161,
+      "sha256": "ce9325e6d7ab7ce603793f05d5b35a7cc26a6b6678646f238a41720c83b8879e"
+    },
+    {
+      "path": "tinybird/pipes/adapters/bill_adapter_coverage_checks.pipe",
+      "size": 16855,
+      "sha256": "f7eac09a6d2c4ab95223215a13c488cbb61080d0af04d2d8b0a83ff6e3176a83"
+    },
+    {
+      "path": "tinybird/pipes/adapters/current_daily_ad_delivery.pipe",
+      "size": 3152,
+      "sha256": "7663a305a39a3c7bf19028c694693a72a7b49055cf9fc72b2c37d0a3ec5fc169"
+    },
+    {
+      "path": "tinybird/pipes/adapters/current_hourly_ad_delivery.pipe",
+      "size": 1454,
+      "sha256": "ae4246d519f8ea562c93034e8bd2457487103da323d3de3b92dab619a2366cd8"
+    },
+    {
+      "path": "tinybird/pipes/adapters/current_lead_evidence.pipe",
+      "size": 2523,
+      "sha256": "839f258b7b13716d4329fac565787f56581cc908c5e9973ae6aad69e6ca089ed"
+    },
+    {
+      "path": "tinybird/pipes/adapters/current_payment_evidence.pipe",
+      "size": 5781,
+      "sha256": "aac41a1ce77dfee9bf597b395b1a46a30c7dc01d4cb9287dbf57ac7ab0452bc2"
+    },
+    {
+      "path": "tinybird/pipes/adapters/google_ad_row_presence_adapter.pipe",
+      "size": 4354,
+      "sha256": "cd65e9301be55542192c1595cbb644c60476c9a4d19258293598aec093682691"
+    },
+    {
+      "path": "tinybird/pipes/adapters/identity_observation_registry.pipe",
+      "size": 8381,
+      "sha256": "f41c70760a2a0ef3b92d2d6aad4df2de7cb2cb557e99f18f23fbcf2c47a06c38"
+    },
+    {
+      "path": "tinybird/pipes/adapters/jitsu_events_api_current_versions.pipe",
+      "size": 936,
+      "sha256": "86785f9a6820a014f75301d0fbacb4ae3e0c1b408505b2d3c4974ee72de65152"
+    },
+    {
+      "path": "tinybird/pipes/adapters/manual_payment_profile_link_adapter.pipe",
+      "size": 2383,
+      "sha256": "4b9b66bfc4dc0b5ee7e41487393294d672e52ccb0a71f0bafbfc433defa85347"
+    },
+    {
+      "path": "tinybird/pipes/adapters/meta_ad_dimension_adapter.pipe",
+      "size": 3950,
+      "sha256": "31f46031ffc28c6dee496d009c23e7ea4418725552a449cc7a2327f6ecb91848"
+    },
+    {
+      "path": "tinybird/pipes/adapters/meta_daily_delivery_adapter.pipe",
+      "size": 6306,
+      "sha256": "1e354c5fea80df1fc9be0319b3357fd4801177105db1b13408e71be5a822caf2"
+    },
+    {
+      "path": "tinybird/pipes/adapters/meta_hourly_delivery_adapter.pipe",
+      "size": 3521,
+      "sha256": "0f78ea89ad549598d6be766d6ab15b2e3e1effb3200e9c6e116558e07cc0e1f3"
+    },
+    {
+      "path": "tinybird/pipes/adapters/registered_contract_coverage_checks.pipe",
+      "size": 27149,
+      "sha256": "52ac675edb0fe6155fb8591ec52e3d1eade89aa3f1df87f1ce5056e38a255fe5"
+    },
+    {
+      "path": "tinybird/pipes/adapters/registered_source_connections.pipe",
+      "size": 2441,
+      "sha256": "2c362a22a5227fd8b8f99900c638ba3158ad9d6e85f4224c301898c57baae0fe"
+    },
+    {
+      "path": "tinybird/pipes/adapters/source_generation_cutoff_coverage_check.pipe",
+      "size": 1138,
+      "sha256": "830e1a23c379294cb425189e963edc9b0b5a77d5f5f49270c46f5ae714c385f6"
+    },
+    {
+      "path": "tinybird/pipes/adapters/stripe_kajabi_payment_adapter.pipe",
+      "size": 10488,
+      "sha256": "01ba01073029ba577920d108fca3edaaa347e07bbd6f7167bd5b28534b59baf3"
+    },
+    {
+      "path": "tinybird/pipes/adapters/stripe_primary_payment_adapter.pipe",
+      "size": 27505,
+      "sha256": "9d90bcf4649cc91306f251174919e77a3c01bdc3f11d5c23865688413ec6afde"
+    },
+    {
+      "path": "tinybird/pipes/adapters/web_attribution_observation_adapter.pipe",
+      "size": 4144,
+      "sha256": "c5a9363fd33aad652fd4416a31494e10205f25491e4c8e5a86435edd888c8c86"
+    },
+    {
+      "path": "tinybird/pipes/adapters/web_conversion_adapter.pipe",
+      "size": 15077,
+      "sha256": "268b3234d7516466bc83881bb1d3be2a3c8fc5346445944a1dacf22b2d09acd2"
+    },
+    {
+      "path": "tinybird/pipes/adapters/web_identity_observation_adapter.pipe",
+      "size": 4750,
+      "sha256": "43b14e7d67fe93af5dc7d5f5a9ce7878cce85462c4fee4f4dd5c6fb0630e457a"
+    },
+    {
+      "path": "tinybird/pipes/adapters/web_page_view_adapter.pipe",
+      "size": 20996,
+      "sha256": "17286da894ee389bc69b01750dd0dfb584e28f644b75a2102f5587fe38edce42"
+    },
+    {
+      "path": "tinybird/pipes/contracts/activecampaign_identity_contract.pipe",
+      "size": 772,
+      "sha256": "4357f2b5fa0c685d2c4b42d024585163b545f3c031c890f544e697d443071406"
+    },
+    {
+      "path": "tinybird/pipes/contracts/activecampaign_lead_contract.pipe",
+      "size": 685,
+      "sha256": "849638d5aa421442b669cc7b597dda16ea89caacb251adf11036fa120df6bb7c"
+    },
+    {
+      "path": "tinybird/pipes/contracts/google_daily_ad_delivery_contract.pipe",
+      "size": 762,
+      "sha256": "a14d46bde0cf565ea3bfc47397c2bea18ca849cdbde85267be65d79b8cf92157"
+    },
+    {
+      "path": "tinybird/pipes/contracts/jitsu_tombstone_identity_contract.pipe",
+      "size": 670,
+      "sha256": "df63bdb89c0d06ae682ae098538aa3be85d07fd38e9dfd86a2f317d8f1fcd2a2"
+    },
+    {
+      "path": "tinybird/pipes/contracts/meta_daily_ad_delivery_contract.pipe",
+      "size": 761,
+      "sha256": "111d3fe9d9037c8994f5dd45225d486ed14cf3ca874dd9c5cb80416af10425ab"
+    },
+    {
+      "path": "tinybird/pipes/contracts/meta_hourly_ad_delivery_contract.pipe",
+      "size": 581,
+      "sha256": "b854f26bbecbc691f8211da964d79f983b9fd78748bb924b9bd3b9769167c5f5"
+    },
+    {
+      "path": "tinybird/pipes/contracts/payment_identity_contract.pipe",
+      "size": 860,
+      "sha256": "549290228ede3079de5fc4d705becaab3fc5b5e4a976ffb7874ddd7d8b2cefa9"
+    },
+    {
+      "path": "tinybird/pipes/contracts/web_attribution_identity_contract.pipe",
+      "size": 808,
+      "sha256": "7fb221374c87fc2963f70a27d437482ef2029b6d18b1412e8d91d28e8bde104a"
+    },
+    {
+      "path": "tinybird/pipes/contracts/web_conversion_identity_contract.pipe",
+      "size": 1027,
+      "sha256": "09aeeab97f6f7783fd32c7b7ee3a68675b65d6b84f627fa0f473e9d74378c840"
+    },
+    {
+      "path": "tinybird/pipes/contracts/web_form_lead_contract.pipe",
+      "size": 680,
+      "sha256": "7c6b97318c27fced844faeb504b3aa54ab39f9a56243fe543e9b017f4b1721bd"
+    },
+    {
+      "path": "tinybird/pipes/contracts/web_identify_identity_contract.pipe",
+      "size": 720,
+      "sha256": "26c5c4835feaa2ff84b05165a07642588015a97532f1b19534d43fc7fe5b7a1f"
+    },
+    {
+      "path": "tinybird/pipes/contracts/web_page_identity_contract.pipe",
+      "size": 812,
+      "sha256": "9f88c9af62c77c4798f7994577ec06bdcedd0474194dd178e61b7fe6e954d2b0"
+    },
+    {
+      "path": "tinybird/pipes/domain/bill_adapter_coverage_requirements.pipe",
+      "size": 1932,
+      "sha256": "3158a28657cc6755b8a61aa517d8041665147218b412dfc5afb989a1561c1e10"
+    },
+    {
+      "path": "tinybird/pipes/domain/bill_build_readiness.pipe",
+      "size": 4622,
+      "sha256": "dd97a14b2edab970c8823c35047847efadcfb678ccb8fb5c68fb1ce2956ba307"
+    },
+    {
+      "path": "tinybird/pipes/domain/bill_krc_acquisition_product.pipe",
+      "size": 9852,
+      "sha256": "0c6c2754b5c5724c27dcc7526b99106720db7c4b12dfeae653475d6fb6410eab"
+    },
+    {
+      "path": "tinybird/pipes/domain/bill_product_build_validation.pipe",
+      "size": 15207,
+      "sha256": "46375bfb73228977cdad331a5e2d98d72e7ae1cda51475e950f4ac96a07b11b9"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_adapter_coverage.pipe",
+      "size": 2914,
+      "sha256": "8184958ba8f1a9cfb01838b08d13f4b1e0aca1b5a87eef0132d525a1eb175e5b"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_attributed_payments.pipe",
+      "size": 4736,
+      "sha256": "faa7f99c69eaa13f3537ece25bad064e6343093758ea872e6061ae807ff6a786"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_bill_krc_acquisition_build.pipe",
+      "size": 998,
+      "sha256": "4223f29d941c7f3f7decb13e691509b311fac80804089f98920c894fb748aaaf"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_report_activation_request.pipe",
+      "size": 4773,
+      "sha256": "974cac1e4201e08a4033ad63fd4f1b8d8a70c9539cf7a7813c09fd5810738dee"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_report_build_validation.pipe",
+      "size": 5319,
+      "sha256": "d4e9ba87086d7a4d74e784cd8defeb0a04533ba8586b939c5e75b94440aec797"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_report_generation.pipe",
+      "size": 2980,
+      "sha256": "b5cf55671353c26c7314f070b51efcf5407b290272d762cf4f89b1dbe162d656"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_report_policy.pipe",
+      "size": 3939,
+      "sha256": "0284ee0e85c306a5e60fc934b1153396fa6908ce4e91b65e04ed7f430db3fb98"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_source_connection_cutoffs.pipe",
+      "size": 5052,
+      "sha256": "4d836bdb7b0e03709e47e74288319cb7cb98cd1612433d46f41fd2153327165f"
+    },
+    {
+      "path": "tinybird/pipes/domain/current_source_generation.pipe",
+      "size": 3263,
+      "sha256": "ebd3c5abbf25c5089ded7329c257d98f03ed67fe6491922a634956178e74dce8"
+    },
+    {
+      "path": "tinybird/pipes/domain/generic_conversion_row_presence.pipe",
+      "size": 4652,
+      "sha256": "1ff7cbf819bd458a33b30150dcee93cd4a1d962577f214d524791a92636a0ea1"
+    },
+    {
+      "path": "tinybird/pipes/domain/identity_observations.pipe",
+      "size": 730,
+      "sha256": "7c782a4451410d77f93fd11dd0418808c7024af320de5c1c318c95ce442dd43d"
+    },
+    {
+      "path": "tinybird/pipes/domain/pinned_identity_mappings.pipe",
+      "size": 1686,
+      "sha256": "db8eb14826a60d903c26d84cc2f2a52568cff42f89d50fe9b25a67b272fcaaf3"
+    },
+    {
+      "path": "tinybird/pipes/domain/pinned_profile_id_resolutions.pipe",
+      "size": 2113,
+      "sha256": "fb0789e54e20d36b4a00250b57c27bd132d8c5f929a0bff488a46f8d74576cbf"
+    },
+    {
+      "path": "tinybird/pipes/domain/pinned_session_touchpoints.pipe",
+      "size": 2498,
+      "sha256": "8ba7d2f7d6517757d978820f1441528417b039be68f4233718b78a4e067975ad"
+    },
+    {
+      "path": "tinybird/pipes/domain/profiled_client_conversions.pipe",
+      "size": 3313,
+      "sha256": "a1cdb0131f7fd5eb3f7b8fc97b2dcacdae34a87b1287487d3595d8c03d415cd3"
+    },
+    {
+      "path": "tinybird/pipes/domain/profiled_krc_registrations.pipe",
+      "size": 2944,
+      "sha256": "c5c7ec011b57ee3aa0b1ad461d299ca515e2d6a28fb7882a52d18ff610ef39e7"
+    },
+    {
+      "path": "tinybird/pipes/domain/published_report_build_stages.pipe",
+      "size": 2388,
+      "sha256": "2a0e7356f9b9fd9974a11c27211f5eda77a2769e0472ad6025674524d5d6b8e8"
+    },
+    {
+      "path": "tinybird/pipes/domain/published_report_generations.pipe",
+      "size": 2226,
+      "sha256": "86b905defe3d5c1c3c1808b80b0336ef3d026f0098607b1be0a6f8887d50b162"
+    },
+    {
+      "path": "tinybird/pipes/domain/registered_contract_coverage_requirements.pipe",
+      "size": 2961,
+      "sha256": "7e7d1fa39be1cc7f043a52f58d83a07c8b2c00c48af706ac10b71f56d7b8fa7a"
+    },
+    {
+      "path": "tinybird/pipes/domain/source_generation_cutoff_readiness.pipe",
+      "size": 7126,
+      "sha256": "688f4da8f8ef58405037534f81d5afc675632bb4b31d6fd9dc3256df9415a968"
+    },
+    {
+      "path": "tinybird/pipes/identity/candidate_identity_facts.pipe",
+      "size": 470,
+      "sha256": "068a4b7c736525639a66161ee1e2b3b72879bc79a560ea39ea6b571f7ed175c3"
+    },
+    {
+      "path": "tinybird/pipes/identity/candidate_identity_generation.pipe",
+      "size": 433,
+      "sha256": "75716f15f83a8cf8b066ce910554e9b4923eb29c45f5efe6eb91c0563404707f"
+    },
+    {
+      "path": "tinybird/pipes/identity/candidate_identity_mappings.pipe",
+      "size": 450,
+      "sha256": "05dd3d74b7c0bc02a2d6f9436b89779bf0d1a5f6428cd59a042b49a56a308884"
+    },
+    {
+      "path": "tinybird/pipes/identity/candidate_identity_state.pipe",
+      "size": 3639,
+      "sha256": "92d79b603e8e169d34ef78d12315ffc1fc3b82d191a688e4a56ad74be7af1ca0"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identifier_policy.pipe",
+      "size": 1121,
+      "sha256": "8242c8634688d329d4fe0e07f42c8b08b98523119d4152fb500d92046d58b389"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identity_checkpoints.pipe",
+      "size": 327,
+      "sha256": "bbebbbb3662de30c00cbb1e9c2b19b227c6ba2b4dd1ed94769ae94d98823fd98"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identity_facts.pipe",
+      "size": 510,
+      "sha256": "178a00e5e5e6d9eb08276223fcf39adc2f0fde101597b3a575a973979042df78"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identity_mappings.pipe",
+      "size": 356,
+      "sha256": "f8d1f142fc34b648f581a1f3462040aef0ae5faecb16bcf051304fb7cdedcfae"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identity_profiles.pipe",
+      "size": 534,
+      "sha256": "c2478811397cb2939e2a086531a3b30a94fe20e34e20fd7d9ef9c2f3e1ffd3c7"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_identity_state.pipe",
+      "size": 4099,
+      "sha256": "41dbf62e0de61bab511842320af4c1f864c79af3389732d18ed6ea312386a84b"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_session_state.pipe",
+      "size": 6245,
+      "sha256": "f7c676a453d5834d28ccb0eb3fe4fb2ceb29eb873ae0f5ad91561ce5caf7809a"
+    },
+    {
+      "path": "tinybird/pipes/identity/current_touchpoint_state.pipe",
+      "size": 203,
+      "sha256": "da42efec2a0afa5e0390b532eb5d85b7cacc273c688f0d0b77679b82d35fc24e"
+    },
+    {
+      "path": "tinybird/pipes/identity/identity_generation.pipe",
+      "size": 3529,
+      "sha256": "02a607befad3c797e600335badb5f2cbab11e5bca30011d626e156826af40107"
+    },
+    {
+      "path": "tinybird/pipes/identity/identity_pending_dirty_profiles.pipe",
+      "size": 608,
+      "sha256": "647241cd880cb3b6a074560ce96a09672bab32d591169e2ced87bc140e9cd369"
+    },
+    {
+      "path": "tinybird/pipes/identity/normalize_identity_input.pipe",
+      "size": 10121,
+      "sha256": "21fada11eb81387c6d06cf0e6facde767118e0ee131d420b96851d084f7e72d6"
+    },
+    {
+      "path": "tinybird/pipes/identity/pending_identity_union.pipe",
+      "size": 4663,
+      "sha256": "4b059d2d84a59368509aab03102ae325b90c923a7a4aa417e2dc51ae9942554a"
+    },
+    {
+      "path": "tinybird/pipes/identity/resolve_identity.pipe",
+      "size": 10347,
+      "sha256": "0f9d051b1b1af4dc01e804887d26fdea17e32bd52488967cc9c16e40d8bd0fc4"
+    },
+    {
+      "path": "tinybird/pipes/identity/shadow_identity_union.pipe",
+      "size": 16538,
+      "sha256": "a407b5c12bbbc29d569b5c3586359f5eede0f8fefc4ca69b1e432e2eaf218095"
+    },
+    {
+      "path": "tinybird/pipes/identity/shadow_normalize_identity_universe.pipe",
+      "size": 10687,
+      "sha256": "f0eb46ad88c9ac964f5c245f07ab9f2ec67ef8beeb822626c9898031e861ac01"
+    },
+    {
+      "path": "tinybird/pipes/identity/source_generation_identity_events.pipe",
+      "size": 17034,
+      "sha256": "2f8cdbb0693bf1235a0e2f01e78e075fca6639b6abb950f67d2408eef488bb2f"
+    },
+    {
+      "path": "tinybird/pipes/policies/boom_registration_policy.pipe",
+      "size": 1834,
+      "sha256": "2c887a6e8b837a78dc791ab8e11e9f1601b6c924bb737bbfe3ab8d46456f5a0c"
+    },
+    {
+      "path": "tinybird/pipes/reports/bill_hourly_product.pipe",
+      "size": 8811,
+      "sha256": "e0378a17ce8f3febba0da5aa5ecac033743da77e759d0eeca1ad7904d25b7d24"
+    },
+    {
+      "path": "tinybird/pipes/reports/bill_meta_delivery_daily_product.pipe",
+      "size": 436,
+      "sha256": "51db993b9cded0dd258a1b5c0740be779800ec5981997ad76c3c1af1f434d861"
+    },
+    {
+      "path": "tinybird/pipes/reports/bill_meta_hour_bounds_product.pipe",
+      "size": 420,
+      "sha256": "0352411f013e1e28ccc571c88564fa492d65a427603df3a62f720dfbe311e0c7"
+    },
+    {
+      "path": "tinybird/project/external-consumer-inventory.json",
+      "size": 1118,
+      "sha256": "973db8698a71902c8a75b3f6d0a8e68033c833a650f164d3a4c0229ca616b48d"
+    },
+    {
+      "path": "tinybird/project/generation-plan.json",
+      "size": 3465,
+      "sha256": "67a8f6cfd5614f729536aa01da3af7a631d7dc725f72880391b73080a28bc148"
+    },
+    {
+      "path": "tinybird/project/model-coverage.json",
+      "size": 30183,
+      "sha256": "523195b41f75de797cf3cf2df30d9f85834fd865118fd31148c780beb1908118"
+    },
+    {
+      "path": "tinybird/project/semantic-policy.json",
+      "size": 1206,
+      "sha256": "9bbf44f0ca5671c78be49c6cd70e9262d4fcb1afec406f78d61dff1d1e359388"
+    },
+    {
+      "path": "tinybird/project/source-registry.json",
+      "size": 6055,
+      "sha256": "73a5632c4e6d453a6b4079c65f8e5ad82b65cda3102ecf9da58637665e442d5d"
+    },
+    {
+      "path": "tinybird/scripts/contract-fanin-oracle.mjs",
+      "size": 8202,
+      "sha256": "75326fb832fef4f50ff2304cb31807664bf8cdedf2a7df1d0f26089aa7eb9ebd"
+    },
+    {
+      "path": "tinybird/scripts/cutoff-oracle.mjs",
+      "size": 5546,
+      "sha256": "67d3acae2979fba965878ef738131d3948c93a1c7680ec465011c7b639d71bbc"
+    },
+    {
+      "path": "tinybird/scripts/export-bigquery-to-gcs.mjs",
+      "size": 8714,
+      "sha256": "fd55e48c05c9fb5d7c28a3a3c7e5b84edc67fc615681d92bd28a6213331e16d5"
+    },
+    {
+      "path": "tinybird/scripts/identity-oracle.mjs",
+      "size": 21801,
+      "sha256": "3b356e55de4980dc0bf3c5cefb2d07a273127c0778458891815b93c23c16fbcc"
+    },
+    {
+      "path": "tinybird/scripts/parse-datafiles.py",
+      "size": 694,
+      "sha256": "71eab40539424b936b808aee989b454a21dccd0bf4257a9d0a26d12461fa7d68"
+    },
+    {
+      "path": "tinybird/scripts/parse-project.mjs",
+      "size": 1439,
+      "sha256": "7da9f669b1ac9676222c90a6e97acb135ffde499d9a54c14c59d7fe4dd3b1b63"
+    },
+    {
+      "path": "tinybird/scripts/plan-generation.mjs",
+      "size": 1679,
+      "sha256": "39933224e60a3d8ed75d2e1d9bf72f17b23bf252817bbadab438353b734399cf"
+    },
+    {
+      "path": "tinybird/scripts/render-raw-datasources.mjs",
+      "size": 17875,
+      "sha256": "3fadbf08e66679618bc4596c427125acec37cd2690eebaace12a18844289f5ce"
+    },
+    {
+      "path": "tinybird/scripts/render-source-registry.mjs",
+      "size": 1428,
+      "sha256": "8e62d2d8d00f30da6e9bbcb450c78dd2d41a1877021ac36795b9c07aae488b2f"
+    },
+    {
+      "path": "tinybird/scripts/report-oracle.mjs",
+      "size": 18626,
+      "sha256": "22d9dba310767d7fafda8435e596af48eb5706f01db6cdc0527a68ac1615124f"
+    },
+    {
+      "path": "tinybird/scripts/source-registry-files.mjs",
+      "size": 18724,
+      "sha256": "5e4c288a56d70b2d1a327a8b8d61ac4845e20b7b1b2c494b086aa5b0ae36b71d"
+    },
+    {
+      "path": "tinybird/scripts/validate-project.mjs",
+      "size": 23367,
+      "sha256": "258e68390ae53f6dc8d25939ac01ed81f0567fdcda3dc41bb9128b3a6409c54c"
+    },
+    {
+      "path": "tinybird/tests/bill_5k_performance.yaml",
+      "size": 318,
+      "sha256": "f5a7e4c46e9d075fdf8269296c79b6f7a38b0bb9308190bab30492e33526dd74"
+    },
+    {
+      "path": "tinybird/tests/bill_live_acquisition.yaml",
+      "size": 599,
+      "sha256": "8cd73a1e82c92b577b513d8d71797d7cadfe0d845df8bdb106b4020d17458f3a"
+    },
+    {
+      "path": "tinybird/tests/bill_meta_delivery_daily.yaml",
+      "size": 290,
+      "sha256": "621c5d87075c521e678d6680732a818de33d866bd5d2c2af7730c7cae01c5005"
+    },
+    {
+      "path": "tinybird/tests/bill_report_generation.yaml",
+      "size": 170,
+      "sha256": "6a75a79d27da5c7c96e2d0eb5e59090a64e88d914800ee8a27324938ea1346b5"
+    },
+    {
+      "path": "tinybird/tests/bill_report_window.yaml",
+      "size": 443,
+      "sha256": "e4b7ca04798c8b01dce819c400465fd36c1ee0c7c9f493495f4ad2d5a9da5186"
+    },
+    {
+      "path": "tinybird/tests/bill_validation_manifest.json",
+      "size": 1765,
+      "sha256": "3a4051cb7c5b47b2567338b163876a435979c1e4d59f81a10a8077a4edd1ae2d"
+    },
+    {
+      "path": "tinybird/tests/current_identity_mappings.yaml",
+      "size": 200,
+      "sha256": "582c19070db096cf5e0148cb309e4a5b34b47dab42f5fb76e07e0061e957a033"
+    },
+    {
+      "path": "tinybird/tests/current_session_state.yaml",
+      "size": 164,
+      "sha256": "1e5d038acaea263917ccf373999f6357095760e190091931d94e3bc35daf9d47"
+    },
+    {
+      "path": "tinybird/tests/identity_generation.yaml",
+      "size": 193,
+      "sha256": "e1ad60d90052f42fffd9455bdc282880844fff2577d3efa18ccecae749ad6a6b"
+    },
+    {
+      "path": "tinybird/tests/identity_validation_manifest.json",
+      "size": 7132,
+      "sha256": "5815e7ec0fef1128eaba91814ee26a5e9ff3442439e781c14d48c78d1886f32f"
+    },
+    {
+      "path": "tinybird/tests/normalize_identity_input.yaml",
+      "size": 208,
+      "sha256": "419e3a0458c3bf8de03c62fa1874666da6f78d223749fa1e8de90e14cde5067d"
+    },
+    {
+      "path": "tinybird/tests/pending_identity_union.yaml",
+      "size": 199,
+      "sha256": "c100722c6879a29390f1054ae5d06ca7865b36f991fe04b18056c59d91a9a7d8"
+    },
+    {
+      "path": "tinybird/tests/resolve_identity.yaml",
+      "size": 369,
+      "sha256": "e629aacf4565c475feb140c12ae2091de86e755f3fd702026a2d83b199294708"
+    },
+    {
+      "path": "tinybird/tests/session_resessionize_dirty_visitors.yaml",
+      "size": 225,
+      "sha256": "2210da768fc9af0bf4d8eaba80bf572fcf402645f1d0204f15bfd75921d8ec54"
+    },
+    {
+      "path": "tinybird/tinybird.config.json",
+      "size": 128,
+      "sha256": "8f328c6e4bebfac8dafac8a35d918e3ca78090b8ea84daf87672a66502d66334"
+    },
+    {
+      "path": "tinybird-production/.audit/tinybird-migration.tsv",
+      "size": 528,
+      "sha256": "4ac16ecc5e972111ccc7e5ec6d7819b21e1ee923a8c5dc88b4be6578304ffebc"
+    },
+    {
+      "path": "tinybird-production/.gitignore",
+      "size": 45,
+      "sha256": "a52d91fc67d27c9430e7597b98960fb6dd8136ff20e48ae182fb3059a70479da"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence/generation_raw_20260828005300000_slot_0/run.json",
+      "size": 34954,
+      "sha256": "98c0ca7f06f3e03327ed38e85792175e6a790f7152ae9be96ea7e318ae960b0a"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine/generation_raw_20260828005300000_slot_0/run.json",
+      "size": 1398219,
+      "sha256": "14d4224f7dbe79535d839caf9e6b43cb504da1c70a626a595314ff2439368497"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-exact-1650/generation_raw_20260828165000000_slot_0/run.json",
+      "size": 2226161,
+      "sha256": "6e62f2488cb86924d867ce000ce8730feb771723db9840056f30095f706fcd24"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-final/generation_raw_20260828111400000_slot_3/profile-trait-mismatches.json",
+      "size": 22766,
+      "sha256": "cbcf7e3f5d332995279ba34851d13993d71543ef5addc50439e9e4a0abfb4cad"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-final/generation_raw_20260828111400000_slot_3/profile-trait-readback-after.json",
+      "size": 223,
+      "sha256": "0e0722f4db074721d45ecfb65ccfa3985310bbf5ba1e5dfb249d47cca1643da8"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-final/generation_raw_20260828111400000_slot_3/run.json",
+      "size": 1001788,
+      "sha256": "d225a781782ce7784199f994e089f5d98c0e43a46e2eb6d6756ef0d75487183c"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-final-1304/generation_raw_20260828114600000_slot_6/fact-gap-readback-after.json",
+      "size": 330,
+      "sha256": "99def0d1560c8a451f78a05e06c71ab5e8a7a727543370e2b15fe8dc2fa1cc20"
+    },
+    {
+      "path": "tinybird-production/.identity-parity-evidence-worker-engine-final-1304/generation_raw_20260828114600000_slot_6/run.json",
+      "size": 2229888,
+      "sha256": "68d4c90129967bb3f3ed6ab56c5be169235d32b7be84af0dc1c625b89a00e6e1"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/journey-live-cutover-20260831/run.json",
+      "size": 2864899,
+      "sha256": "4424f65ac7bfd876802ea5f21b295bc6834846a335094b9650472036a9b5ab24"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/journey-live-seed-20260831/run.json",
+      "size": 917316,
+      "sha256": "35a4570cab4ed213bc0a3ed28ff07876103b00f1ba7b45f71b6e9a622ab70b7e"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z/run.json",
+      "size": 2986,
+      "sha256": "208776ca774784b24fb659aa20f27d1ae35c5d0a9c83432916762a9b96f2a9ae"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-full-v4/run.json",
+      "size": 5028064,
+      "sha256": "4afeddda042c8b6a2b5966aa9b8a5f4a346db070a84b9713374e3e0223f240c6"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-full-v5-layer1/run.json",
+      "size": 5403307,
+      "sha256": "248742c5513d2fa0d31c3b397ad7c1a98b96a3cb71792ddc9aa48418328d0db1"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-payments-diagnostic-v1/run.json",
+      "size": 1497389,
+      "sha256": "ecb621dc2be8cddbda322555780f1059eaeb9ce82b6405d5de36bf4791e96ff7"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-payments-diagnostic-v2/run.json",
+      "size": 1482472,
+      "sha256": "f99f6f57fc7a0d53c0f863240feb1f4dabd71efe8df32d910d6421ab2f8a3c04"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-segretl-seed/run.json",
+      "size": 6789,
+      "sha256": "5237e64f6bc9e841804b20ac2865a0f01d9d835a3b529684695ee298a83d8fbd"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-touchpoints-seed/run.json",
+      "size": 4986,
+      "sha256": "f4bec3df6259f6e58192ed6fb691c4a5866362cb74fdd41725fcfad559521ea4"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-touchpoints-seed-v2/run.json",
+      "size": 4992,
+      "sha256": "cec99cc23a6ae1d0e6518067020c312d264fdd7d5359e6d411cfe8035c43d615"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-touchpoints-seed-v3/run.json",
+      "size": 6777,
+      "sha256": "9ac4a53a5e2813e1e7e132bde928f00c6f7d4f80971bb49f6d882d37bb47fd1b"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-v2/run.json",
+      "size": 6933,
+      "sha256": "0355efc4bc7b0fc6d3a7fb3dc7d1c39b431e4af760d20068483b37f7102b55b0"
+    },
+    {
+      "path": "tinybird-production/.reporting-parity-evidence/quiet-cut-20260828t165026z-v3-ad/run.json",
+      "size": 729658,
+      "sha256": "ec4d4cd581a359ab83e2630472a1e3e7db80d68ab70220e98fc32e332ee72cff"
+    },
+    {
+      "path": "tinybird-production/PARITY_RUNBOOK.md",
+      "size": 21506,
+      "sha256": "c592fd2fd074cbb7190ed74d67932849afe9d928239328de37eb343a473f2834"
+    },
+    {
+      "path": "tinybird-production/README.md",
+      "size": 2949,
+      "sha256": "51a8058f901ce4f2d1249fae758e7315e64db557d7165cae1e89c1e7d1510de9"
+    },
+    {
+      "path": "tinybird-production/connections/boom_bigquery_gcs.connection",
+      "size": 111,
+      "sha256": "6528246bb84b8db784a93111093d1990cd7bd9517da5b710f6fffdb8537b57a3"
+    },
+    {
+      "path": "tinybird-production/copies/activecampaign/backfill_activecampaign_contact_tags_current.pipe",
+      "size": 707,
+      "sha256": "6d67e307f1c09f885da8bf3b9f757c59dca5cb40bfe17dc809115960907548ee"
+    },
+    {
+      "path": "tinybird-production/copies/activecampaign/backfill_activecampaign_contacts_current.pipe",
+      "size": 720,
+      "sha256": "1fd6ba7aa0c91c2a21621123ec9fda91cf87b219aa3d3f43f25a7af0259e6b76"
+    },
+    {
+      "path": "tinybird-production/copies/activecampaign/backfill_activecampaign_tag_semantic_versions.pipe",
+      "size": 843,
+      "sha256": "31ca6ae21d150a8bf0834049485391d6d32290bd532ec7a3b1a53de706ff1a6f"
+    },
+    {
+      "path": "tinybird-production/copies/activecampaign/backfill_activecampaign_tags_current.pipe",
+      "size": 627,
+      "sha256": "30887e8501558d16dca8e3daff86046745a2d2940e06b4b49b4bfe87c00a0cc4"
+    },
+    {
+      "path": "tinybird-production/copies/activecampaign/snapshot_activecampaign_registrations.pipe",
+      "size": 364,
+      "sha256": "4f83a38c4e8543a1a0b51cd533e619433c9d87a19963e1c4869a720db1baaed8"
+    },
+    {
+      "path": "tinybird-production/copies/identity/build_identity_compaction_components.pipe",
+      "size": 367,
+      "sha256": "77fe851d8a58efe3018ba142037a6c091ee14e896ac56c39f3632a6220d95788"
+    },
+    {
+      "path": "tinybird-production/copies/identity/classify_identity_compaction_changes.pipe",
+      "size": 269,
+      "sha256": "bfdec73de6582867079cab5b827aba1a70286b223a0bb14c7bc78c56f4ffc3e0"
+    },
+    {
+      "path": "tinybird-production/copies/identity/compact_identity_state.pipe",
+      "size": 337,
+      "sha256": "9d1294d54e2e87c060f9cd598f14e598a510893673f58b316ace7a0406d99d09"
+    },
+    {
+      "path": "tinybird-production/copies/identity/enqueue_identity_changes.pipe",
+      "size": 5165,
+      "sha256": "5ab58e2e6cb1f9fe8757b049974473cf3f481ffd378d8638de03581929e9e2f2"
+    },
+    {
+      "path": "tinybird-production/copies/identity/expand_identity_compaction_facts.pipe",
+      "size": 338,
+      "sha256": "29d5d7a946f5b83edc7361a0953508eef4e287642e92a6e396c6e3556d1a1fd5"
+    },
+    {
+      "path": "tinybird-production/copies/identity/freeze_identity_compaction_touched_profiles.pipe",
+      "size": 296,
+      "sha256": "23e5b373454ed2ef53a3bf53e23db505be4c4d7b05a42963b4cc2ea7cbdc42d3"
+    },
+    {
+      "path": "tinybird-production/copies/identity/prepare_identity_compaction.pipe",
+      "size": 308,
+      "sha256": "9eda190ec88b53b36187b9d84cf014d417558a70d0c90b849f96ec36cde23878"
+    },
+    {
+      "path": "tinybird-production/copies/identity/scope_identity_compaction.pipe",
+      "size": 334,
+      "sha256": "b8a0e71c7b5a9c6659ce31ff1ab0eb8bc0df63983bc845ed303c6f341c0efec0"
+    },
+    {
+      "path": "tinybird-production/copies/identity/seed_identity_compaction_profiles.pipe",
+      "size": 289,
+      "sha256": "ea341287bd83812957b5572745ff775f41b76a95d6dcc89b8afec62c6a6fcb03"
+    },
+    {
+      "path": "tinybird-production/copies/identity/select_identity_compaction_fact_keys.pipe",
+      "size": 284,
+      "sha256": "dbae6a32ebe892c4af4be32878b001d665364f754303eaf4f5bb335d1e2a6508"
+    },
+    {
+      "path": "tinybird-production/copies/jitsu/backfill_jitsu_attribution_param_versions.pipe",
+      "size": 2696,
+      "sha256": "7ca18e880c9be48045bd75316faf8226e3757c79f271f0e7c35a8de50e1a4871"
+    },
+    {
+      "path": "tinybird-production/copies/jitsu/backfill_jitsu_form_submission_versions.pipe",
+      "size": 3472,
+      "sha256": "b2d35dafa6908b88f9aafa3c18a5858d3833b0469c2e5eca35f857643b27014a"
+    },
+    {
+      "path": "tinybird-production/copies/jitsu/backfill_jitsu_identify_versions.pipe",
+      "size": 1963,
+      "sha256": "3c0edd57bf365509a93cde9af0d3f51ae1852a96bedcceb17873bd46d201cf26"
+    },
+    {
+      "path": "tinybird-production/copies/jitsu/backfill_jitsu_order_completed_versions.pipe",
+      "size": 3056,
+      "sha256": "6e3e4fd5d4cbe0813ea4af14a81120e66b6e57a8e8799af22ea3d0561adad2ff"
+    },
+    {
+      "path": "tinybird-production/copies/jitsu/backfill_jitsu_page_view_versions.pipe",
+      "size": 4607,
+      "sha256": "c2ca50a70d9f9a81038a56a23bc1ce467db78298a4ad95a613708665d55ebc29"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/migrate_mart_touchpoints_all_facts_v3.pipe",
+      "size": 892,
+      "sha256": "6f9d6ac0e6c049628bafaca675eddf6ef15e43a8558b0ea53356e58f1f2f1cad"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/migrate_reporting_conversion_facts_v2.pipe",
+      "size": 714,
+      "sha256": "be7f2e682f354d56df594db66d1858dd25c19edd8ee07aa5bcf9a619a0dc69db"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/seed_mart_form_submissions_server_side_facts.pipe",
+      "size": 1628,
+      "sha256": "c96ab67b70b0f31b2300b113695462bd1bc2428a66ed59550d9a1ce1e8ebfd3f"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/seed_mart_touchpoints_all_facts.pipe",
+      "size": 450,
+      "sha256": "fecd2e626e5a65170e310237e8e97786afd0357d9a42d025188c779a6f6a6002"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/seed_reporting_conversion_identity_base.pipe",
+      "size": 360,
+      "sha256": "fb059505057493fe060f0f7ad6613e519eba8579a8c84fa46766c43c829da08d"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/seed_reporting_identity_facts.pipe",
+      "size": 623,
+      "sha256": "8e972ac8294686f8dab19d9ddfa1fa429518570b83d8e6b989f1e0640ff6e5d1"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_int_payment_plan_timing.pipe",
+      "size": 402,
+      "sha256": "8cf6409c96a377f875d42d54e327fa5d38826df98f75ed8f90a5d9e7d3851dc5"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_ad_performance.pipe",
+      "size": 435,
+      "sha256": "0836f410a3c12690126b1bb7d5ce36ace9b1d012cb110fe06f7c0ea5630b5d45"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_form_submissions_client_side.pipe",
+      "size": 386,
+      "sha256": "de54db538af78ed67a18c7dd1afa998c8be8be9e2ebc69c1d09200e4b5d16bf1"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_form_submissions_server_side.pipe",
+      "size": 301,
+      "sha256": "6704ff991b8840c49d158bc4e0d50a5b578e902cd75ed660c763d625cb2186f0"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_manual_attribution_profile_search_candidates.pipe",
+      "size": 480,
+      "sha256": "0e3f9932335624041503979e6318849eb42568af2a238ce8ada7f28a865ce8a4"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_payments.pipe",
+      "size": 356,
+      "sha256": "24c0ee3d6635aa67069c332fc1db069f9eb3762df748dab66aa4244ec2227247"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_payments_client_side.pipe",
+      "size": 366,
+      "sha256": "3b78407abfee86e8e63d4b78a01d5ce5b5e0bf10155eeaea6cc27c7fb2013d64"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_touchpoints_all.pipe",
+      "size": 259,
+      "sha256": "7eb188dfc2fd223b743e5d6e86c89d01f2edbbbce716f4047a313ea57c050a1f"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_mart_touchpoints_all_facts.pipe",
+      "size": 1461,
+      "sha256": "94be8f1e5e08f3cd8e150dc918369388af20fa51cc8eb346fe532daa3fd0b3c4"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_reporting_latest_ad_names.pipe",
+      "size": 767,
+      "sha256": "2134efd96b8b7a44c9b145cf4668cd9d7c893db29b7ed362ae37878baaa286f2"
+    },
+    {
+      "path": "tinybird-production/copies/outputs/snapshot_segretl_repeatable_conversions.pipe",
+      "size": 1634,
+      "sha256": "c499e0f10c77dc091198c62aa6cdd3839217feb9080774f96111e42c7d4eca9b"
+    },
+    {
+      "path": "tinybird-production/copies/payments/snapshot_all_stripe_payments.pipe",
+      "size": 1901,
+      "sha256": "7d6b5a0cfa48ce2f1e5bad4eaa4a63fbc5df9e2508114daa90f27a83883a456c"
+    },
+    {
+      "path": "tinybird-production/copies/payments/snapshot_int_stripe_browser_product_resolution.pipe",
+      "size": 513,
+      "sha256": "b12a6f49f681b8182b6bcc1e0befd8efb126f2262ba612a253966ceeba0c6c1a"
+    },
+    {
+      "path": "tinybird-production/datasources/live/jitsu_events_api_observations.datasource",
+      "size": 3317,
+      "sha256": "b01a2a433b1beb28d9a729a6787725717b968e110bd8235c34dda48e73144e8d"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_activecampaign_contact.datasource",
+      "size": 1629,
+      "sha256": "14a32c79863dfd99eead848e6b8668a3fcde1b2ebdeca1c87fa7f4c3329630ef"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_activecampaign_contact_tag.datasource",
+      "size": 1180,
+      "sha256": "9c340a54178384bee970cfba50d55ebe675648edcfc3ba302ab6feca7f9b5db4"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_activecampaign_tags.datasource",
+      "size": 1384,
+      "sha256": "01d178082ced72be9d0be29396266eaa43988138ed2e41e2223d7efd02cbdef7"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_boom_domains_attr.datasource",
+      "size": 6809,
+      "sha256": "4e25d3447fbab0d83ed783875eb06b2d3b89b1dcc729efd1eabdadc7d9a3a7cb"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_boom_domains_form_submitted.datasource",
+      "size": 10253,
+      "sha256": "f0ffee73f0dd77665147f415fe45653bc235bf480e3fcee1fc6fbcf3bac4e98f"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_boom_domains_identifies.datasource",
+      "size": 6362,
+      "sha256": "ae303e6143664e3b467a746d0c284480de351490885a932e9f94f40421f4101e"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_boom_domains_order_completed.datasource",
+      "size": 7515,
+      "sha256": "3135c8b2a770b72253004377eda5fb573dc2f3ca16df0c49e988be3bdcaa593e"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_boom_domains_pages.datasource",
+      "size": 6490,
+      "sha256": "2534fb2d1317709b86c2268035974e1dccf4914ff05a8ba7d1dd48267b75d456"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_ad_history.datasource",
+      "size": 2313,
+      "sha256": "c0e4c8e152b52702ab996fd987d5b7a7439f60a576be19f9dcaf68be371c2d2a"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_ad_set_history.datasource",
+      "size": 10444,
+      "sha256": "cb1cbbe134f1d27f6a79eb111a8676fb0bfdd8450ace3aaf6e17698382f75e62"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_ad.datasource",
+      "size": 1836,
+      "sha256": "9e7024f6a7ada4d57021889f81982ed300d0fbc8490270404997562f1a027f82"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_ad_action_values.datasource",
+      "size": 1519,
+      "sha256": "d39a19df1be5fd4e0e5ff1d03a7917485101d54ff6b866413818184c38706a14"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_ad_actions.datasource",
+      "size": 1507,
+      "sha256": "92aa74bc9192bc4bc6e53bef321af0a7e9f6820d13e331fa518fd3ff78f505a0"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_ad_hourly.datasource",
+      "size": 2014,
+      "sha256": "87eb463104d57722eb3dd634824accb367cbf7c7c0466ec28bd657a689eb7070"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_ad_set.datasource",
+      "size": 1819,
+      "sha256": "8f7fcb5097039e09bf3954dddfea3bb419105f991c7efa2a506ef3ce81859379"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_basic_campaign.datasource",
+      "size": 1777,
+      "sha256": "1ee741a540a2b6a55c44eebfe1ba442b383f06c679405d2d61c195b0d45209c0"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_campaign_history.datasource",
+      "size": 4386,
+      "sha256": "62a569e621d89a67ae1ab814bf2331d475df619afc138e484eb2e3a2dd46d7eb"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_facebook_ads_creative_history.datasource",
+      "size": 10346,
+      "sha256": "3977b1279f34f1b4ad9ce7afd30c9ec9da3d7c7c5579d8006b49f03cfd33b8d2"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_google_ads_account_history.datasource",
+      "size": 2011,
+      "sha256": "fd3c72d7dfbf47e9fb3039577c0883d19425f4c8b3b9b07bd23ed7c9fc2afcb5"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_google_ads_ad_group_history.datasource",
+      "size": 2094,
+      "sha256": "72e677ed801c8e3032485c0d0b6b9c9798945c6f56ce6320f3efaf3e46afbcc8"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_google_ads_ad_history.datasource",
+      "size": 2461,
+      "sha256": "26abbe2e36bd80bd142927d51540285522ccd7a6e729bf151419479b8d9299d0"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_google_ads_ad_stats.datasource",
+      "size": 2809,
+      "sha256": "834e4159964d466f6af545bd965af8eaf4908f34367cdca483752d9b3112bf41"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_google_ads_campaign_history.datasource",
+      "size": 2920,
+      "sha256": "57f4b2f1c1bb76892cfe8592cd37f6476119c5bd4b1cd8d0fc928efda6bdcb13"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_jitsu_data_attr.datasource",
+      "size": 12248,
+      "sha256": "cb5c14b46f6f4a62c79b27fcae9b745912f6ee43183bdbb680c644017a827f3f"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_jitsu_data_form_submitted.datasource",
+      "size": 21309,
+      "sha256": "0211229e62adf84354b7a7f1bab234ca32dc5974d40c09d43b401cf606931d49"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_jitsu_data_identifies.datasource",
+      "size": 8735,
+      "sha256": "16c0eb2fb196ac8ce4b68f736d5dc7c11c493325a7062cde1076e8dc8307ed08"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_jitsu_data_order_completed.datasource",
+      "size": 16896,
+      "sha256": "6c692dad4e35422a18e99860a51829d651b0b148567c45ad261dd7b32251d090"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_jitsu_data_pages.datasource",
+      "size": 10921,
+      "sha256": "dedeb14571c15e686710d33f029d3bd6893c92e58e4c36f4ce5c91208d29bb37"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_manual_attribution_manual_payment_profile_link_events.datasource",
+      "size": 881,
+      "sha256": "399c812ab42f30d9350e3bba6262570b5eb91cd1098192c474eca0f3b3313695"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_auxiliary.datasource",
+      "size": 1874,
+      "sha256": "b165f1fc90d58a30e10cde3690a2816bac08aefe062d9a06d8e8722d2b9577d2"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_charge.datasource",
+      "size": 5435,
+      "sha256": "6f91b7d3023048db7d504d161467c0fc61c067ae7b9c21c21a000b2092d47d2a"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_checkout_session.datasource",
+      "size": 9599,
+      "sha256": "1887360e43ab4f0f9d2f68114b2f6cee6ca23b4f5078fd0e76035a81e65d9cb3"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_checkout_session_line_item.datasource",
+      "size": 1490,
+      "sha256": "1b256029c09716d3de6d27af126804f2f2ad10a51634de0de5cdedd34be6dac7"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_coupon.datasource",
+      "size": 1535,
+      "sha256": "f3423cca6b59bf25531a818c3a96932c4564a92980cae62826d5f31c6fe4abda"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_customer.datasource",
+      "size": 3438,
+      "sha256": "d5ef98fe651e72d8295fa7fa0810d34d3602d53224876e7586d9f5f8f7edb2f2"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_discount.datasource",
+      "size": 1619,
+      "sha256": "481676b32d9db593fe9707eddedc68aba8bf6c129089c5cc0bd590d416e4692b"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_invoice.datasource",
+      "size": 9522,
+      "sha256": "fc75d979275973f8eeecbb4b86cda318c80c2fd2d5e7e860a1f3a4b44a3a1653"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_invoice_line_item.datasource",
+      "size": 2135,
+      "sha256": "0d95a275bfe2716b0f4681a22ac2ae9ce1ac0eea48bb83ac0a3676b9b8a52408"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_kajabi_charge.datasource",
+      "size": 5449,
+      "sha256": "d523f8269d4f8da4df30dfdb5a38528f98554f5b24b7c927be5324ff8090dfa1"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_kajabi_customer.datasource",
+      "size": 3452,
+      "sha256": "971480f37c62ec597c8ce57c50f619cac65c9307889621b8100696e87495392e"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_kajabi_invoice.datasource",
+      "size": 9536,
+      "sha256": "97a0952b4591c68bcedc48069bf8ae536daad15554aae59b38fd83754cbd9650"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_kajabi_invoice_line_item.datasource",
+      "size": 2149,
+      "sha256": "fd06ea185205bf0be3f40aae7b7c63b6c98e89cc1e2104fd775c2c16f488aa97"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_kajabi_payment_intent.datasource",
+      "size": 3252,
+      "sha256": "cc719e5eba28a19e85b27bfc96ed5ea78743c5305cd8ce638acf953bbbe56ee0"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_payment_intent.datasource",
+      "size": 3238,
+      "sha256": "e746471c8637d9247546f754312273a665fbdcd34f8c3555df169c9c8b500457"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_payment_link_line_item.datasource",
+      "size": 1470,
+      "sha256": "5838c1828b93a88a6ffcfc30d4067644190aa1e366c29e43392d114be17372cc"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_plan.datasource",
+      "size": 1801,
+      "sha256": "86a0765326ad1b3c727e56cac912eef75d62800cdaa405b903ff74e1373099c1"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_price.datasource",
+      "size": 2132,
+      "sha256": "f937e40611ad62e44a738f1db4d27abcf9935fd56d6ee336ac66fd81c40690e4"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_product.datasource",
+      "size": 1836,
+      "sha256": "0352691b317c42f95d80f74a19d8895ba0fef82fd8329383bea6fb5b30b4d6f8"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_promotion_code.datasource",
+      "size": 1548,
+      "sha256": "28fe05c0a9d1f7532680c9111b9a1ce8ee94086f3a82c4a42d5fe70f186dc39d"
+    },
+    {
+      "path": "tinybird-production/datasources/raw/raw_stripe_subscription_item.datasource",
+      "size": 1546,
+      "sha256": "6f0387688c2680d6ff08fea2427d85ddeb5f6aba38b07020cd043082a90e2563"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/identity_fact_evidence_seed.datasource",
+      "size": 772,
+      "sha256": "d4fd87092261575e78cc1cb72d6cf2059279080bd0239c2f896bf37e79ad388b"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/identity_mapping_evidence_seed.datasource",
+      "size": 591,
+      "sha256": "3f167fb39fbfab735bf7872b8a2a5c79eec9f3e868cb54236ed30ea91e1ed8f3"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/identity_mapping_serving_seed.datasource",
+      "size": 660,
+      "sha256": "4faace4907aaa1c3c4d0cd2fcf8f1ee17f6d4d52eebb125c864ca15a9ff19194"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/identity_state_seed.datasource",
+      "size": 2645,
+      "sha256": "415ecd66bcc4bd7023f8667170920de129d5ea6271e188d76ade9015f2487484"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/identity_state_seed_enriched.datasource",
+      "size": 2697,
+      "sha256": "3d4faaf8f34045e16a5d99686f7acf6200d7d8db9efee640d1165576a9df8992"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/mart_touchpoints_all_seed_current.datasource",
+      "size": 3687,
+      "sha256": "92e3e3d5274820a27667f442b4f0b06196b2c480c1ec6b07995d7411e4ef69cc"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/reporting_conversion_identity_base.datasource",
+      "size": 325,
+      "sha256": "fe9b336971696e13104b34bb25334d44015e15676ccfa93d02b21c41232b71e9"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/reporting_identity_fact_seed.datasource",
+      "size": 442,
+      "sha256": "e74764f43b8c7f57bb0ec4679fc7a88fd6e2058b50811b67ace9cb8f801152cb"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/reporting_journey_seed_current.datasource",
+      "size": 5104,
+      "sha256": "bd90856c454f6c2e796e2e51fa2157ef3f7b73099534966c3fdd0e2589969835"
+    },
+    {
+      "path": "tinybird-production/datasources/seed/segretl_repeatable_conversions_seed_current.datasource",
+      "size": 4406,
+      "sha256": "3532f246a6b796d2015a86dc4dbf3d5265132833abb71a41f2a15900b54b7c63"
+    },
+    {
+      "path": "tinybird-production/datasources/state/activecampaign_contact_tags_current.datasource",
+      "size": 512,
+      "sha256": "e614e235085557d21fc9f99b5f47d3d2085e9d5a9f77511289cc787866052aa4"
+    },
+    {
+      "path": "tinybird-production/datasources/state/activecampaign_contacts_current.datasource",
+      "size": 695,
+      "sha256": "61e0c991a7b92721817254b1f987cb79b9c1a56d8045625f75893145206d6dad"
+    },
+    {
+      "path": "tinybird-production/datasources/state/activecampaign_registrations_current.datasource",
+      "size": 1129,
+      "sha256": "e639d4444857698ab802e8662af661434bcdb35131a343a2eec8c2467dc09c92"
+    },
+    {
+      "path": "tinybird-production/datasources/state/activecampaign_tag_semantic_versions.datasource",
+      "size": 520,
+      "sha256": "15703dd8df8391962ccdcbf825f577626b4d82917ee9971e197ed57398bf4777"
+    },
+    {
+      "path": "tinybird-production/datasources/state/activecampaign_tags_current.datasource",
+      "size": 438,
+      "sha256": "fbb75dfcdb957b87a4e97ec41397e57aa4ee7c78877dd74fd7547680704d0224"
+    },
+    {
+      "path": "tinybird-production/datasources/state/all_stripe_payments_current.datasource",
+      "size": 4177,
+      "sha256": "e6e0360b68a016b3165612e7e4159b5b56d2ceb26a2f7b37f3f554c06d059dd2"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_activation_lookup.datasource",
+      "size": 470,
+      "sha256": "95184b56a469477db68f2f364aa79ebabfef359dbd9b78646a38f09fb8b43d64"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_batch_output_rows.datasource",
+      "size": 652,
+      "sha256": "25416d5aff099209bae3059e3b6389f649917d0fa826bf29082e8aa433a6d240"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_compaction_changes_stage.datasource",
+      "size": 1860,
+      "sha256": "1f465fb75ff482826d17112b8b70f6e48749b980ccd3db1f487826a5a8438345"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_compaction_components_stage.datasource",
+      "size": 1273,
+      "sha256": "22247faa3267f6d142e1fe0ea371a89b40793fb89d88f619e549eb73c69d6502"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_compaction_fact_keys_stage.datasource",
+      "size": 667,
+      "sha256": "9d57d37d3c43ab9c2371ee94f76b3bddb7c0e6473396850dcc5bff01147872d1"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_compaction_scope_stage.datasource",
+      "size": 1873,
+      "sha256": "4df8f23e27d25869520257fe7a6dd2cf86afaa2b847250b6d880ced4d7438d5e"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_events_cursor.datasource",
+      "size": 1302,
+      "sha256": "e9119315f100d93568be10b4d0cc75c37d2421cb5f39a7c070955a90a668a109"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_events_raw.datasource",
+      "size": 1265,
+      "sha256": "512ffe7c3a9b477683f903bbdb6f5ad61cc765bafd93f346a4f4e5099f8c2d55"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_live_pending_snapshot_current.datasource",
+      "size": 1420,
+      "sha256": "50059da0c139c3f51870837056a168dc5dd713147ab32e977597dba0f9af33ba"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_mapping_delta_lookup.datasource",
+      "size": 629,
+      "sha256": "51a488693c83309e7148da11b17f920295a2d0f8488ecce95434bed91baa4f6b"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_pending_components_current.datasource",
+      "size": 918,
+      "sha256": "ab46315f899fc9c0f38c6f5063082b046e79119e15ff603ea9b57959c6c6fb7d"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_pending_events_current.datasource",
+      "size": 1258,
+      "sha256": "8eb9706dcc9d21a989d0cce328997cbdd55a188546d1a65cd3b0ea22ad051fdb"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_commit_current.datasource",
+      "size": 704,
+      "sha256": "f0158ec1759ccd2895b3d4aab8c0cb40ef8bd6adef25c3e7e176011de1aaca95"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_components_current.datasource",
+      "size": 1987,
+      "sha256": "f2b60390fe4282037f83172dd4ee4db2e535373815e9c2ae2940a01b6aef6234"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_fact_stage_current.datasource",
+      "size": 2350,
+      "sha256": "c4e2810a09fe3bf960e181834ddd7496531faa5112f34717f9dd7d769383d5c3"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_facts_current.datasource",
+      "size": 1517,
+      "sha256": "c747fe4ff2d3b432021275bc27d00610f2351719a6775a4edae0bc30f253b369"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_label_versions.datasource",
+      "size": 735,
+      "sha256": "46b156f1f6223df5f4ee8f620d4d7fbb291ff79b50f0fd5ee35f5895509cbaec"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_mapping_stage_current.datasource",
+      "size": 2356,
+      "sha256": "4b1520c41823b17c8a7c73ec001b2c02cd7060130e5103689a3d63e2f6215623"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_profile_stage_current.datasource",
+      "size": 2356,
+      "sha256": "70f3514aa9a246a0d29e106e05128d9c3601e7bd65d32f46ea75f90920e41a64"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_ready_commit_current.datasource",
+      "size": 677,
+      "sha256": "80ceb1cf79d72b9294f4028881df92e8fc0b8f8490df3a7261f70cd26ac29337"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_requirement_current.datasource",
+      "size": 459,
+      "sha256": "aa8675f7d1ebc8f9f93ec26808a8ac02d3ed9686637fa02903f6b12b28ed4c57"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_rebuild_snapshot_current.datasource",
+      "size": 584,
+      "sha256": "724ee305888806a70f541762e813d30088c87afb75eb7386f61fead65f3a43b1"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_state_delta_versions.datasource",
+      "size": 2762,
+      "sha256": "e0a6be5ef7d540cb065d11c123f6be176701b53224fbdba8546a3d7fc14caa28"
+    },
+    {
+      "path": "tinybird-production/datasources/state/identity_state_versions.datasource",
+      "size": 2406,
+      "sha256": "e957e48625fa3e0cb32dd3117a958a782951a1f358b63e129d1d83e3913d2f56"
+    },
+    {
+      "path": "tinybird-production/datasources/state/int_payment_plan_timing_current.datasource",
+      "size": 698,
+      "sha256": "406bcf0362236e7a543c209073cf245a1539fa2dd06b47262db309a3aa973e32"
+    },
+    {
+      "path": "tinybird-production/datasources/state/int_stripe_browser_product_resolution_current.datasource",
+      "size": 563,
+      "sha256": "80d16452f9fafe9d816d3c936ad97b45fa2619bf683bcd012b8af762828f827b"
+    },
+    {
+      "path": "tinybird-production/datasources/state/jitsu_attribution_param_versions.datasource",
+      "size": 2435,
+      "sha256": "2c802c8421fcc2858e4dfe91f67984f8365a01ea0cc6069bb3e8bb30a87153c4"
+    },
+    {
+      "path": "tinybird-production/datasources/state/jitsu_form_submission_versions.datasource",
+      "size": 3448,
+      "sha256": "2924e58409d4e6bd070b9dfff5ff56c5716c82c3ce55eef8ed23d80b2bb41346"
+    },
+    {
+      "path": "tinybird-production/datasources/state/jitsu_identify_versions.datasource",
+      "size": 1468,
+      "sha256": "5b13b6f55b75819c8095862b2a5dc13a116476b9a0c591e03965d99f85d2fff2"
+    },
+    {
+      "path": "tinybird-production/datasources/state/jitsu_order_completed_versions.datasource",
+      "size": 2917,
+      "sha256": "5b2148b1a19133e18c27ed8b14cefea379141f2c964af97e9901237c0c47377e"
+    },
+    {
+      "path": "tinybird-production/datasources/state/jitsu_page_view_versions.datasource",
+      "size": 4712,
+      "sha256": "4dc9f11fe7e743464a0047db9cb8ef357b0f6e67f28968db7d9cdda072dae6fb"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_ad_performance_current.datasource",
+      "size": 1489,
+      "sha256": "aadcaa9e4c098070820366bf9a50b0d7a1f108a6d6fb09411c54376e7734a88c"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_conversions_multi_touch_current.datasource",
+      "size": 15151,
+      "sha256": "98402cb80d305b344feafdf22c11b13a2715b4690ceac828d112980400cdfd1e"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_conversions_with_touchpoints_current.datasource",
+      "size": 4820,
+      "sha256": "37907aeebf0c3a018b250669087110f0a418a196002aa8e607c230c278e19cba"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_form_submissions_client_side_current.datasource",
+      "size": 2971,
+      "sha256": "aeec13e17c1f1d9d02e8ee6f2d62824c2e65d652bac9e91527712d691aad1936"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_form_submissions_server_side_current.datasource",
+      "size": 1084,
+      "sha256": "9e17ffc950397f8fd3a8811a35fe933ea681b5b06f82a1082d0962625f0ea534"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_form_submissions_server_side_facts_current.datasource",
+      "size": 1131,
+      "sha256": "0896f39ac4b6528cb9b9007d10c6eef8a485b978978e33e08a8c4f317505879d"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_manual_attribution_profile_search_candidates_current.datasource",
+      "size": 928,
+      "sha256": "093183da0ef250ae848ac30fa8a7ec764b151f9acb0afce0a0baa621e1469a41"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_payments_client_side_current.datasource",
+      "size": 1975,
+      "sha256": "cc26d61c4f7b2207aaba52861637e2c252d8eeec2a33df33e9289f63fc7cf280"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_payments_current.datasource",
+      "size": 4600,
+      "sha256": "28b8298c2238b8523604a8bd6364e17d9c51dec53a71f95049e009d9d9a1280e"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_revenue_attribution_current.datasource",
+      "size": 6165,
+      "sha256": "f93ac02f7bdefbec30855250850e60ab91d3d9f1ab7bf7ee9b3b23431a000037"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_touchpoints_all_current.datasource",
+      "size": 3448,
+      "sha256": "165f161da314bd2259a9cc58f79b3a76715e3edc7541286d964bc8edf912d488"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_touchpoints_all_fact_deltas.datasource",
+      "size": 4200,
+      "sha256": "ed14eb89c62ec4e386428abcffcad2f08f3d7da17af93b7b63eb55a60244a147"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_touchpoints_all_facts_current.datasource",
+      "size": 3371,
+      "sha256": "9f8003070ffd323fa9b1a1d88c1141503167ed57d1209443470353b7724bb6b3"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_touchpoints_all_facts_v2_current.datasource",
+      "size": 3714,
+      "sha256": "6fddc6c4642af780573f081bc477103535e2f71165722c79db21d7f480d72257"
+    },
+    {
+      "path": "tinybird-production/datasources/state/mart_touchpoints_all_facts_v3_current.datasource",
+      "size": 3640,
+      "sha256": "ff9e0963b2f001e327adac3fcc9f672b2366feaf69e602cd0fca928b9f2e1d3a"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_conversion_fact_deltas.datasource",
+      "size": 1948,
+      "sha256": "25bb06abccc723a7afa48120f63d4f7ce72ebfecda5aa5a3ac44e38da8250911"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_conversion_facts_v2_current.datasource",
+      "size": 1486,
+      "sha256": "005edb0f7446076e6dcd5a0e9e79c350ebcece468843de035805c30f3650e21c"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_journey_commits.datasource",
+      "size": 683,
+      "sha256": "0852c2f3f81ba009560691fbb4eb1908811dc7e2e339304c0f02ab185801a456"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_journey_identity_queue.datasource",
+      "size": 926,
+      "sha256": "d2916a3167d0afe09d371e07cd8e843bec97d6f4f6f2ccdc7bf774f76f747467"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_journey_versions.datasource",
+      "size": 5293,
+      "sha256": "9e52dceaab5df741452e3f67abb5296aadbb1339aafa72a2de85a930ff1b7789"
+    },
+    {
+      "path": "tinybird-production/datasources/state/reporting_latest_ad_names_current.datasource",
+      "size": 850,
+      "sha256": "803c09fcea0a581fea8875dcfc028ff3cdfaf2df630fc40352242095267c85e3"
+    },
+    {
+      "path": "tinybird-production/datasources/state/segretl_repeatable_conversions_current.datasource",
+      "size": 4213,
+      "sha256": "f0526bf7a3ccb694715bfaa4d290f9eed99806d57521c50404b4ee7f1b123bb0"
+    },
+    {
+      "path": "tinybird-production/endpoints/current_identity_compaction_cursor.pipe",
+      "size": 1221,
+      "sha256": "2690c21b4457414f08eb32fa538af974189d6961d676da0db85a689f3a2afadf"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_compaction_manifest.pipe",
+      "size": 2554,
+      "sha256": "5ffa55b7340ae0fb2957689a3e0e5064ad6a2adbd0fba2627e31c62a64d816c1"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_generation.pipe",
+      "size": 2498,
+      "sha256": "b5856c9c8ac221c469c1724a31950ea0ca956ddb70c79dfc39d9dd0ad0e22d30"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_evidence_heads.pipe",
+      "size": 1892,
+      "sha256": "c3de58f0bc1b0bae2c0dfbaaffa9e46f62d1b137b8160c827f04b23c17a2cb2a"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_fact_heads.pipe",
+      "size": 2786,
+      "sha256": "ee9c51448f94964951449ac274916327a8327a2986d06b17303011c9f4bdde95"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_mapping_heads.pipe",
+      "size": 2219,
+      "sha256": "7b15ed480e3299559095812c87b4a1ab8702be2983e6a9b0ddadfef7865740ec"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_pending_facts.pipe",
+      "size": 994,
+      "sha256": "f365251ed7bddbddc7c5f9faa89f9cbf7120cd7a3fda1cd783b0d9901444bc43"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_profile_heads.pipe",
+      "size": 2487,
+      "sha256": "5ceda5ccdb62583c4316fe2757e5191effe0a82c1b9db30495626713eb81486b"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_source_facts.pipe",
+      "size": 775,
+      "sha256": "6d7fa5c150dc9b86b1d9878fcb12e7743952a7179bdd406dacceb7d89d7d1704"
+    },
+    {
+      "path": "tinybird-production/endpoints/identity_worker_written_rows.pipe",
+      "size": 720,
+      "sha256": "4d79cfbae219e4888f55ada6dbe94dfa5a9a12a5e0c11c4def63dc7757615424"
+    },
+    {
+      "path": "tinybird-production/endpoints/mart_ad_performance_hourly.pipe",
+      "size": 943,
+      "sha256": "532578bf45570a236f51808f0e952808d0e147894a6af09ee980103ece1bb694"
+    },
+    {
+      "path": "tinybird-production/endpoints/mart_meta_delivery_daily.pipe",
+      "size": 879,
+      "sha256": "d62bef1dd883b87b0b3c49db6937bcbaac921d41a2c42cc9b43762b038d4e659"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_cdc_changed_conversions.pipe",
+      "size": 7449,
+      "sha256": "ce142824282ed4060a671e3d89bebbecf0870abce99602b2e370ed3ac737e465"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_cdc_changed_visitors.pipe",
+      "size": 1159,
+      "sha256": "a2ef90a640ee194208ca3eaca237e9728463948534134a705fee00e93609cb03"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_conversion_fact_heads.pipe",
+      "size": 1907,
+      "sha256": "30e500504e2c8403525ee36a4da4d918d3822dca5e34e13e5772cea42a9739fc"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_conversion_facts_cdc_build.pipe",
+      "size": 15645,
+      "sha256": "b398ec268c123a5fbc5e2a4bc6c035cae2035ef46a2a9a3f9158019a6131f2a3"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_journey_pending_batch.pipe",
+      "size": 1092,
+      "sha256": "f100fe4a4745b972de22a52719bc56396222e2ba19cdf67690637d2733b129ff"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_journey_profile_page.pipe",
+      "size": 1917,
+      "sha256": "62499c724fddeb888d5396d36c746c8b704aee1d6d726ae66ddd8a441f7145bf"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_profile_journey_build.pipe",
+      "size": 3290,
+      "sha256": "88cdc2eecb0aa4b9ce3cda84caa171527daa53916b67945842d2048a71256282"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_touchpoint_fact_heads.pipe",
+      "size": 1660,
+      "sha256": "af2f3ab033196dbe58635b74018e96ea3e1465da38160916ac9ce4ac48885347"
+    },
+    {
+      "path": "tinybird-production/endpoints/reporting_touchpoint_facts_cdc_build.pipe",
+      "size": 18204,
+      "sha256": "25aa1c92473f96fde4ba07e16cbb3f578c163583556616ca531492ece8b797fc"
+    },
+    {
+      "path": "tinybird-production/endpoints/resolve_identity.pipe",
+      "size": 14808,
+      "sha256": "c0d4dc1075e2ab314b3bf3277f443947760f5347f470a811031b9edb799009f8"
+    },
+    {
+      "path": "tinybird-production/materializations/activecampaign/materialize_activecampaign_contact_tags_current.pipe",
+      "size": 566,
+      "sha256": "5ef7567f2dcaf6403a6c74996155427255642ee6536758a34c4e41ff8e4bee0a"
+    },
+    {
+      "path": "tinybird-production/materializations/activecampaign/materialize_activecampaign_contacts_current.pipe",
+      "size": 582,
+      "sha256": "000e340bc10effd7c42ae082e8c3f8071545db21cbf5a05782a73292b57745f6"
+    },
+    {
+      "path": "tinybird-production/materializations/activecampaign/materialize_activecampaign_tag_semantic_versions.pipe",
+      "size": 851,
+      "sha256": "7875c1731ed8c972170716b9696efe4d2a4008a05316f2b42ba6725fd8f252e1"
+    },
+    {
+      "path": "tinybird-production/materializations/activecampaign/materialize_activecampaign_tags_current.pipe",
+      "size": 493,
+      "sha256": "e0b2adcf89aba8dd5c15a82ddf41f02f73800020dfb835e55fd8ffbb1ee89c0f"
+    },
+    {
+      "path": "tinybird-production/materializations/jitsu/materialize_jitsu_attribution_param_versions_live.pipe",
+      "size": 1063,
+      "sha256": "20ed94321f930f3bf393cb3015e5b46e00b1c3b28c970cfb21a888b7a54d5d3d"
+    },
+    {
+      "path": "tinybird-production/materializations/jitsu/materialize_jitsu_form_submission_versions_live.pipe",
+      "size": 1450,
+      "sha256": "88d804eaa7d378190b1a359a41d1a3f5e40df1760ce6ab9f97062095923288ad"
+    },
+    {
+      "path": "tinybird-production/materializations/jitsu/materialize_jitsu_identify_versions_live.pipe",
+      "size": 692,
+      "sha256": "fd4abcef084ac75129b0c2adf8d07b93d2f1445a55f6e874f487bfac52afd606"
+    },
+    {
+      "path": "tinybird-production/materializations/jitsu/materialize_jitsu_order_completed_versions_live.pipe",
+      "size": 1248,
+      "sha256": "a232a027bbbe3df2a805bafd64f6d42eca3d2f8dfd55a9408e498c5be230a8ca"
+    },
+    {
+      "path": "tinybird-production/materializations/jitsu/materialize_jitsu_page_view_versions_live.pipe",
+      "size": 1846,
+      "sha256": "a8e155c21e9c5c8b1196745a7a58a47ad3f94728e56af197b94c9c2068d0fdfe"
+    },
+    {
+      "path": "tinybird-production/package.json",
+      "size": 1294,
+      "sha256": "be5da7fa895a5282a4b6b427f1a6170e840b8983b13772ecad8dafba23e32c4a"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_contact_tags_adapter.pipe",
+      "size": 420,
+      "sha256": "dd2e1bae619b6fa3bf4f888ab62ca4c70fb11aed50c0e230502427a0da34401d"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_contacts_adapter.pipe",
+      "size": 793,
+      "sha256": "061c9bd3ff83770e1849032e90e955f62914eea1bb0dfb7f5238c4b86054405f"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_identity_facts_adapter.pipe",
+      "size": 8724,
+      "sha256": "7b93146ca63ad283763c15b0340c60bd8d869d1c8a98acbc57a744b0b459fd91"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_registration_adapter.pipe",
+      "size": 240,
+      "sha256": "f3d336ac423924983271b8b982015d831c63ac5726c15c8e9f8cde95dc72a6e3"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_registration_build.pipe",
+      "size": 3233,
+      "sha256": "4b06b390efd27342eec07c317cc7e4012532b0581040d36a1ee3bb1adeda82f8"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_registration_tag_policy.pipe",
+      "size": 1175,
+      "sha256": "c6f7fdd74f1cffa3d9dd6fc7d5c017c05a94fc12486789dbf19d37b20bc1472b"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/activecampaign/activecampaign_tags_adapter.pipe",
+      "size": 324,
+      "sha256": "0b63230d36bbf6c3cbf00c32d80c23febf5c290a9abb733aeb27726b3b13520c"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/ads/daily_ad_performance_adapter.pipe",
+      "size": 9869,
+      "sha256": "30868a2e60663ab62dada0809540f87a7b93171af4de0d39a6999e18b820867d"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_attribution_params.pipe",
+      "size": 2092,
+      "sha256": "723476542d011bfc68914d6b12cfaffa46e4ab7b370a48daf2df889bf24f44c8"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_attribution_params_build.pipe",
+      "size": 19238,
+      "sha256": "90dae7f552080b2735c2802d183271eedfa882abb2799a0d5409cdbd4d3d79ca"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_attribution_params_live_build.pipe",
+      "size": 11182,
+      "sha256": "8e6233a9c8c14e01b78ebf1f81f889d6a0ac1afb759c7e22db21ad5f004a95b3"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_form_submissions.pipe",
+      "size": 2455,
+      "sha256": "beb402116883bb8640a770661a50e2ed3dff2d1e9f1d12b84d9f1f7e69183509"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_form_submissions_build.pipe",
+      "size": 25848,
+      "sha256": "6ea6ff0777b9207c31f79259c90ffa1c2c5238f0f30d062c719f18e44ad3302b"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_form_submissions_live_build.pipe",
+      "size": 19148,
+      "sha256": "02ec00371e700503c2e63667abd17dd0fd5ad8baccf81194d61a22d3c6d140ee"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_identifies.pipe",
+      "size": 1669,
+      "sha256": "167c5d50693dd0aa2e10e0c0e7101f0667c1f21f01ab64e6816499394551c453"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_identifies_build.pipe",
+      "size": 6880,
+      "sha256": "3830592022f3c2b95fb1883a1a7b96ebf4ac16ace6be3e7a7f202481c2fb7402"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_identifies_live_build.pipe",
+      "size": 4347,
+      "sha256": "e1e6bbbd86032ab1de8009de606b0e7ec2f9d74110e4b5e6f33b3fb7b5081a3b"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_order_completed.pipe",
+      "size": 2270,
+      "sha256": "9ba9c1313d6b126d0e23f22358ce8609098a34fc8f577b340f8781ddce682b01"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_order_completed_build.pipe",
+      "size": 18104,
+      "sha256": "acf64d041cd6d88aa41ac794dc382545064f3ce1aa00316c97de5587c859e8d3"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_order_completed_live_build.pipe",
+      "size": 12127,
+      "sha256": "61da2d1407f8f33a0f65e703f0a89bd634fd7cf66b413dc1db38127969968a30"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_page_views.pipe",
+      "size": 2831,
+      "sha256": "95593d158f242405200207f6389a10ec7916ebff6964b4fe565f64526b62af8b"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_page_views_build.pipe",
+      "size": 43471,
+      "sha256": "7bc1ee1c74a3b80cc3dba4aca907c17464e0129c3c31395404f02e8337a7c16d"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/jitsu/jitsu_page_views_live_build.pipe",
+      "size": 35497,
+      "sha256": "996f17b08149d7d91c3934446cdbe7242023fea5d8698acff3dc6c1c0636b763"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/all_stripe_payments_adapter.pipe",
+      "size": 1731,
+      "sha256": "7b678f45d9cf04d15afbe95b20f29bd8977bea1bcbace49b103c638c0936eab1"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/all_stripe_payments_build.pipe",
+      "size": 5712,
+      "sha256": "d0f09d3fbc21bc7f5700c9f022efa3ed154083561d64e49d3997f8f62a21c254"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_identity_facts_adapter.pipe",
+      "size": 6004,
+      "sha256": "cfcec78c0ecd03c38a6e45acf3fe6322e6d8915f7a9abae5442ebe72ea24a934"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_kajabi_payment_adapter.pipe",
+      "size": 12203,
+      "sha256": "41591a02653763b00496afe6e61da2eba7ab595828e6b644de8c6b266a9522c7"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_primary_catalog_adapter.pipe",
+      "size": 12959,
+      "sha256": "0c9260d666b99318963d90bd9474dec79e63775aa487381b19317f631b76d744"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_primary_discount_adapter.pipe",
+      "size": 5038,
+      "sha256": "5a5cc173f52f99e069bb4f3c8ac8875f81c63f7312a1e8a87e5541bce4ee7407"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_primary_payment_adapter.pipe",
+      "size": 24738,
+      "sha256": "9c4453512b03176dbb4dd4577092c0df663e7a9e68b9355f00f697843916fe1e"
+    },
+    {
+      "path": "tinybird-production/pipes/adapters/payments/stripe_primary_successful_charges_adapter.pipe",
+      "size": 1881,
+      "sha256": "bf68eebc560e1b6d78996feff8445440ae869d5fee6cc2a8af72212a4873e2d5"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/int_attribution_events.pipe",
+      "size": 2349,
+      "sha256": "36b5ff8d47ea8ff6f5b3fcaf7e98e0b2780e38f384bb31845408511af7141ac8"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/int_attribution_traits.pipe",
+      "size": 2201,
+      "sha256": "2d7958cf9897359012c0db09b38d32d7855a74440d9d701ee2ba2fe0ca7bf603"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/int_payment_plan_timing.pipe",
+      "size": 364,
+      "sha256": "6b4e56083f25f20a68afe7d7710a69a536cf67232f7d533fcc77e9c2f0ba0dbd"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/int_payment_plan_timing_build.pipe",
+      "size": 9427,
+      "sha256": "eaece453264e11c6dd2b3d374dbef8da9600cce2a03ffcf511b53c7d98bedb7f"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/mart_conversions_multi_touch_build.pipe",
+      "size": 16347,
+      "sha256": "fd69abbc17c7e4062cddb6453139528bb9f8ddb8c9b513b451879f006307df72"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/mart_conversions_with_touchpoints_build.pipe",
+      "size": 2653,
+      "sha256": "808973b7d9083340adcc8d174932c81092001762a1487fcfa34fa28d50fad442"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/mart_krc_acquisition.pipe",
+      "size": 16608,
+      "sha256": "7d8aca63551d6cd5a1da557115eed70d1f4c300690ee7f534c3edc09106c2114"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/mart_krc_post_registration_paid_clicks.pipe",
+      "size": 2506,
+      "sha256": "cb494dcf4ad0e4e6574aae48352bac7f6adb4f3f856ead3f49b0764fdcaa7b13"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/reporting_conversion_facts.pipe",
+      "size": 10752,
+      "sha256": "84c90e7d872bd9ab466e5dd8c7b4652a76a1c89535bdc0873e351592f062759b"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/reporting_current_journey_base_rows.pipe",
+      "size": 8652,
+      "sha256": "1a91a5b1e59fd916bf4981fac31494bed8d56bd060988700b9d55a83c0e0da82"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/reporting_current_journey_rows.pipe",
+      "size": 1215,
+      "sha256": "96caa60edb626454c711cc6579d356e6451f8293350775674d016488415fb3f3"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/reporting_profile_journey_window_build.pipe",
+      "size": 35313,
+      "sha256": "64082d3b259295dbbcdb4c784016a1be91ba602501deaa1e95932866d3c91477"
+    },
+    {
+      "path": "tinybird-production/pipes/models/attribution/reporting_resolved_conversion_events.pipe",
+      "size": 7133,
+      "sha256": "70743dc2de735583d095b3fe06c90a844f3aa6d8591eb0ec1541f5e04f0ed20d"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/activated_identity_batches.pipe",
+      "size": 2476,
+      "sha256": "17c5af7de5485ea3f82ee72a160eb4ccf264f96ace93e6bdb8462c9a96d599f4"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_batch_versions.pipe",
+      "size": 988,
+      "sha256": "de99527ea7bb0dcf5b19706fe9be1f261da20c61e1806fd199cd8c6cba6f8239"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_delta_state.pipe",
+      "size": 803,
+      "sha256": "d6e7f3008989af79fa2ec61838fa756050a0f8ee9bcc3db04a228fca3bc1ec4f"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_evidence.pipe",
+      "size": 2118,
+      "sha256": "19a47c0d1e12591af23af78ab0f140532591b752eafe58ff4812d3647712f1a5"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_facts.pipe",
+      "size": 3431,
+      "sha256": "f65d9cde33c8efc81ab89806b1012c3302e8034d6097ba1d335f855015e9765a"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_mappings.pipe",
+      "size": 3179,
+      "sha256": "f4c264e70eb56af7476d2866758893e4a2b20940eb569f1397ed54558f1c444b"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_profiles.pipe",
+      "size": 4166,
+      "sha256": "01d6e17ba4b082bd5a782f974dce94720ec8cf33c0d50edc64be8c7219ae1ee1"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/current_identity_state.pipe",
+      "size": 4022,
+      "sha256": "50a6e390fb4f05057e1daf9ac8ce5dceba23458278793c68b6173fe791269be4"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_activation_lookup_mv.pipe",
+      "size": 447,
+      "sha256": "d8596048354a5bd5669f57f7b36cae2759a39315f772eab2fa2cdcf2761a5cc4"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_build.pipe",
+      "size": 38009,
+      "sha256": "9c88c3aa5cafff4c51ca4c3beea3d696fe6b60a914ac8de3001cbdf8458fdfbd"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_changes_build.pipe",
+      "size": 8808,
+      "sha256": "53fef3869e60c68c2cba2e86c59c0bee204b243b675fb4b3b561232c518d11b8"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_components_build.pipe",
+      "size": 16555,
+      "sha256": "ef422c9db88dc9e38df463462556b0162127936c72a3ba139913140f3e80ead2"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_fact_keys_build.pipe",
+      "size": 9821,
+      "sha256": "5332c6e4037f5a850314724084b5bbd36744e63ece0d725e873d47567b198a2d"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_facts_build.pipe",
+      "size": 17430,
+      "sha256": "4ea83675b8bd192bd2626da5ea9079f0e862024df20780b038ab91aa16487f0a"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_prepare_build.pipe",
+      "size": 8942,
+      "sha256": "8d59c2d148e489fcbcce1a6e44a8a9193a445c8f990fac0954189dd85d880aea"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_profiles_build.pipe",
+      "size": 8332,
+      "sha256": "8c124875dcf44b3bc26f26ad6c67ae83cb21232b17a72bfc9fe423d5b5f5d80c"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_scope_build.pipe",
+      "size": 12117,
+      "sha256": "f609a90714ad3bdc15d3b3fc82766b77ad8ebef56239cb3832c6b65f88d0f948"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_compaction_touched_profiles_build.pipe",
+      "size": 8353,
+      "sha256": "bca8b3c3d9820c727cc961dfd021208d08457dc6185846403b6c22ee9f416c1e"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/identity_state_base.pipe",
+      "size": 1899,
+      "sha256": "08b09f37e78449ccd6d66c780c363a5bcde08af84f4009679109e9f045e2dbdc"
+    },
+    {
+      "path": "tinybird-production/pipes/models/identity/source_identity_facts.pipe",
+      "size": 17552,
+      "sha256": "f940291d71bbc9b4cc0b5f01945cfe1a65df8e592110c01ff2e3f1769a3e36fe"
+    },
+    {
+      "path": "tinybird-production/pipes/models/manual_attribution/manual_attribution_profile_sources.pipe",
+      "size": 4312,
+      "sha256": "83bb5d54f5ed5078884799d1228c5a10ea441dd05c699bca69aa6b555820e95d"
+    },
+    {
+      "path": "tinybird-production/pipes/models/manual_attribution/mart_manual_attribution_profile_search_candidates_build.pipe",
+      "size": 4688,
+      "sha256": "831271222110bb5e40564a6f610ea959aecd628c000c9289edd9b5a11351b813"
+    },
+    {
+      "path": "tinybird-production/pipes/models/meta_ad_dimensions.pipe",
+      "size": 2662,
+      "sha256": "229d592bd5602a4d0af999e695f9a2bc4ac9acd2ddd4782dc64e4736349621bd"
+    },
+    {
+      "path": "tinybird-production/pipes/models/model_mart_ad_performance_hourly.pipe",
+      "size": 2689,
+      "sha256": "57707490fd50e2b904998be73f46b3fda7297f7b65227a83bbfa3a0da3a618d2"
+    },
+    {
+      "path": "tinybird-production/pipes/models/model_mart_meta_delivery_daily.pipe",
+      "size": 4826,
+      "sha256": "736719f83a551279cf96d2624a9b6c1e8af1f406ec2a238cc8dc5021fc6f6271"
+    },
+    {
+      "path": "tinybird-production/pipes/models/payments/int_stripe_browser_product_resolution.pipe",
+      "size": 376,
+      "sha256": "5e806cb69a16284b66dbcd219f6c39269ae58115bbea87660420a7df29296947"
+    },
+    {
+      "path": "tinybird-production/pipes/models/payments/int_stripe_browser_product_resolution_build.pipe",
+      "size": 21142,
+      "sha256": "88d495bbdd72c9b0ca54b02c6514d3516b7c306c89086dd825beec926bba9136"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/identity_mapping_delta_lookup_mv.pipe",
+      "size": 582,
+      "sha256": "f83b18704be420548a7dc4cb1736ed84a12efe99978828b881f3ca3d4d85845b"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/manual_payment_profile_links_latest.pipe",
+      "size": 1098,
+      "sha256": "ab110320519255bdb16fe7ea399def8e2845e009f211c4c52b9516b1ad02d194"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_current_identity_mappings.pipe",
+      "size": 1749,
+      "sha256": "e60f1c5691713bd4968c51048e7f12d7a5c635d6dd13b32b767842c27e116c69"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_current_identity_mappings_direct.pipe",
+      "size": 3396,
+      "sha256": "a09bae2d848c5e96904ed24d74843b4a1d673f7b97b90b182b4ab3b0915031a0"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_current_identity_profiles.pipe",
+      "size": 2264,
+      "sha256": "4687c8db63d79215615794f1740bcdc07c6dd23c5721bf99bcb2f0f373ec2198"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_current_identity_profiles_direct.pipe",
+      "size": 4470,
+      "sha256": "550cd11596597f9b17555f4b7568683c5cf15586dfd830a93423d23bce84e0d6"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_latest_identity_mapping_delta.pipe",
+      "size": 1683,
+      "sha256": "e6bb0f303cbbe8d1e5919d83ac5e637604897bf4b11bb0a43c70c443d200c398"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/reporting_resolved_payments.pipe",
+      "size": 6727,
+      "sha256": "4b7d32959ad0d3d2a2827bce489c348ee6c168fb3e14471c948ef28992576a36"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/resolved_activecampaign_registrations.pipe",
+      "size": 3255,
+      "sha256": "f43f57ff623f9709ce8fa3a5e1c9cb1d937e36b77cf45aacf8fd15fec11eb52c"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/resolved_payments.pipe",
+      "size": 8435,
+      "sha256": "42e897b7a882fdd8d7763dfaccc76768ace2a14b710c12beae50422212a83052"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/resolved_server_form_facts.pipe",
+      "size": 1072,
+      "sha256": "914aafd91cd1f57c7a09b01465192307b702f2503f91e292e41511176c52c2ad"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/resolved_session_touchpoint_facts.pipe",
+      "size": 3450,
+      "sha256": "02d0acb4db47d2bbcc81f3e7197da086a4dc0ca213170ce533de52f37e39f751"
+    },
+    {
+      "path": "tinybird-production/pipes/models/resolution/resolved_session_touchpoints.pipe",
+      "size": 4051,
+      "sha256": "c2190aaa32a6289bad9f41a5db4805b1e83461fc0597717b36a6f5d0dd2ba7b1"
+    },
+    {
+      "path": "tinybird-production/pipes/models/sessionization/sessionized_page_views.pipe",
+      "size": 2217,
+      "sha256": "510e14aa8d7bbed6765a0613bce88e11e19a114f748ed28eaad4a2e5f627cc9a"
+    },
+    {
+      "path": "tinybird-production/pipes/models/sessionization/website_session_touchpoints.pipe",
+      "size": 3729,
+      "sha256": "f682c34be9eeb815c6a0323fe9021f6f3edc4284e0635f0b1532939661125ea8"
+    },
+    {
+      "path": "tinybird-production/pipes/models/sessionization/website_sessions.pipe",
+      "size": 8354,
+      "sha256": "18706c3fa4e3ab807027900e58f1499e40e9947b4753eba661a41ac42bc4a299"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/ads/mart_ad_cost_by_landing_page_daily.pipe",
+      "size": 3143,
+      "sha256": "6094335628fcf68f8d6b4e7d9617a87ef56fb7e37d0444fed8bef9db459f1bae"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/ads/mart_ad_performance.pipe",
+      "size": 239,
+      "sha256": "b6369459a81fa1a4dfeb4e69cef72ff91a9b5b98b1b54a3ca8621d0db798d4a0"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/ads/mart_ad_performance_build.pipe",
+      "size": 692,
+      "sha256": "402160ad885693093cef25a83429839701b9ef5c24934680329164304571adac"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_contact_first_conversions.pipe",
+      "size": 787,
+      "sha256": "90efadd91aec60604e72f9e111f921ab0417f70476ad800deeb1235394866d43"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_ad_performance.pipe",
+      "size": 28853,
+      "sha256": "1b13e7cc3ca82f889f795ec3f41acb2427e12c2e9e4195b2c81212174ed7aa5f"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_ad_performance_hourly.pipe",
+      "size": 30959,
+      "sha256": "0122bef9b213257d014fc001bbbaaa998558ddef26129c5ede3468db3cdb835b"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_all_performance.pipe",
+      "size": 7850,
+      "sha256": "11a4f6e675ee7c026986f808b79a1f7929207c2fd9a86123559765163e6daa19"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_multi_touch.pipe",
+      "size": 189,
+      "sha256": "ee3f4bfd0d3489763d7d26ab6f5923dc14e10a236bb54209642734405feb5651"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_multi_touch_pages.pipe",
+      "size": 5796,
+      "sha256": "3fd9a3244e3d5e9dfc7e63f164ed6d2d6532bf4942d5d676ba87b9c95763adcb"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_organic_performance.pipe",
+      "size": 19467,
+      "sha256": "614e9bb28e9849f35d070d783b4217bba8d26b1022955493dea0751ecebbd95c"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_conversions_with_touchpoints.pipe",
+      "size": 241,
+      "sha256": "de3fb8f5a52b13539bd99fb107af15a778a72ba48c9614b649962e6a7aece90e"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_meta_krc_reporting_hourly.pipe",
+      "size": 8075,
+      "sha256": "c3254f50121f4e339a6a137084a1413467fb422353dc1e3bfadda7fa3a7d6016"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_revenue_attribution.pipe",
+      "size": 180,
+      "sha256": "37046592e3f021a6e2a531119fd12fd50eedf6435d25fa81d3929a3d55c5b274"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/attribution/mart_revenue_attribution_build.pipe",
+      "size": 10271,
+      "sha256": "eb86dd4068f0633498c5e1e7621b78f69de0dda48003752680c4487199b74326"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/customers/mart_booming_mentorship_vip_customers.pipe",
+      "size": 6308,
+      "sha256": "3b6fd2e815aa69ac40f53f8610062f47ed0f564ed93adfe78afea50314da466b"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/customers/mart_customers.pipe",
+      "size": 2224,
+      "sha256": "2d655f5414f30b9d8d8e690cf471c7fea2433a68d98101ec80755645904f2d52"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_checkout_started_client_side.pipe",
+      "size": 1145,
+      "sha256": "78112b296a2a83db1d9d6185b2175dad4910d7b40a57ccf3ac8a68c332ee24b0"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_form_submissions_client_side.pipe",
+      "size": 210,
+      "sha256": "4874bd78c86b2b054b1b183241f8d6475d461b2bf905b55ca741481a0c771781"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_form_submissions_client_side_build.pipe",
+      "size": 5201,
+      "sha256": "f46b47a757ef95df29ba7c2a7b514e1b588f90d7ca6baf7df1f9d74cca775f58"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_form_submissions_server_side.pipe",
+      "size": 193,
+      "sha256": "6a2be5594b6139de07ecfe82769581b950033b27ff0da0b62dbab43562f7309c"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_form_submissions_server_side_build.pipe",
+      "size": 196,
+      "sha256": "25dec7aa0af7d23a56b837f3ebce378d556e301e8327a3e748385e1d5cc76638"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/funnel/mart_payment_info_submitted_client_side.pipe",
+      "size": 211,
+      "sha256": "ed2fe8694c6bd7cdf41075d8d414acbcf942bb380e8d73d734d54ab91d8cf383"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/landing_pages/mart_landing_page_performance_daily.pipe",
+      "size": 24461,
+      "sha256": "8e8eef45140f0222a90e25bd00cc95c5fa860ccb6d6faed231d5484cf0781dd8"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/manual_attribution/mart_manual_attribution_payment_status.pipe",
+      "size": 971,
+      "sha256": "e39dff5f75a8cf0b1a16d0797f378a44da8b98d83b7987ff4492f6f6a6d5091d"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/manual_attribution/mart_manual_attribution_profile_search_candidates.pipe",
+      "size": 244,
+      "sha256": "ea30c730f86c7ac63ef6c30bf8c1ef007d227179d5a7cbadc109b7e4319e7549"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/manual_attribution/mart_unattributed_payments.pipe",
+      "size": 3222,
+      "sha256": "769c2250ba139d83db10c431e7b3aca09480883834a9ba498450bd0c57ba8c46"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/payments/mart_payments.pipe",
+      "size": 332,
+      "sha256": "05d34d64a36de578eccaec82236de2edf31a99ff4f1706af377bc8acf683fe54"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/payments/mart_payments_build.pipe",
+      "size": 1966,
+      "sha256": "ffdd458067efbc08e8b57b3c9d3d6f32a4250d137e615a6ac78fadb1cd0b4c22"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/payments/mart_payments_client_side.pipe",
+      "size": 197,
+      "sha256": "6d2bf20e69d84c2c3a2dccc2d5e6324f9173030075299dbd81194258747db742"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/payments/mart_payments_client_side_build.pipe",
+      "size": 5662,
+      "sha256": "5339f2a1a5678f1a3440bcfa35c25fa9f2a82ad48b43a0853428ee586c784363"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/products/mart_product_sales.pipe",
+      "size": 762,
+      "sha256": "5f4e23c33f0a93748050511adb73ea25241c96ddec3b5c0ee99c380cf1f9fe1c"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_first_conversions.pipe",
+      "size": 6979,
+      "sha256": "f994aaca19790fd2eb88d3e33e925fc0852c7edf5bc1e65720d3936008d6af19"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_first_conversions_flattened.pipe",
+      "size": 1624,
+      "sha256": "d0895a52c6123f87a99b2c988e8ed70e556a29984d662cdb22c96fa3566f2ef1"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_form_submitted.pipe",
+      "size": 7578,
+      "sha256": "ef683d07f5b10cde1ac66ef8c7f01765ac55bc144608cb2d2dba0d8adaedec97"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_form_submitted_flattened.pipe",
+      "size": 1980,
+      "sha256": "93de6ea08c7dd71541e7a62efd64f9fb5a47e2528603821981d6919bd4e1c171"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_order_completed.pipe",
+      "size": 1524,
+      "sha256": "f6e6448c8df7006da27222200097a83b38e0b64f515fe0e172602d44024e43dd"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_order_completed_flattened.pipe",
+      "size": 3468,
+      "sha256": "38ce743cfdd8fde0bf6b016d2867a6f82aa2dc51879b377ec2341fa884324228"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_repeatable_conversions.pipe",
+      "size": 1506,
+      "sha256": "55bbed09d74012ffa1d68d1d039152449651483e88ae82231251252878058254"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_repeatable_conversions_build.pipe",
+      "size": 15807,
+      "sha256": "3c8a6410b4f85d596e17787d9361bdc152ccf8586059ab1b529ac15c10459b4c"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/segment/segretl_repeatable_conversions_flattened.pipe",
+      "size": 3488,
+      "sha256": "74497e418665a1a7e01c83ee71b390a922c98f4cf781097d6c9f8bd34cd0656c"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/touchpoints/mart_touchpoints_all.pipe",
+      "size": 1410,
+      "sha256": "e5a0b4a4aa20fb08d3b6e2ed869a71aba4ee6db2f1442248c46028cf4c779901"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/touchpoints/mart_touchpoints_all_build.pipe",
+      "size": 1412,
+      "sha256": "73c3c65762f99a223855f2503e05a584d9d663d631b45188714cd1ca78f06744"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/touchpoints/mart_touchpoints_first.pipe",
+      "size": 304,
+      "sha256": "30da03cb1df83c5da8ed9e2ebd24d6a7c51664f94193d115238bb6ed2c1ea33b"
+    },
+    {
+      "path": "tinybird-production/pipes/outputs/touchpoints/mart_touchpoints_last.pipe",
+      "size": 312,
+      "sha256": "461454745c227b9f830110d4b1d2d90823b426cb1c447288419043829117bbf5"
+    },
+    {
+      "path": "tinybird-production/scripts/append-parquet-directory.mjs",
+      "size": 3820,
+      "sha256": "dd45f7ec03157d9170ddb7a627864452dbeede785b13ee3cd763db6c7e3781bf"
+    },
+    {
+      "path": "tinybird-production/scripts/benchmark-journey-identifier-keys.mjs",
+      "size": 4884,
+      "sha256": "1b7a3921c5a83aa5796d37c636bda7d8ecb91ed4433aa393fe5c92d90cf89521"
+    },
+    {
+      "path": "tinybird-production/scripts/benchmark-profile-journey.mjs",
+      "size": 1105,
+      "sha256": "be922b96bc416da11a7db26ebd4741b9932b91cb7348f84d1cac0e569528a641"
+    },
+    {
+      "path": "tinybird-production/scripts/check-project.mjs",
+      "size": 9376,
+      "sha256": "0bb1690bd8d12d031ecf047b0533e3a42cca6137b22ec40b5ca65c02bb712b64"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-activecampaign-registration.mjs",
+      "size": 10902,
+      "sha256": "a3e5852480c488d3e635c62caa1212dac16f97cc37c17ede270fbe6caa4fc8d6"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-all-stripe-payments.mjs",
+      "size": 13473,
+      "sha256": "ee7f723c13417035e5ef703d8a41d4c1d978df44f7623729b2de46b477b10c95"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-dataform-outputs.mjs",
+      "size": 29403,
+      "sha256": "5e2b49bf57d04a1116e94926eff03696605bb9fb04620f3208d76320e6d54e5d"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-identity-state.mjs",
+      "size": 13264,
+      "sha256": "ca0d78bb85afbf6a5d222d2fb99560b8f74f92402e769a160625246def8032d7"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-journey-profile-sample.mjs",
+      "size": 11300,
+      "sha256": "69b3253a4fda0a543a81abe86324c2dc458964dcd83e7d53f6a5cd4aafe6833b"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-meta-marts.mjs",
+      "size": 8574,
+      "sha256": "cf0e7cbbd64ad832d954c578f49b643f5d6ce53dc61008f62733ca35632ed3dd"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-page-view-history.mjs",
+      "size": 7704,
+      "sha256": "d4cd0bf5c774fe13b0dce9fb3c35f098c9f50aa9f7054cbc58178ceb9641ef16"
+    },
+    {
+      "path": "tinybird-production/scripts/compare-parquet-rows.py",
+      "size": 3450,
+      "sha256": "d4fa1655666fb0cbc91d077ef02d0f7e3794fcad84e6b188db1cb847319f6159"
+    },
+    {
+      "path": "tinybird-production/scripts/diagnose-identity-profile-bucket.mjs",
+      "size": 5772,
+      "sha256": "3eab61dfc79cb5b719756b73ebe148a74acfeed0863d677b322cac6ca3e672d5"
+    },
+    {
+      "path": "tinybird-production/scripts/enqueue-journey-profile-repairs.mjs",
+      "size": 3814,
+      "sha256": "8125d0f3506cf211dc87f36cdc8842197b03b3539be5956ca094a33a3e92bd54"
+    },
+    {
+      "path": "tinybird-production/scripts/export-identity-state-seed-to-gcs.mjs",
+      "size": 4936,
+      "sha256": "699030757d15b339d6929d3425fafaad9e57ee33ad9776615aa813527e8d37e5"
+    },
+    {
+      "path": "tinybird-production/scripts/export-tinybird-query.mjs",
+      "size": 988,
+      "sha256": "1741ae4fa2b119abdfb7e3fb4d7ac7604ec210d9b66f2666b79b32ddefb05098"
+    },
+    {
+      "path": "tinybird-production/scripts/find-identity-profile-trait-mismatches.mjs",
+      "size": 6749,
+      "sha256": "044a8b4701a658c103b935d020c40c60c9bbaa31b012747e480f92a6b7d76c74"
+    },
+    {
+      "path": "tinybird-production/scripts/import-gcs-prefix.mjs",
+      "size": 1770,
+      "sha256": "d4483972f2a4865e70939e98d78b4dd32ca8b4fa7213ec1a765fc867bb8c67ad"
+    },
+    {
+      "path": "tinybird-production/scripts/lib/identity-parity.mjs",
+      "size": 38440,
+      "sha256": "0ff3004174affc6e8a88ec64f0270afe617a450feb840c20d2a9986c4ccb6010"
+    },
+    {
+      "path": "tinybird-production/scripts/lib/parity-contract.mjs",
+      "size": 4580,
+      "sha256": "67b2a39110c313903f9ca1ae4748632f0b3d84dae675af409861f4e035d7eb74"
+    },
+    {
+      "path": "tinybird-production/scripts/lib/parity-sql.mjs",
+      "size": 26525,
+      "sha256": "eae9b92acd93012562e84c14822e8cf208c962707cc013ad275b09436ec13835"
+    },
+    {
+      "path": "tinybird-production/scripts/lib/parity-types.mjs",
+      "size": 9712,
+      "sha256": "70403bffdbcb6f1fbbfac61db7c85b4534477182b2af590d02c382bc3b3c0e9d"
+    },
+    {
+      "path": "tinybird-production/scripts/lib/tinybird-target.mjs",
+      "size": 1053,
+      "sha256": "56f60740dc0a423b7dbf036309d6945cedfc57c10585c152577514eea734002d"
+    },
+    {
+      "path": "tinybird-production/scripts/merge-parquet-files.py",
+      "size": 978,
+      "sha256": "4fcf1cf3d1c902725b9bfe25eb8c38d97a2453ed33b3e6059cea1a28ba197bd8"
+    },
+    {
+      "path": "tinybird-production/scripts/parity/output-contract.json",
+      "size": 10723,
+      "sha256": "e38eb0a045ec2434c7076e380fc4b4f9228a5d4a318624ceaf06503f9af621db"
+    },
+    {
+      "path": "tinybird-production/scripts/send-events-directory.mjs",
+      "size": 2255,
+      "sha256": "6b8d61f7fbac50ea70fbf4f2126d5fb7092733af9dccc4c5a86b7af52d7c50af"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/build-jitsu-page-view-versions-tail-table.sql",
+      "size": 1555,
+      "sha256": "13312b2b58d4f3bf0c882ef59cee312105a9daeefb58d6ea2d8a7e2b7e2706bf"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/enrich-identity-state-seed.sql",
+      "size": 2572,
+      "sha256": "8a36aaad48123b8a7f0ba750d2afa23cedd4aaf7dd84614c320bf5e459de00be"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-identity-fact-evidence-seed.sql",
+      "size": 3049,
+      "sha256": "f818b6101646ccd697b2b5f02e9318ad33a1dcbc89759f3d0e56540de5b755aa"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-identity-mapping-evidence-seed.sql",
+      "size": 2629,
+      "sha256": "b15ded181c94f7278798bf4c0c01b8f0f1f1b86edcb0b29f416dcd37eabed2c4"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-identity-mapping-serving-seed.sql",
+      "size": 730,
+      "sha256": "08c221c6fb129762327bc105f69f85497e3947bba20a52e382b56ed0701e1a4c"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-identity-state-seed.sql",
+      "size": 14086,
+      "sha256": "338aefdaf7067fc0d4dbb02d6e357857c1d1c99ecc05d2556e3b09188fe59eed"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-jitsu-page-view-versions-delta.sql",
+      "size": 1749,
+      "sha256": "7090d01d262ceb715020df3339c28a8972d9381702b3335eb677310f5b4e0d0b"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/export-jitsu-page-view-versions-seed.sql",
+      "size": 2002,
+      "sha256": "73f1d1df2c9d1bb43a939d6e04a23ede3407cfd0d2004ef1e6930d08049ef82a"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/select-jitsu-page-view-history-tail-tinybird.sql",
+      "size": 777,
+      "sha256": "66168e48ebfc1332d23545d95e3d57d61723527064ee955cb4a50658db9538e4"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/validate-enriched-identity-state-seed.sql",
+      "size": 2732,
+      "sha256": "b67cf558e605bd8ad2c6de67ea826f5d594ae7a8a583fe1e81f7420dff94ba59"
+    },
+    {
+      "path": "tinybird-production/scripts/sql/validate-identity-fact-evidence-seed.sql",
+      "size": 3824,
+      "sha256": "ed549572a03e4c9547c73632463eb5ae8eef3da67cc14eacc31c686aa9402cb6"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/identity-compaction.test.mjs",
+      "size": 33646,
+      "sha256": "fd10f4f4259b5d7dde8d6755ff0b68def44939084d645035986233f8829d2793"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/identity-enqueue-batching.test.mjs",
+      "size": 6491,
+      "sha256": "ab2c8e1e68bf6f32d1777e532d6484ef2cc154e6f5b09e8d1867eb2f33097d13"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/identity-parity.test.mjs",
+      "size": 18080,
+      "sha256": "951091289c6e28cf7679d6cb9e090d551423ea3b54b1c9902a0260edc74c5924"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/identity-source-cdc.test.mjs",
+      "size": 4823,
+      "sha256": "d4e015679fe6145198ae8ec378b0ad97d7b25ff4889728e683c7b2772a96dded"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/identity-state-layer.test.mjs",
+      "size": 10236,
+      "sha256": "a4a5a12ba1a297b33da39f1db715881be2b8157414a465802aaf7fbd0e32edaf"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/incremental-journey.test.mjs",
+      "size": 7492,
+      "sha256": "4f30c3cf3ef12ec31f1c14587880337734ecb30144c597a48ff7ef5be395c99e"
+    },
+    {
+      "path": "tinybird-production/scripts/tests/parity-contract.test.mjs",
+      "size": 7278,
+      "sha256": "a1a82b033f471ed1480061a5d2c709e6d9383bca42a3bb4b58d696477f9e8ed2"
+    },
+    {
+      "path": "tinybird-production/tinybird.config.json",
+      "size": 152,
+      "sha256": "baff0ec396e1d86202c071fee48ebf35d699bfa61eddcb0b2fbd30ada2a543ff"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/README.md",
+      "size": 17644,
+      "sha256": "8bd7cefd84c0c5bcd8b40dac5b860108ec9f8cd4fb85084f9a01ccbc2e4d2e53"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/docs/environment-variables.md",
+      "size": 3288,
+      "sha256": "afdc8412cd2f158101dd053da4f1ca8bdcc0f7a5fe16b61eadac1dd86462a830"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/docs/identity-gcp-forwarding.md",
+      "size": 4312,
+      "sha256": "0a5a32e1b39090d36b0d8e1b69cf0501d04addc4299348fd52247e912ca2f5bb"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/package-lock.json",
+      "size": 143719,
+      "sha256": "651bddeca29a822952607146f8429b10a8649e7d6f83b4e835988fcfb68fdc18"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/package.json",
+      "size": 1277,
+      "sha256": "3a3f56390255001c1982db2be2276cfd62b189533f252c24d988f16fa41dab7b"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/dry-run-identity-worker.ts",
+      "size": 2003,
+      "sha256": "b2700bc08cf60df7be0e22f19cf0f6302c642f9852a1b073c9129d4b6aaa8411"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/generate-table-manifest.mjs",
+      "size": 7580,
+      "sha256": "24ca9a05b1773e6de7087386bdc90e9c3276bc54244e37f6a223485a3e53efad"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/repair-identity-bigquery-gap.ts",
+      "size": 12379,
+      "sha256": "8776fc8e1375631ef03c2aaa53c43d5c5a2b2375ab417acd64b436e8c65ed394"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/repair-profile-traits.ts",
+      "size": 9510,
+      "sha256": "1f550b0c58ad5e90e611741177ea3bf34d5f418a6dbf9d86c276f50a9257a296"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/source-registration.d.mts",
+      "size": 570,
+      "sha256": "dd8ab1c687468d5cb4d2e16958f7e88c55676ee3d51b1bc7312dda3c2d2141ba"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/scripts/source-registration.mjs",
+      "size": 1789,
+      "sha256": "401ba537055b422167c5605767ba6b97e5f2c9c6c2ad25755dd98157f0ca63e8"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/bigquery.ts",
+      "size": 21160,
+      "sha256": "5803335a839e21bd761e09f3d10a358b16870e9f7dad43091836551e3d0b673e"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/cadence.ts",
+      "size": 308,
+      "sha256": "c24812f4c494d9cb1f9ba50f80a88b83430ab3e5deba663cadb8a577c34489dc"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/copy-plan.ts",
+      "size": 6441,
+      "sha256": "5cd7448161cb43ee87eaecac30f484c4834620603cfb8152df69ae7fdb8fbefe"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/http.ts",
+      "size": 13756,
+      "sha256": "2fa42189fc116d2318c0d960ab50d5495b0a238d36d48c40142f84cef9f8a5ce"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/identity-batch-recovery.ts",
+      "size": 290,
+      "sha256": "fc006e9d1acb18240d444485e1688527d292a99754f1ecc3604f52b0c25e0be6"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/identity-engine.ts",
+      "size": 28240,
+      "sha256": "2331307629bd542da5320d3771604ff1ad18e4c5d18c1cf1d059606428bcdfdd"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/identity-gcp-forwarding.ts",
+      "size": 6865,
+      "sha256": "38bb5025ff76502797ebf657ae0fe9dedd1876638ffa93ca7d49de555cb9135e"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/identity-worker.ts",
+      "size": 10381,
+      "sha256": "4aaf5e0a8b7dc975dfff8c9fda20b6180a2b121016c4d0369578d1783eea8086"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/index.ts",
+      "size": 1193,
+      "sha256": "dc07c067c5ccfdff066df4d2a857d7079c23e8783ea7ecc86f89591c056e5457"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/journey-coordinator.ts",
+      "size": 18518,
+      "sha256": "979e64b20588efee1928f356aecc3842d866d632fd340b7474351e055df90347"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/journey-worker.ts",
+      "size": 8053,
+      "sha256": "0e627ef893c276aef842c835034fa98e3bf06e2fc072444ec79dfe5adf307e39"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/md5.ts",
+      "size": 4780,
+      "sha256": "d5e0fc65b68a3c9d8bd3d70441cb8afc64383f4cfa4789d0cda2de99ddc41b14"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/publication-coordinator.ts",
+      "size": 95486,
+      "sha256": "817a8f47d832eb96a7b48ac53342fd8ff568c61afcdb8f7ce8db3ee8bbf91b8a"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/reporting-facts-coordinator.ts",
+      "size": 18665,
+      "sha256": "1e12d9ea2430ab02f00ccaa9caccb61d10c7a03666146ecb86d05f214ad2772f"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/reporting-facts-worker.ts",
+      "size": 8755,
+      "sha256": "76a23c1080cf5ddc5ff1dd7c368d4feda184955ffa8d271537646b98af9493b0"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/sync.ts",
+      "size": 8389,
+      "sha256": "94e1d14bae933e7f5edcf56cff2a765eb8fa3d503b661ca2ab8aad9d92a11e9b"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/table-manifest.generated.ts",
+      "size": 178053,
+      "sha256": "b51e457b3bb3f5431dcf841eb9edfe9924dca6dfa6ffd1f4f5ce13c830ab98e6"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/tinybird-api.ts",
+      "size": 45800,
+      "sha256": "1d21db8a373862e70c76133609596687ee060319fa879438eaa5faad98a5bbe8"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/src/tinybird-gate.ts",
+      "size": 13921,
+      "sha256": "f98eb7d4dcd57aad2e8ddc53b0ed71e8562d52955739b9828e38e0f474b731ae"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/bigquery.spec.ts",
+      "size": 9697,
+      "sha256": "14b6e5818df3c098a3f3f235be7f52b70db3fda711251313a935d677e5871af5"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/copy-plan.spec.ts",
+      "size": 6066,
+      "sha256": "a5a456c74a2c3e41a30ac1acda3f3503cb2fe1edf9d8b9b3cbf92d0ec767e3ce"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/env.d.ts",
+      "size": 76,
+      "sha256": "1a48d1e153c36ca5aedd11bafd91ca0782484150f7165d7ae2442f5b4837716e"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/helpers.ts",
+      "size": 5107,
+      "sha256": "0c3dec8f9a3352cd3f89901e9721a3c3e22b07bc81d5dfed7158d4ca58632e3b"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/identity-batch-recovery.spec.ts",
+      "size": 761,
+      "sha256": "264dba240ba202c2e179b73fe93fbae7291f8dafd406fe407848660a729843ad"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/identity-engine.spec.ts",
+      "size": 7310,
+      "sha256": "b8e5fb4f4bb9752bca99bf174e867fa3987bd86bcc81e37964ed0789d7e62bc7"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/identity-gcp-forwarding.spec.ts",
+      "size": 4988,
+      "sha256": "ba0557a3187b53e519a4ccf935d9025eb1302962687c897922a6896f6656543a"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/index.spec.ts",
+      "size": 5132,
+      "sha256": "9c2ad2803c4e300f9fdeb225bc412ece910752cde9066419c4e3d4356145bb45"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/journey-coordinator.worker.spec.ts",
+      "size": 11397,
+      "sha256": "c4a49b02abff720d6bb77ab0274c6ab9452518fdc547087490a12b06aeaab582"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/journey-migration.spec.ts",
+      "size": 986,
+      "sha256": "7e288a47d6f7aa154f70763bc2ea3c72b8e0c2b09ad4e6e3874c707cb22e48a1"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/journey-worker.spec.ts",
+      "size": 13782,
+      "sha256": "0be28071d3a1c139305b13dde78cee5ec6e2d9d667f22f1e6dae51e966025dcd"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/manifest.spec.ts",
+      "size": 2383,
+      "sha256": "2c9d7e973fc405cbe058d5f2ed5ab56ababa3be40c0a387d96be4777971b5a79"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/publication-coordinator.worker.spec.ts",
+      "size": 69846,
+      "sha256": "f05ec715a078068289e774ff33107a6506aa40b9c9f8e4e6d4dea7e086d68c01"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/reporting-facts-coordinator.worker.spec.ts",
+      "size": 10161,
+      "sha256": "c61a315d430c89369132d8e100703b24897550d3639d6c9cdf96875bbb5464a2"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/reporting-facts-worker.spec.ts",
+      "size": 7518,
+      "sha256": "4dc2c86c47cc02ca91c5ff25e2d0b4eb074873578e8070f41954ce1752ea900a"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/source-registration.spec.ts",
+      "size": 1856,
+      "sha256": "a10d2709f8847f83ee8377063ba78b5afc2ee9b3972f1d0a2b07ade958f03891"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/sync.spec.ts",
+      "size": 6820,
+      "sha256": "dabb508fadc4399689ca8ea7ecc6f7e7d5db6c2734ca0c16087d5aef18402003"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/tinybird-api.spec.ts",
+      "size": 10087,
+      "sha256": "3c16f07de7b08d4fbd2dc688f4fce47b9c29330287aab77cab826ae8647c3ada"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/test/tinybird-gate.worker.spec.ts",
+      "size": 6019,
+      "sha256": "b301f972189642fd49acc66ae328972f301e69f4204eae2850063f90ed5096d2"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/tsconfig.json",
+      "size": 508,
+      "sha256": "81eb0b85f46b332ef100472945b7b38878cda9ee3ea53c83446e533d93ea4f7e"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/vitest.config.mts",
+      "size": 207,
+      "sha256": "85fdb7a2dfa462054631b5e15a8d2646fe851bab198bc753d90df30e966d3c0d"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/vitest.do.config.mts",
+      "size": 621,
+      "sha256": "d85fcb17538e8126eac35410c69715dc781bda481260d9b514ece574e1ee0437"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/worker-configuration.d.ts",
+      "size": 583814,
+      "sha256": "3f2d67dbfd56bd90a1769a6acb3845c30e64941178ba87ffffb791cffeb8e5f8"
+    },
+    {
+      "path": "cloudflare-workers/bigquery-tinybird-sync/wrangler.jsonc",
+      "size": 1770,
+      "sha256": "25e70543672bfa51aa00aa199f1c876b77bcbd1f53cc616a99b5315c14a45d36"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/.gitignore",
+      "size": 42,
+      "sha256": "f63daee3db8733cf0b7d94cf228be66b64e8aecd88eb2a2aee043bd101c02c3b"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/README.md",
+      "size": 3723,
+      "sha256": "22141917cf2e9ad80eeb222b3a12bf860c09ab96389964ec2b500815cdfb0aac"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/docs/environment-variables.md",
+      "size": 1054,
+      "sha256": "cfc56f5db3d2c7f8e7a3b9c780d5312605d18f85afc8509959533082d1fe9b8d"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/package-lock.json",
+      "size": 101406,
+      "sha256": "8378341c35f381f2525b9acc8b69e81589ad837138cdb152b476983c47ee6071"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/package.json",
+      "size": 464,
+      "sha256": "c0f812caa495f1bb347e7a3936e4006623f121752da157b9f54127862c89588a"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/index.ts",
+      "size": 958,
+      "sha256": "00e0718aceced719abb5b21daa0633ccec9bdd36c8e67548286b7d3797b0a020"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/ingress.ts",
+      "size": 2671,
+      "sha256": "8ea09ba91dc384bed0255f5f477caf2bd2031e5de2f1dcac79755e9b949b82ed"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/jitsu.ts",
+      "size": 16138,
+      "sha256": "f037c38a32121cc1ef1f6213ca9115f2e2e01f9d0853277366f31b073f16d7d4"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/json.ts",
+      "size": 1807,
+      "sha256": "694aa370ff79bf42fff37fcbd18d58b7f30136a07c00724c47c2b294926ff74c"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/tinybird.ts",
+      "size": 5058,
+      "sha256": "f9ce5cbca2de3e5badf38046782e2e59fd170a1c3c83efc166b29a4abcffece4"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/src/types.ts",
+      "size": 1987,
+      "sha256": "2889d54c6db93ae9f4b3df6fd863788ec4677301bebea34f2dd06056cd40f8cd"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/test/helpers.ts",
+      "size": 2330,
+      "sha256": "ccb93b69d4b420a478c73b424a5a71d8ef00c232bca6d429bebbf4472fb8a4a9"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/test/ingress.spec.ts",
+      "size": 6917,
+      "sha256": "842dc6f8cb606a587f6e3845faaa53cce527679413cd62a2ecc4b105a191e4b3"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/test/tinybird.spec.ts",
+      "size": 4102,
+      "sha256": "5a97190e030742d256f8385f43163fb577c9a0f62473563f3f6a49a0be2e608d"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/tsconfig.json",
+      "size": 480,
+      "sha256": "0d994f49e02a80b4b73ae0ed66c4eeb9bbba10b4b95dd620f9baa6719e019512"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/vitest.config.mts",
+      "size": 122,
+      "sha256": "2f6ee000c85283a731868404976ab50927ef0a7a07009aa62cadeecdb5780b58"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/worker-configuration.d.ts",
+      "size": 582718,
+      "sha256": "731a554f10110eaf27ef2b444fe5c7ab1cfb7576a788dc09df278096b4e325c9"
+    },
+    {
+      "path": "cloudflare-workers/jitsu-tinybird-ingest/wrangler.jsonc",
+      "size": 845,
+      "sha256": "d1418442295996a2da8ccd719cb6c8dbeddc16fafe674a5afb0dc2b3a73b281a"
+    },
+    {
+      "path": "identity-gcp-ingest/.env.example",
+      "size": 159,
+      "sha256": "be53ba400a71f666033000a26641053e17ab0e58e51af2d13540b953965f111d"
+    },
+    {
+      "path": "identity-gcp-ingest/.gitignore",
+      "size": 25,
+      "sha256": "4ad2dd72b5b8511335b75e7b4dac1a8c92c576a7735f1e275b58c26ef1a1bef2"
+    },
+    {
+      "path": "identity-gcp-ingest/README.md",
+      "size": 1597,
+      "sha256": "fa4d61f7b91317471c7b5571a250b91c030c431eb89fd15c42a58b8fd3f9ad78"
+    },
+    {
+      "path": "identity-gcp-ingest/package-lock.json",
+      "size": 19859,
+      "sha256": "967a7ee63d7c082c709702637a64e53af0875bfba0a01f43da4c74509ee7918a"
+    },
+    {
+      "path": "identity-gcp-ingest/package.json",
+      "size": 280,
+      "sha256": "937e4de59a1ac8a5327415496e1f94eab2835adb2476cf6e91bed587d51ba6ae"
+    },
+    {
+      "path": "identity-gcp-ingest/sql/create_identity_landing.sql",
+      "size": 1591,
+      "sha256": "cd027d27dd1c4c6d8ba338d9afc69fab1689a121169f83bdcb4f2e630b3cca42"
+    },
+    {
+      "path": "identity-gcp-ingest/src/app.js",
+      "size": 2691,
+      "sha256": "60a138291c6352573b928dc100ea44dc903600454711b9bf49a28dfd5cd768ad"
+    },
+    {
+      "path": "identity-gcp-ingest/src/auth.js",
+      "size": 482,
+      "sha256": "79df52dbdc306bc5b5b1e560adb1130d81e0b5857750fd1d373ed911e8c7f7e7"
+    },
+    {
+      "path": "identity-gcp-ingest/src/bigquery-store.js",
+      "size": 6299,
+      "sha256": "257bd10ed01eea7d666eeefc5929b6a847f829ad9486f2d6d5d0c2edfbc1aad4"
+    },
+    {
+      "path": "identity-gcp-ingest/src/contracts.js",
+      "size": 5421,
+      "sha256": "3dc120cfa77b71ca92c8b4e96d76bb4410888ca3b5532ed5827788fcbfb368b7"
+    },
+    {
+      "path": "identity-gcp-ingest/src/index.js",
+      "size": 997,
+      "sha256": "bfdde0566139a7832ccb651add4fbb8610f30e4bb6c7a39ed3cc31d8bd0ff5a7"
+    },
+    {
+      "path": "identity-gcp-ingest/test/app.test.js",
+      "size": 3988,
+      "sha256": "67d5b7e76a30bf04e15ec697b9413b7e6431a073de15ef706b141eeded2fe7b0"
+    },
+    {
+      "path": "identity-gcp-ingest/test/bigquery-store.test.js",
+      "size": 2566,
+      "sha256": "57a265e8aad4fc811e85df0e5b007f54b9cc49fcc3f15a61dfae196143ffe81b"
+    },
+    {
+      "path": "identity-gcp-ingest/test/contracts.test.js",
+      "size": 1729,
+      "sha256": "a099050fa7a38f75586e7276a00b969b5ee33c78073902ee3d242b02fc51116d"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/.editorconfig",
+      "size": 185,
+      "sha256": "e2c6a1226fa00153b5d5ad44339aa43b77a4146d859ab5fff5ba60d320a16bf6"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/.gitignore",
+      "size": 2056,
+      "sha256": "53bb536ddec2a824ddf55546481425b4104738e6152dba89073e09044f4e1ba2"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/.prettierrc",
+      "size": 78,
+      "sha256": "4803449f91cd1042d7097cd76ecd70ae14deba457a0962651ee7c656b7b0c3a8"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/.vscode/settings.json",
+      "size": 58,
+      "sha256": "fec96b475a440618288a5f6d38f30c7267e9a14d827e3a7ff0970206b8d28a9c"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/JITSU_CLOUD_PROXY_MIGRATION.md",
+      "size": 29271,
+      "sha256": "c4e3894f1c0e75ecc280cc3711290b4634e6482c0b715ca012eec7f6bbb9b4bf"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/JITSU_COOKIEBOT_CONSENT_V2.md",
+      "size": 599,
+      "sha256": "39df84e4eb1aba11535a799e221d836016c21d4f535b8de899807991fa70eaba"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/README.md",
+      "size": 5118,
+      "sha256": "2a9cd4e2123ee870d4acd8a515d863332f90637bf52a2bb1d1531a32ccad3584"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/package-lock.json",
+      "size": 88971,
+      "sha256": "3072a3dd89830781a11516a8f28b0c321722024f103f759ccb3cfadcfe62881b"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/package.json",
+      "size": 646,
+      "sha256": "ed7b570c09c7747f0d1b29ed48dcb4593bfb9d028403dde087feb4b45ced8d9e"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/scripts/publish-clickfunnels-r2.mjs",
+      "size": 6387,
+      "sha256": "82f35a735f49ed6ae7d5215ad97ba50fce02e431609379a3e9616d4ca37ced79"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/README.md",
+      "size": 1991,
+      "sha256": "866a6a17c41093417bc2fbfe8636b5e68a9c3e320d55fe032d46003d0d5f6e9f"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/consent-shard.ts",
+      "size": 4554,
+      "sha256": "182b029edcd8708262a0a505b03ab925d7f7d647ac38a6662d55437d24424abe"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/cookie.ts",
+      "size": 4349,
+      "sha256": "fec75eea28743e58a10cbdb51f20a1dea9f8d4ca0b774f19399162da9aa2d6a2"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/crypto.ts",
+      "size": 2671,
+      "sha256": "c492c2d393a6f5a70e471ab7b276b11f37f5b25cf7553c4d3ba1a229757b60dd"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/event-consent.ts",
+      "size": 4279,
+      "sha256": "267f8394eae41c3ee3a1151ace22262da9995fbab842b177e47b68a1ed0abd3a"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/routes.ts",
+      "size": 5676,
+      "sha256": "2988fad033cbb76c36c6d71b041e4f4ad03a14e370fb54a8b07641ab27f2f844"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/service.ts",
+      "size": 3706,
+      "sha256": "0137140259d827af45e396cee5178b1c28bde41649320d5b0cca64b31c58481e"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/consent/types.ts",
+      "size": 951,
+      "sha256": "4f2fb6dec10de09b2f21d7bc0e50c06f708db74dd9a73461563eeb182514a406"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/index.archive.ts",
+      "size": 24214,
+      "sha256": "dc96ac0ffc34d64688f0eae22cff7a5e1803c6bb089fe1626dfbfb03bab49c68"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/index.ts",
+      "size": 3081,
+      "sha256": "d41284e1aee4d2e7b60c13b65038723814dc85d356ecbd2f4a4f9219ce0e7701"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/jitsu-proxy.ts",
+      "size": 30713,
+      "sha256": "b908ab759cbc9aa8b15a1a6e378a87a7e23ea4617d877bc5bc9f074ae3022c08"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/stripe/confirmed-purchases.ts",
+      "size": 15023,
+      "sha256": "7a158926dc778fd16e549d91190f00c14f37c72d9cf60a2941c3e4d7639d41af"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/stripe/purchase-state.ts",
+      "size": 6745,
+      "sha256": "3f2d9f873915f199da746a5ad9b872c8801743090d8b0cd994212c77cad46d27"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/stripe/routes.ts",
+      "size": 4787,
+      "sha256": "9f45de1315139939e04087d62d55e78d6936f0ee8bacb97006a457b29a257f64"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/src/stripe/types.ts",
+      "size": 1006,
+      "sha256": "c6548d2b7752a0c0a0d2f1fab3bc17743f571df5b5ca26e0f3670bb855035124"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/clickfunnels.spec.ts",
+      "size": 44358,
+      "sha256": "54e29fd93299b9bae770a43219768f285e3a07e83020377872ea6aae86986191"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/consent.spec.ts",
+      "size": 14149,
+      "sha256": "fecc99ac0a2f029dfd82f10923ca64d91c0269d3b148c0751af28a1e2eb06d56"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/env.d.ts",
+      "size": 75,
+      "sha256": "666b29a29e8854aad34f7e68bcdbc2b2cbe6c2e5fbae4389315c8ef03541e76a"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/index.spec.ts",
+      "size": 22908,
+      "sha256": "519d55dcac22ca0edae08f6410a47f3adef08e058932e6f8af36d345b5975d91"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/stripe-purchases.spec.ts",
+      "size": 12493,
+      "sha256": "c26ca322a2de5142bb37f1049e75856c9323797bac5548fb628223985b3d48fb"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/test/tsconfig.json",
+      "size": 183,
+      "sha256": "6838d50603540116726e97e3f578d6df91c82dc585a8f14ba0b504c66a50d0b1"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/tsconfig.json",
+      "size": 1574,
+      "sha256": "bd3e62139afa8ab2246a28760257d0a09ed8be8f60ad7e298936cd22f6e3dc30"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/vitest.config.mts",
+      "size": 225,
+      "sha256": "1105d6871de70f3f4eefc3511f9e5d4e093223cfc3aa5bd81f5ab767b6bc5a8a"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/worker-configuration.d.ts",
+      "size": 504550,
+      "sha256": "769ae921a728f91fb38bfd7c40bd275af9cbc431b26939448af5001058413106"
+    },
+    {
+      "path": "cloudflare-workers/reverse-proxy/wrangler.jsonc",
+      "size": 2520,
+      "sha256": "e6e8e59b92618480c8a2ae4f90f5142f8ffd54ab64badfe85989c617e55de13d"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/.editorconfig",
+      "size": 185,
+      "sha256": "e2c6a1226fa00153b5d5ad44339aa43b77a4146d859ab5fff5ba60d320a16bf6"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/.gitignore",
+      "size": 2056,
+      "sha256": "53bb536ddec2a824ddf55546481425b4104738e6152dba89073e09044f4e1ba2"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/.prettierrc",
+      "size": 78,
+      "sha256": "4803449f91cd1042d7097cd76ecd70ae14deba457a0962651ee7c656b7b0c3a8"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/.vscode/settings.json",
+      "size": 58,
+      "sha256": "fec96b475a440618288a5f6d38f30c7267e9a14d827e3a7ff0970206b8d28a9c"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/README.md",
+      "size": 7434,
+      "sha256": "1113e763985960849cae66e916dfcb3f663102df0f6f7ecd739a5393e1085e91"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/docs/environment-variables.md",
+      "size": 2766,
+      "sha256": "9fcc53d5c59c6404800112505a6a9f62f5e7105f4fe98378c4023b42f4237b9b"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/overview-audit.md",
+      "size": 3811,
+      "sha256": "218d8f05789df74f4067df08d19fbd6f185ff5c9d069655b5d09f3d27742f864"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/package-lock.json",
+      "size": 87878,
+      "sha256": "74cfe18152b2ab017681c023ea15953c511382e3e5f5b9044b86f41efde3b25b"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/package.json",
+      "size": 427,
+      "sha256": "118afad2e3f3160d713297965c1e409c3108ea2f39cf1bf75138d195b8d00f3a"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/README.md",
+      "size": 1374,
+      "sha256": "53707ea64a4b209f7bb25f98efaf6782b1beec3117a492f29b58678362eda8fe"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/clients/activecampaign.ts",
+      "size": 1340,
+      "sha256": "6bc9b2bf07f416f217bb80724ef9c2f9c47616c30676cfd24f2b4d9e16bbefa6"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/clients/http.ts",
+      "size": 3203,
+      "sha256": "762608f8cc5b286c83ee2217ed9857c83d167665426d745ea4108355ab04631e"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/clients/index.ts",
+      "size": 118,
+      "sha256": "d797577755a2d8bfac9be19ffbe9ef7cd2154be24beafcb5b7091519a667a058"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/clients/segment.ts",
+      "size": 2213,
+      "sha256": "8a98df8b86490e0c356814169332fd414c1e3684752cba4acd57d9561e4039c5"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/consumers/dlq-handler.ts",
+      "size": 3734,
+      "sha256": "42a50408c69e42449978f7b1fd2b439c2ef3017adbb80df6faebfc4587931f36"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/consumers/index.ts",
+      "size": 95,
+      "sha256": "b91504aa38144d11798ff025ff090fd8bbfa0ca5e1076f92cc69f8941607ee38"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/consumers/processor.ts",
+      "size": 6557,
+      "sha256": "6f030eeee8b417b8c2bd1d84d165e53b84424a950901bf398175da47f0364da9"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/durable-objects/reverse-etl-debug-store.ts",
+      "size": 2150,
+      "sha256": "d79645a624d211c6f1fea41cdb2af198f5487b1a094916167160cc3486206cea"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/handlers/debug-webhook.ts",
+      "size": 4456,
+      "sha256": "d4a0f8aae77118f5cf61d333739c5901981f7ab207eb8d89f17dbf7a121bde5f"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/index.ts",
+      "size": 13362,
+      "sha256": "9856049ad3dba5c6f9e0e8a65b299f64909f8a9a14acb25b92e9f83c4fbee7de"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/README.md",
+      "size": 2024,
+      "sha256": "2d48df33becda4bea9b9d42893b80fc67b03d1ec0c48c1940d42343f52096de7"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/README.md",
+      "size": 1068,
+      "sha256": "6fc210cfccd2b294f7898abc65e9fe9d20be042473a6a4e1e529c8ed6b982219"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/enricher.ts",
+      "size": 1614,
+      "sha256": "cbce4adc507b9e233f3a193db3df1ad01d884d61f28cc09042548eb9b027e8ed"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/extractors.ts",
+      "size": 2035,
+      "sha256": "bf8e2445f3af3d46a5602187630d736b453527270767214e255f7af7bd5c4f48"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/handlers/contact-tag-added.ts",
+      "size": 5031,
+      "sha256": "437678c9f8686acf66b6873eed2e5bf93a1498d124262c65ecb92c48b45d8fa6"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/handlers/index.ts",
+      "size": 62,
+      "sha256": "307931ef9f04217758ccf6e4959b62c63217ba8c4ea15b9be33ef300675bdcb3"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/index.ts",
+      "size": 1163,
+      "sha256": "f06f10b349074b740b412d31d91071e5fe9ad296a2770bbb8452fd2d025fb3bc"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/parser.ts",
+      "size": 2131,
+      "sha256": "34759a52c01718e061e86e7ee162ed657bd7d47621538130c3741588c7918c89"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/activecampaign/types.ts",
+      "size": 832,
+      "sha256": "3dcf6180961e2e21a9c80b9575f531f7f9f6c5b3a156c255b62d181c975815eb"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/base.ts",
+      "size": 3720,
+      "sha256": "02aa8edecb49c29a6a5c8d060fa77a9e89ab7a7ae0ba878fa61a9aaf78bef66b"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/index.ts",
+      "size": 353,
+      "sha256": "6fb7a46e5fd37875310d11739d7edd2171ace6a62abe8a0ce3a8a0e4e6f68e54"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/registry.ts",
+      "size": 1458,
+      "sha256": "24b99e0849e49e7039c42345f531c4f6469530d48a9f56ef36b720253a35a9cf"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/enricher.ts",
+      "size": 10154,
+      "sha256": "b52a905f576eea59e94a35957cf841646d83c37c9e7ba03810bc99a75096fc9e"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/extractors.ts",
+      "size": 13093,
+      "sha256": "ae1407848192ef5e1f5779f3252bf271e5aecdf95192cf9bb8196739f777e878"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/handlers/checkout-started.ts",
+      "size": 4372,
+      "sha256": "ceb603e748400d294efb3f384e47f3b4f43dbd254c98ad0503ee232a3ddb258e"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/handlers/customer-created.ts",
+      "size": 3166,
+      "sha256": "9a00f7cfdd12704ba7b269ef9a07c6473a2e4dc867ef2d39a040750413f66e73"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/handlers/index.ts",
+      "size": 326,
+      "sha256": "587ecf4a7cfebbc64b54c884d6591730769bf76048e4d52ae0ef81d07b59db58"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/handlers/order-fulfilled.ts",
+      "size": 5760,
+      "sha256": "56d4613b579f09db36b4d2cdc953617252cb5c2ef70949a7d0f6df3c8178ca16"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/handlers/order-paid.ts",
+      "size": 6178,
+      "sha256": "e4512ea7df713c57fb68677631bca40244c6b89069cfbf9522e30481aec45dd5"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/index.ts",
+      "size": 1670,
+      "sha256": "d7622b19e123329be5f746fa8d257e0eea11dc0887d8678dc1c957822b7c97b9"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/shopify/types.ts",
+      "size": 4913,
+      "sha256": "8f6773a18a429627a1d76059694a64992cfa2f07d55d63ab9f233f858f9edb5d"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/webflow/extractors.ts",
+      "size": 6155,
+      "sha256": "c7ad6168051df1bff36da184c602a639f8576b9c2c0b22e388541c797c1ae509"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/webflow/handlers/form-submission.ts",
+      "size": 5197,
+      "sha256": "9cc0a31ba7d3153a6f4d9fa6b458778db440003aca612a1624a52ac88de56a50"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/webflow/handlers/index.ts",
+      "size": 59,
+      "sha256": "ea61d2f161c29d19c25ec5a7ac768fea2cb1a53fc04603907729736072efe5f9"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/webflow/index.ts",
+      "size": 732,
+      "sha256": "03d5f4deeca40ba71dfed3795fe99ddfdc6774c9c36b1c0f91fe5e775c6984bc"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/sources/webflow/types.ts",
+      "size": 378,
+      "sha256": "89b6d7935efd53dabb373d2bce13268465e5ef459fc94047dee7b3caa2c6dba6"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/types/env.ts",
+      "size": 631,
+      "sha256": "49b42c01c727a4a3c59879bb287db4c01506836653b6a2782ba0997754b78155"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/types/index.ts",
+      "size": 226,
+      "sha256": "a2a279004183f878a886342aae8481e0f98945ca65a88efc0aa7aab3aefea04c"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/types/queue.ts",
+      "size": 1119,
+      "sha256": "dfa6454e1acd3bdc6e7985cfdd341d9c0f4b8011c0724164cb526e5dc0240987"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/types/segment.ts",
+      "size": 904,
+      "sha256": "2f7a3c82e084b6cc06f86e6b1a7997f34b8abf46b445d877f770d20db03bfdb5"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/utils/google-api-compliant.ts",
+      "size": 1794,
+      "sha256": "f067791e12d36677e97911f8b0465ca18df69e3d6cdcc7af4827a236d3f04889"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/utils/helpers.ts",
+      "size": 1998,
+      "sha256": "ba3cdd6b1d4a5166ab1bdbb5f3c29c41d62f59faf00ff8bbf2ff8dfc4167460b"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/utils/index.ts",
+      "size": 126,
+      "sha256": "9a0d51f57935865ad226640a1063fcb58f2608ce0aaaf695ddcca03789fbee92"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/src/utils/uuid.ts",
+      "size": 676,
+      "sha256": "7d015b6bb7350f84ce2ce9371bbaa88684f7fd8cb76cf8d59601a594e50d0d67"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/activecampaign-contact-tag-added.spec.ts",
+      "size": 4931,
+      "sha256": "ac3f7db50e4903446696ea4c9321aabe7ec1b3876a9959d3139405ace5211d5a"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/env.d.ts",
+      "size": 75,
+      "sha256": "666b29a29e8854aad34f7e68bcdbc2b2cbe6c2e5fbae4389315c8ef03541e76a"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/index.spec.ts",
+      "size": 5358,
+      "sha256": "ec7b5c166aa9eb0db01df3ca8d6956a9d50ca3c14ac858443fc5f8bc9d7e7b40"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/manual/order-paid.payload.json",
+      "size": 8018,
+      "sha256": "2b78e82a0d526030e6ad557d2691077c817aa9e2f321da6cd2166f196ba60e70"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/shopify-order-fulfilled.spec.ts",
+      "size": 2102,
+      "sha256": "5b4f3feb6fd2731376a1977c729fd2ed40d432b69c16101d8f2e5dde6b564703"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/shopify-order-paid.spec.ts",
+      "size": 1569,
+      "sha256": "07083a65a9a8e3eceecf9410e7ab8e07e0ed64c84120e05982a6c74ceb0f0052"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/tsconfig.json",
+      "size": 183,
+      "sha256": "6838d50603540116726e97e3f578d6df91c82dc585a8f14ba0b504c66a50d0b1"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/test/webflow-form-submission.spec.ts",
+      "size": 3709,
+      "sha256": "4671da16e9d7c2d423024468415e13b8d0ab01b223ced459d624ab056048c686"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/tsconfig.json",
+      "size": 1574,
+      "sha256": "bd3e62139afa8ab2246a28760257d0a09ed8be8f60ad7e298936cd22f6e3dc30"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/vitest.config.mts",
+      "size": 225,
+      "sha256": "1105d6871de70f3f4eefc3511f9e5d4e093223cfc3aa5bd81f5ab767b6bc5a8a"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/worker-configuration.d.ts",
+      "size": 504581,
+      "sha256": "987b3e2f3eb1df5184992cb0be0d9570ba134a7b3ae348e96f968ca97a3550cf"
+    },
+    {
+      "path": "cloudflare-workers/marketing-webhooks/wrangler.jsonc",
+      "size": 1984,
+      "sha256": "ea7dd07db12db3282185436e31fe94457108e40e2e4c58f41f66806fd64f091e"
+    }
+  ],
+  "archive_sha256": "91b8a6ea4f1f40cf88aa29ccf42be03a2e594ea874349d5c1478bd19f29300e6",
+  "verified": true
+}

@@ -1,0 +1,64 @@
+DESCRIPTION >
+    Resolve a current or historical profile token as of the report generation's pinned
+    identity batch. Ambiguous tokens return no target and fail the manual-link gate.
+
+NODE pinned_profile_token_versions
+SQL >
+    SELECT
+        state.tenant_id,
+        state.state_kind,
+        state.state_key,
+        generation.source_generation_id,
+        generation.identity_stable_batch_version,
+        argMax(
+            tuple(
+                state.is_deleted,
+                state.identifier_value,
+                state.profile_id,
+                state.batch_version,
+                state.committed_at
+            ),
+            tuple(state.batch_version, state.committed_at, state.row_hash)
+        ) AS pinned_row
+    FROM identity_state_versions AS state
+    INNER JOIN current_source_generation AS generation
+        ON state.tenant_id = generation.tenant_id
+       AND state.batch_version <= generation.identity_stable_batch_version
+    WHERE state.state_kind IN ('profile', 'alias')
+    GROUP BY
+        state.tenant_id,
+        state.state_kind,
+        state.state_key,
+        generation.source_generation_id,
+        generation.identity_stable_batch_version
+
+NODE pinned_live_profile_tokens
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        if(
+            state_kind = 'profile',
+            tupleElement(pinned_row, 3),
+            tupleElement(pinned_row, 2)
+        ) AS input_profile_id,
+        tupleElement(pinned_row, 3) AS candidate_profile_id
+    FROM pinned_profile_token_versions
+    WHERE tupleElement(pinned_row, 1) = 0
+      AND input_profile_id != ''
+      AND candidate_profile_id != ''
+
+NODE pinned_profile_token_resolutions
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        input_profile_id,
+        if(
+            uniqExact(candidate_profile_id) = 1,
+            any(candidate_profile_id),
+            ''
+        ) AS resolved_profile_id,
+        toUInt64(uniqExact(candidate_profile_id)) AS resolution_target_count
+    FROM pinned_live_profile_tokens
+    GROUP BY tenant_id, source_generation_id, input_profile_id

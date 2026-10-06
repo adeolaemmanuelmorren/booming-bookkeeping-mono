@@ -1,0 +1,104 @@
+DESCRIPTION >
+    Stable journal generation and deterministic digest of valid pending deliveries.
+
+NODE latest_committed_batch
+SQL >
+    SELECT
+        seed.tenant_id,
+        coalesce(maxIf(state.batch_version, state.state_kind = 'batch_audit'), toUInt64(0)) AS stable_batch_version,
+        coalesce(
+            nullIf(
+                argMaxIf(state.batch_id, tuple(state.batch_version, state.committed_at), state.state_kind = 'batch_audit'),
+                ''
+            ),
+            hex(MD5(''))
+        ) AS stable_batch_id,
+        coalesce(maxIf(state.committed_at, state.state_kind = 'batch_audit'), toDateTime64(0, 6)) AS committed_at
+    FROM (SELECT 'boom' AS tenant_id) AS seed
+    LEFT JOIN current_identity_state AS state
+        ON seed.tenant_id = state.tenant_id
+    GROUP BY seed.tenant_id
+
+NODE pending_delivery_summary
+SQL >
+    SELECT
+        tenant_id,
+        countDistinct(tuple(producer_id, producer_sequence, event_id, payload_hash)) AS pending_event_count,
+        hex(
+            MD5(
+                arrayStringConcat(
+                    arraySort(
+                        groupUniqArray(
+                            concat(
+                                producer_id,
+                                ':',
+                                toString(producer_sequence),
+                                ':',
+                                event_id,
+                                ':',
+                                payload_hash
+                            )
+                        )
+                    ),
+                    '|'
+                )
+            )
+        ) AS pending_digest
+    FROM normalize_identity_input
+    WHERE record_kind = 'event'
+    GROUP BY tenant_id
+
+NODE visible_cursor_candidates
+SQL >
+    SELECT tenant_id, producer_id, checkpoint_sequence AS visible_sequence
+    FROM current_identity_checkpoints
+
+    UNION ALL
+
+    SELECT tenant_id, producer_id, max(batch_high_sequence) AS visible_sequence
+    FROM normalize_identity_input
+    WHERE record_kind = 'event'
+    GROUP BY tenant_id, producer_id
+
+NODE visible_cursor_summary
+SQL >
+    SELECT
+        tenant_id,
+        hex(MD5(arrayStringConcat(
+            arraySort(groupArray(concat(producer_id, ':', toString(visible_sequence)))),
+            '|'
+        ))) AS visible_cursor_digest
+    FROM (
+        SELECT tenant_id, producer_id, max(visible_sequence) AS visible_sequence
+        FROM visible_cursor_candidates
+        GROUP BY tenant_id, producer_id
+    )
+    GROUP BY tenant_id
+
+NODE generation_row
+SQL >
+    SELECT
+        stable.tenant_id,
+        stable.stable_batch_version,
+        stable.stable_batch_id,
+        stable.committed_at,
+        coalesce(pending.pending_event_count, toUInt64(0)) AS pending_event_count,
+        coalesce(pending.pending_digest, hex(MD5(''))) AS pending_digest,
+        coalesce(cursors.visible_cursor_digest, hex(MD5(''))) AS visible_cursor_digest,
+        hex(MD5(concat(
+            stable.stable_batch_id,
+            ':',
+            toString(stable.stable_batch_version),
+            ':',
+            coalesce(pending.pending_digest, hex(MD5(''))),
+            ':',
+            coalesce(cursors.visible_cursor_digest, hex(MD5('')))
+        ))) AS identity_generation,
+        'active' AS activation_status
+    FROM latest_committed_batch AS stable
+    LEFT JOIN pending_delivery_summary AS pending
+        ON stable.tenant_id = pending.tenant_id
+    LEFT JOIN visible_cursor_summary AS cursors
+        ON stable.tenant_id = cursors.tenant_id
+
+TYPE endpoint

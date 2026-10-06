@@ -1,0 +1,99 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bigquery-tinybird-sync",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-26",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "observability": {
+    "enabled": true
+  },
+  "upload_source_maps": true,
+  "limits": {
+    "cpu_ms": 30000
+  },
+  "vars": {
+    "BIGQUERY_PROJECT_ID": "able-folio-499722",
+    "BIGQUERY_LOCATION": "US",
+    "GCS_BUCKET": "booming-data",
+    "GCS_PREFIX": "tinybird/v1-live",
+    "COMPLETE_THROUGH": "2026-09-05T22:28:00.000Z",
+    "INGESTION_ENABLED": "true",
+    "TINYBIRD_API_URL": "https://api.us-east.tinybird.co",
+    "EXPORT_OVERLAP_MINUTES": "20",
+    "BIGQUERY_POLL_INTERVAL_MS": "5000",
+    "BIGQUERY_JOB_TIMEOUT_MS": "480000",
+    "COPY_JOB_TIMEOUT_MS": "3600000",
+    "COPY_POLL_INTERVAL_MS": "5000",
+    "IDENTITY_BOOTSTRAP_SOURCE_INGESTED_FROM": "2026-08-26 23:05:00",
+    "TINYBIRD_FETCH_TIMEOUT_MS": "30000",
+    "TINYBIRD_GATE_TIMEOUT_MS": "180000",
+    "SOURCE_BRIDGE_THROUGH": "2026-09-05T23:42:00.000Z",
+    "CHANGE_HISTORY_ENABLED_AT": "2026-09-05T23:38:46.234Z",
+    "CHANGE_HISTORY_RETENTION_HOURS": "168",
+    "SOURCE_CREATED_AT_JSON": "{\"raw_activecampaign_contact\":\"2026-07-15T09:40:22.635Z\",\"raw_activecampaign_contact_tag\":\"2026-07-15T09:40:41.170Z\",\"raw_activecampaign_tags\":\"2026-07-16T04:07:17.322Z\",\"raw_stripe_charge\":\"2026-06-23T17:56:17.085Z\",\"raw_stripe_customer\":\"2026-06-23T17:56:17.834Z\",\"raw_stripe_kajabi_charge\":\"2026-07-22T05:24:50.089Z\",\"raw_stripe_kajabi_customer\":\"2026-07-22T05:24:55.757Z\",\"raw_stripe_kajabi_payment_intent\":\"2026-07-22T05:24:50.928Z\",\"raw_stripe_payment_intent\":\"2026-06-23T17:56:16.745Z\"}"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "TINYBIRD_SYNC_GATE",
+        "class_name": "TinybirdSyncGate"
+      },
+      {
+        "name": "PUBLICATION_COORDINATOR",
+        "class_name": "PublicationCoordinator"
+      },
+      {
+        "name": "JOURNEY_COORDINATOR",
+        "class_name": "JourneyCoordinator"
+      },
+      {
+        "name": "REPORTING_FACTS_COORDINATOR",
+        "class_name": "ReportingFactsCoordinator"
+      },
+      {
+        "name": "SOURCE_EXPORT_COORDINATOR",
+        "class_name": "SourceExportCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "TinybirdSyncGate"
+      ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "PublicationCoordinator"
+      ]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": [
+        "JourneyCoordinator"
+      ]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": [
+        "ReportingFactsCoordinator"
+      ]
+    },
+    {
+      "tag": "v5-source-export",
+      "new_sqlite_classes": [
+        "SourceExportCoordinator"
+      ]
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
+}

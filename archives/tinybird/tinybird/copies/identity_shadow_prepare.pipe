@@ -1,0 +1,312 @@
+DESCRIPTION >
+    Prepare one on-demand shadow generation as durable nodes, edges, initial labels, and run status.
+
+NODE already_prepared_shadow_generations
+SQL >
+    SELECT DISTINCT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash
+    FROM identity_shadow_work_versions
+    WHERE tenant_id = 'boom'
+      AND record_kind = 'status'
+
+NODE unprepared_shadow_identifiers
+SQL >
+    SELECT normalized.*
+    FROM shadow_normalize_identity_universe AS normalized
+    LEFT JOIN already_prepared_shadow_generations AS prepared
+        ON normalized.tenant_id = prepared.tenant_id
+       AND normalized.shadow_generation = prepared.shadow_generation
+       AND normalized.source_generation_id = prepared.source_generation_id
+       AND normalized.request_hash = prepared.request_hash
+    WHERE prepared.tenant_id = ''
+
+NODE prepared_shadow_nodes
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        request_hash,
+        identifier_key AS node_key,
+        max(source_cutoff) AS source_cutoff,
+        max(policy_version) AS policy_version,
+        any(identifier_type) AS identifier_type,
+        any(identifier_value) AS identifier_value,
+        min(winner_priority) AS winner_priority,
+        argMaxIf(first_name, tuple(observed_at, observation_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(observed_at, observation_key), last_name != '') AS last_name,
+        min(observed_at) AS first_seen_at,
+        max(observed_at) AS last_seen_at
+    FROM unprepared_shadow_identifiers
+    GROUP BY
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        request_hash,
+        identifier_key
+
+NODE prepared_observation_anchors
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash,
+        observation_key,
+        min(identifier_key) AS anchor_node_key
+    FROM unprepared_shadow_identifiers
+    GROUP BY tenant_id, shadow_generation, source_generation_id, request_hash, observation_key
+
+NODE prepared_shadow_edges
+SQL >
+    SELECT DISTINCT
+        identifiers.tenant_id,
+        identifiers.shadow_generation,
+        identifiers.source_generation_id,
+        identifiers.request_hash,
+        least(anchors.anchor_node_key, identifiers.identifier_key) AS left_node_key,
+        greatest(anchors.anchor_node_key, identifiers.identifier_key) AS right_node_key
+    FROM unprepared_shadow_identifiers AS identifiers
+    INNER JOIN prepared_observation_anchors AS anchors
+        ON identifiers.tenant_id = anchors.tenant_id
+       AND identifiers.shadow_generation = anchors.shadow_generation
+       AND identifiers.source_generation_id = anchors.source_generation_id
+       AND identifiers.request_hash = anchors.request_hash
+       AND identifiers.observation_key = anchors.observation_key
+    WHERE anchors.anchor_node_key != identifiers.identifier_key
+
+NODE prepared_shadow_counts
+SQL >
+    SELECT
+        nodes.tenant_id,
+        nodes.shadow_generation,
+        nodes.source_generation_id,
+        nodes.source_manifest_version,
+        nodes.source_manifest_digest,
+        nodes.connection_inventory_digest,
+        nodes.cutoff_set_digest,
+        nodes.source_cutoff,
+        nodes.policy_version,
+        nodes.request_hash,
+        toUInt64(countDistinct(nodes.node_key)) AS node_count,
+        coalesce(edges.edge_count, toUInt64(0)) AS edge_count
+    FROM prepared_shadow_nodes AS nodes
+    LEFT JOIN (
+        SELECT
+            tenant_id,
+            shadow_generation,
+            source_generation_id,
+            request_hash,
+            toUInt64(count()) AS edge_count
+        FROM prepared_shadow_edges
+        GROUP BY tenant_id, shadow_generation, source_generation_id, request_hash
+    ) AS edges
+        ON nodes.tenant_id = edges.tenant_id
+       AND nodes.shadow_generation = edges.shadow_generation
+       AND nodes.source_generation_id = edges.source_generation_id
+       AND nodes.request_hash = edges.request_hash
+    GROUP BY
+        nodes.tenant_id,
+        nodes.shadow_generation,
+        nodes.source_generation_id,
+        nodes.source_manifest_version,
+        nodes.source_manifest_digest,
+        nodes.connection_inventory_digest,
+        nodes.cutoff_set_digest,
+        nodes.source_cutoff,
+        nodes.policy_version,
+        nodes.request_hash,
+        edges.edge_count
+
+NODE prepared_node_rows
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        'node' AS record_kind,
+        concat('node:', toString(length(node_key)), ':', node_key) AS record_key,
+        toUInt16(0) AS iteration,
+        node_key,
+        '' AS left_node_key,
+        '' AS right_node_key,
+        '' AS label_key,
+        '' AS prior_label_key,
+        identifier_type,
+        identifier_value,
+        winner_priority,
+        first_name,
+        last_name,
+        first_seen_at,
+        last_seen_at,
+        toUInt8(0) AS changed,
+        '' AS run_status,
+        toUInt64(0) AS node_count,
+        toUInt64(0) AS edge_count,
+        toUInt64(0) AS change_count,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        source_cutoff,
+        policy_version,
+        request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat(node_key, ':', toString(shadow_generation)))) AS row_hash
+    FROM prepared_shadow_nodes
+
+NODE prepared_edge_rows
+SQL >
+    SELECT
+        edges.tenant_id,
+        edges.shadow_generation,
+        'edge' AS record_kind,
+        concat(
+            'edge:',
+            hex(SHA256(concat(edges.left_node_key, ':', edges.right_node_key)))
+        ) AS record_key,
+        toUInt16(0) AS iteration,
+        '' AS node_key,
+        edges.left_node_key,
+        edges.right_node_key,
+        '' AS label_key,
+        '' AS prior_label_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        toUInt8(0) AS winner_priority,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        toUInt8(0) AS changed,
+        '' AS run_status,
+        toUInt64(0) AS node_count,
+        toUInt64(0) AS edge_count,
+        toUInt64(0) AS change_count,
+        counts.source_generation_id,
+        counts.source_manifest_version,
+        counts.source_manifest_digest,
+        counts.connection_inventory_digest,
+        counts.cutoff_set_digest,
+        counts.source_cutoff,
+        counts.policy_version,
+        counts.request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat(
+            edges.left_node_key,
+            ':',
+            edges.right_node_key,
+            ':',
+            toString(edges.shadow_generation)
+        ))) AS row_hash
+    FROM prepared_shadow_edges AS edges
+    INNER JOIN prepared_shadow_counts AS counts
+        ON edges.tenant_id = counts.tenant_id
+       AND edges.shadow_generation = counts.shadow_generation
+       AND edges.source_generation_id = counts.source_generation_id
+       AND edges.request_hash = counts.request_hash
+
+NODE initial_label_rows
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        'label' AS record_kind,
+        concat('label:', toString(length(node_key)), ':', node_key) AS record_key,
+        toUInt16(0) AS iteration,
+        node_key,
+        '' AS left_node_key,
+        '' AS right_node_key,
+        node_key AS label_key,
+        node_key AS prior_label_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        toUInt8(0) AS winner_priority,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        toUInt8(0) AS changed,
+        '' AS run_status,
+        toUInt64(0) AS node_count,
+        toUInt64(0) AS edge_count,
+        toUInt64(0) AS change_count,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        source_cutoff,
+        policy_version,
+        request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat('label:', node_key, ':0:', toString(shadow_generation)))) AS row_hash
+    FROM prepared_shadow_nodes
+
+NODE prepared_status_row
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        'status' AS record_kind,
+        'status:000' AS record_key,
+        toUInt16(0) AS iteration,
+        '' AS node_key,
+        '' AS left_node_key,
+        '' AS right_node_key,
+        '' AS label_key,
+        '' AS prior_label_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        toUInt8(0) AS winner_priority,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        toUInt8(0) AS changed,
+        'prepared' AS run_status,
+        node_count,
+        edge_count,
+        node_count AS change_count,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        source_cutoff,
+        policy_version,
+        request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat(
+            'prepared:',
+            toString(shadow_generation),
+            ':',
+            toString(node_count),
+            ':',
+            toString(edge_count),
+            ':',
+            request_hash
+        ))) AS row_hash
+    FROM prepared_shadow_counts
+
+NODE prepared_shadow_work_rows
+SQL >
+    SELECT * FROM prepared_node_rows
+    UNION ALL SELECT * FROM prepared_edge_rows
+    UNION ALL SELECT * FROM initial_label_rows
+    UNION ALL SELECT * FROM prepared_status_row
+
+TYPE COPY
+TARGET_DATASOURCE identity_shadow_work_versions
+COPY_MODE append

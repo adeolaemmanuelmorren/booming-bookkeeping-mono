@@ -1,0 +1,243 @@
+DESCRIPTION >
+    Latest applicable KRC registration per profile with strict pre-registration Meta paid
+    touches, refunded-compatible Immediate VIP, and the first qualifying mentorship payment.
+
+NODE earliest_krc_registration_by_profile
+SQL >
+    SELECT
+        profile_id,
+        min(submitted_at) AS earliest_registration_timestamp
+    FROM profiled_krc_registrations
+    WHERE registration_type = 'krc'
+      AND profile_id IS NOT NULL
+      AND submitted_at IS NOT NULL
+    GROUP BY profile_id
+
+NODE qualifying_five_k_payment_candidates
+SQL >
+    SELECT
+        payments.profile_id,
+        payments.payment_id,
+        payments.payment_time,
+        payments.net_amount,
+        row_number() OVER (
+            PARTITION BY payments.profile_id
+            ORDER BY payments.payment_time, payments.payment_id
+        ) AS payment_rank
+    FROM current_attributed_payments AS payments
+    INNER JOIN earliest_krc_registration_by_profile AS registrations
+        ON payments.profile_id = registrations.profile_id
+       AND payments.payment_time >= registrations.earliest_registration_timestamp
+    CROSS JOIN current_report_policy AS policy
+    WHERE payments.payment_category = 'mentorship'
+      AND payments.is_repeat_payment = 0
+      AND payments.net_amount > policy.five_k_net_threshold
+
+NODE first_five_k_payments
+SQL >
+    SELECT
+        profile_id,
+        payment_id,
+        payment_time,
+        net_amount
+    FROM qualifying_five_k_payment_candidates
+    WHERE payment_rank = 1
+
+NODE eligible_krc_registration_candidates
+SQL >
+    SELECT
+        registrations.*,
+        purchases.payment_id AS first_5k_payment_id,
+        purchases.payment_time AS first_5k_payment_timestamp,
+        purchases.net_amount AS first_5k_revenue,
+        row_number() OVER (
+            PARTITION BY registrations.profile_id
+            ORDER BY registrations.submitted_at DESC, registrations.registration_id DESC
+        ) AS registration_rank
+    FROM profiled_krc_registrations AS registrations
+    LEFT JOIN first_five_k_payments AS purchases
+        ON registrations.profile_id = purchases.profile_id
+    WHERE registrations.registration_type = 'krc'
+      AND registrations.profile_id IS NOT NULL
+      AND registrations.submitted_at IS NOT NULL
+      AND (
+          purchases.payment_time IS NULL
+          OR registrations.submitted_at <= purchases.payment_time
+      )
+
+NODE selected_krc_registrations
+SQL >
+    SELECT *
+    FROM eligible_krc_registration_candidates
+    WHERE registration_rank = 1
+
+NODE latest_meta_names_by_ad
+SQL >
+    SELECT
+        tenant_id,
+        campaign_id,
+        adset_id,
+        ad_id,
+        argMax(campaign_name, tuple(date, source_version)) AS campaign_name,
+        argMax(adset_name, tuple(date, source_version)) AS adset_name,
+        argMax(ad_name, tuple(date, source_version)) AS ad_name
+    FROM current_daily_ad_delivery
+    WHERE source = 'meta'
+      AND level = 'ad'
+    GROUP BY tenant_id, campaign_id, adset_id, ad_id
+
+NODE pinned_meta_paid_touchpoints
+SQL >
+    SELECT
+        sessions.touchpoint_id,
+        sessions.profile_id,
+        sessions.session_start_timestamp AS click_timestamp,
+        toStartOfHour(sessions.session_start_timestamp, 'America/Los_Angeles') AS click_hour,
+        sessions.campaign_id,
+        sessions.adset_id,
+        sessions.ad_id,
+        coalesce(names.campaign_name, sessions.utm_campaign, 'Unknown campaign') AS campaign_name,
+        coalesce(names.adset_name, 'Unknown ad set') AS adset_name,
+        coalesce(names.ad_name, sessions.utm_content, 'Unknown ad') AS ad_name
+    FROM pinned_session_touchpoints AS sessions
+    INNER JOIN current_source_generation AS generation
+        ON sessions.tenant_id = generation.tenant_id
+    LEFT JOIN latest_meta_names_by_ad AS names
+        ON names.tenant_id = sessions.tenant_id
+       AND names.campaign_id = sessions.campaign_id
+       AND names.adset_id = sessions.adset_id
+       AND names.ad_id = sessions.ad_id
+    WHERE sessions.record_kind = 'touchpoint'
+      AND sessions.touchpoint_id IS NOT NULL
+      AND sessions.profile_id IS NOT NULL
+      AND sessions.session_start_timestamp IS NOT NULL
+      AND lowerUTF8(coalesce(nullIf(trim(sessions.utm_source), ''), nullIf(trim(sessions.channel_source), ''), '')) = 'meta'
+      AND lowerUTF8(coalesce(nullIf(trim(sessions.utm_medium), ''), nullIf(trim(sessions.channel_medium), ''), '')) = 'paid'
+
+NODE pre_registration_meta_paid_touchpoints
+SQL >
+    SELECT
+        registrations.source_connection_id AS registration_source_connection_id,
+        registrations.registration_id,
+        touchpoints.*
+    FROM selected_krc_registrations AS registrations
+    INNER JOIN pinned_meta_paid_touchpoints AS touchpoints
+        ON registrations.profile_id = touchpoints.profile_id
+       AND touchpoints.click_timestamp < registrations.submitted_at
+
+NODE krc_paid_touch_rollups
+SQL >
+    SELECT
+        registration_source_connection_id,
+        registration_id,
+        count() AS pre_registration_paid_click_count,
+        argMin(
+            tuple(
+                touchpoint_id,
+                click_timestamp,
+                click_hour,
+                campaign_id,
+                adset_id,
+                ad_id,
+                campaign_name,
+                adset_name,
+                ad_name
+            ),
+            tuple(click_timestamp, touchpoint_id)
+        ) AS first_touch,
+        argMax(
+            tuple(
+                touchpoint_id,
+                click_timestamp,
+                click_hour,
+                campaign_id,
+                adset_id,
+                ad_id,
+                campaign_name,
+                adset_name,
+                ad_name
+            ),
+            tuple(click_timestamp, touchpoint_id)
+        ) AS last_touch
+    FROM pre_registration_meta_paid_touchpoints
+    GROUP BY registration_source_connection_id, registration_id
+
+NODE immediate_vip_payment_candidates
+SQL >
+    SELECT
+        registrations.source_connection_id AS registration_source_connection_id,
+        registrations.registration_id,
+        payments.payment_id,
+        payments.payment_time,
+        payments.net_amount,
+        row_number() OVER (
+            PARTITION BY registrations.source_connection_id, registrations.registration_id
+            ORDER BY payments.payment_time, payments.payment_id
+        ) AS payment_rank
+    FROM selected_krc_registrations AS registrations
+    INNER JOIN current_attributed_payments AS payments
+        ON registrations.profile_id = payments.profile_id
+       AND payments.payment_time >= registrations.submitted_at
+       AND toDate(payments.payment_time, 'America/Los_Angeles') = registrations.registration_date
+    WHERE payments.product_rule IN (
+        'keyboard_rich_challenge_vip',
+        'structured_basic_vip'
+    )
+      AND payments.is_repeat_payment = 0
+
+NODE first_immediate_vip_payments
+SQL >
+    SELECT
+        registration_source_connection_id,
+        registration_id,
+        payment_id,
+        payment_time,
+        net_amount
+    FROM immediate_vip_payment_candidates
+    WHERE payment_rank = 1
+
+NODE bill_krc_acquisition_rows
+SQL >
+    SELECT
+        registrations.tenant_id,
+        registrations.report_generation,
+        registrations.registration_id,
+        registrations.profile_id,
+        registrations.submitted_at AS registration_timestamp,
+        registrations.registration_date,
+        toUInt64(coalesce(touches.pre_registration_paid_click_count, 0)) AS pre_registration_paid_click_count,
+        toUInt8(coalesce(touches.pre_registration_paid_click_count, 0) = 1) AS is_solo_touch,
+        tupleElement(touches.first_touch, 1) AS first_touch_touchpoint_id,
+        tupleElement(touches.first_touch, 2) AS first_touch_click_timestamp,
+        tupleElement(touches.first_touch, 3) AS first_touch_click_hour,
+        tupleElement(touches.first_touch, 4) AS first_touch_campaign_id,
+        tupleElement(touches.first_touch, 5) AS first_touch_adset_id,
+        tupleElement(touches.first_touch, 6) AS first_touch_ad_id,
+        tupleElement(touches.first_touch, 7) AS first_touch_campaign_name,
+        tupleElement(touches.first_touch, 8) AS first_touch_adset_name,
+        tupleElement(touches.first_touch, 9) AS first_touch_ad_name,
+        tupleElement(touches.last_touch, 1) AS last_touch_touchpoint_id,
+        tupleElement(touches.last_touch, 2) AS last_touch_click_timestamp,
+        tupleElement(touches.last_touch, 3) AS last_touch_click_hour,
+        tupleElement(touches.last_touch, 4) AS last_touch_campaign_id,
+        tupleElement(touches.last_touch, 5) AS last_touch_adset_id,
+        tupleElement(touches.last_touch, 6) AS last_touch_ad_id,
+        tupleElement(touches.last_touch, 7) AS last_touch_campaign_name,
+        tupleElement(touches.last_touch, 8) AS last_touch_adset_name,
+        tupleElement(touches.last_touch, 9) AS last_touch_ad_name,
+        immediate.payment_id AS immediate_vip_payment_id,
+        immediate.payment_time AS immediate_vip_payment_timestamp,
+        immediate.net_amount AS immediate_vip_revenue,
+        toUInt8(immediate.payment_id IS NOT NULL) AS is_immediate_vip,
+        registrations.first_5k_payment_id,
+        registrations.first_5k_payment_timestamp,
+        registrations.first_5k_revenue,
+        toUInt8(registrations.first_5k_payment_id IS NOT NULL) AS is_5k_purchaser,
+        now64(6) AS materialized_at
+    FROM selected_krc_registrations AS registrations
+    LEFT JOIN krc_paid_touch_rollups AS touches
+        ON registrations.source_connection_id = touches.registration_source_connection_id
+       AND registrations.registration_id = touches.registration_id
+    LEFT JOIN first_immediate_vip_payments AS immediate
+        ON registrations.source_connection_id = immediate.registration_source_connection_id
+       AND registrations.registration_id = immediate.registration_id

@@ -1,0 +1,25 @@
+DESCRIPTION >
+    Append-only proof that each candidate product matched its deterministic source query
+    after the product Copies ran. Zero-row products still receive an explicit audit row.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `report_generation` String `json:$.report_generation`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` String `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `policy_digest` FixedString(64) `json:$.policy_digest`,
+    `stage_id` LowCardinality(String) `json:$.stage_id`,
+    `product_materialized_at` DateTime64(6) `json:$.product_materialized_at`,
+    `expected_row_count` UInt64 `json:$.expected_row_count`,
+    `materialized_row_count` UInt64 `json:$.materialized_row_count`,
+    `expected_digest` FixedString(64) `json:$.expected_digest`,
+    `materialized_digest` FixedString(64) `json:$.materialized_digest`,
+    `build_digest` FixedString(64) `json:$.build_digest`,
+    `is_valid` UInt8 `json:$.is_valid`,
+    `validated_at` DateTime64(6) `json:$.validated_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, stage_id, source_manifest_version, validated_at"

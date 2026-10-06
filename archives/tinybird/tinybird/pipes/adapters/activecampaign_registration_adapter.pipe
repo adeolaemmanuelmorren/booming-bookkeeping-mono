@@ -1,0 +1,145 @@
+DESCRIPTION >
+    Configured ActiveCampaign registration tags at assignment grain. KRC primary tags
+    suppress KRC fallback only; webinar and future registration families remain modular.
+
+NODE current_registration_contacts
+SQL >
+    SELECT
+        toString(id) AS contact_id,
+        nullIf(lowerUTF8(trim(email)), '') AS email,
+        nullIf(trim(phone), '') AS phone,
+        nullIf(trim(first_name), '') AS first_name,
+        nullIf(trim(last_name), '') AS last_name,
+        nullIf(trim(concat(ifNull(first_name, ''), ' ', ifNull(last_name, ''))), '') AS full_name,
+        coalesce(_fivetran_deleted, false) AS is_deleted,
+        _fivetran_synced AS source_version
+    FROM raw_activecampaign_contact
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.activecampaign_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE current_registration_tags
+SQL >
+    SELECT
+        toString(id) AS tag_id,
+        nullIf(trim(tags), '') AS tag_name,
+        coalesce(_fivetran_deleted, false) AS is_deleted,
+        _fivetran_synced AS source_version
+    FROM raw_activecampaign_tags
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.activecampaign_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE current_registration_assignments
+SQL >
+    SELECT
+        toString(id) AS registration_id,
+        toString(contact) AS contact_id,
+        toString(tags) AS tag_id,
+        c_date AS submitted_at,
+        coalesce(_fivetran_deleted, false) AS is_deleted,
+        _fivetran_synced AS source_version
+    FROM raw_activecampaign_contact_tag
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.activecampaign_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE classified_registration_assignments
+SQL >
+    SELECT
+        assignments.registration_id,
+        assignments.submitted_at,
+        contacts.contact_id,
+        contacts.email,
+        contacts.phone,
+        contacts.first_name,
+        contacts.last_name,
+        contacts.full_name,
+        tags.tag_id,
+        tags.tag_name,
+        multiIf(
+            startsWith(tags.tag_name, '[KRC] Registered for Challenge -')
+                OR startsWith(tags.tag_name, '[KRC] Registered -')
+                OR tags.tag_name = '[KRC] Registered for Challenge', 'krc',
+            tags.tag_name = '[CW] Registered for Webinar', 'webinar',
+            ''
+        ) AS registration_type,
+        if(
+            tags.tag_name = '[KRC] Registered for Challenge',
+            'fallback',
+            'primary'
+        ) AS registration_tag_type,
+        greatest(assignments.source_version, contacts.source_version, tags.source_version) AS source_version
+    FROM current_registration_assignments AS assignments
+    INNER JOIN current_registration_tags AS tags
+        ON assignments.tag_id = tags.tag_id
+    INNER JOIN current_registration_contacts AS contacts
+        ON assignments.contact_id = contacts.contact_id
+    WHERE assignments.is_deleted = 0
+      AND tags.is_deleted = 0
+      AND contacts.is_deleted = 0
+      AND assignments.submitted_at IS NOT NULL
+      AND (
+          startsWith(tags.tag_name, '[KRC] Registered for Challenge -')
+          OR startsWith(tags.tag_name, '[KRC] Registered -')
+          OR tags.tag_name = '[KRC] Registered for Challenge'
+          OR tags.tag_name = '[CW] Registered for Webinar'
+      )
+
+NODE registration_assignments_with_primary_state
+SQL >
+    SELECT
+        *,
+        max(registration_tag_type = 'primary') OVER (
+            PARTITION BY contact_id, registration_type
+        ) AS contact_has_primary_registration
+    FROM classified_registration_assignments
+
+NODE current_registration_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        registration_id,
+        contact_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        full_name,
+        submitted_at,
+        toDate(submitted_at, 'America/Los_Angeles') AS registration_date,
+        registration_type,
+        if(
+            registration_type = 'krc',
+            'Keyboard Rich Challenge Registration',
+            'Booming Bookkeeping Webinar Registration'
+        ) AS content_name,
+        'activecampaign_tag' AS form_type,
+        'activecampaign' AS event_source,
+        registration_tag_type,
+        concat(
+            'form_submission_',
+            lowerUTF8(hex(SHA256(concat(
+                lowerUTF8(trim(email)),
+                '|',
+                registration_type,
+                '|',
+                toString(toDate(submitted_at, 'America/Los_Angeles'))
+            ))))
+        ) AS canonical_event_id,
+        source_version
+    FROM registration_assignments_with_primary_state
+    CROSS JOIN current_source_generation AS generation
+    WHERE registration_tag_type = 'primary'
+       OR contact_has_primary_registration = 0

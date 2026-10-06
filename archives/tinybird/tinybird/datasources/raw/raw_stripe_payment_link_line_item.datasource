@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.stripe.payment_link_line_item.
+    Source role: payment_product_evidence.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `payment_link_id` Nullable(String) `json:$.payment_link_id`,
+    `id` Nullable(String) `json:$.id`,
+    `price_id` Nullable(String) `json:$.price_id`,
+    `amount_discount` Nullable(Int64) `json:$.amount_discount`,
+    `amount_subtotal` Nullable(Int64) `json:$.amount_subtotal`,
+    `amount_tax` Nullable(Int64) `json:$.amount_tax`,
+    `amount_total` Nullable(Int64) `json:$.amount_total`,
+    `currency` Nullable(String) `json:$.currency`,
+    `description` Nullable(String) `json:$.description`,
+    `metadata` Nullable(String) `json:$.metadata`,
+    `quantity` Nullable(Int64) `json:$.quantity`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(payment_link_id, ''),
+    `__tb_sort_2` String `json:$.__tb_sort_2` DEFAULT ifNull(id, ''),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/stripe/payment_link_line_item/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

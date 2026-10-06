@@ -1,9 +1,0 @@
-config {
-  type: "view",
-  description: "Unified paid and non-paid acquisition performance with distinct client/server conversion measures.",
-  tags: ["output", "attribution", "performance"],
-}
-
-select * from ${ref("mart_conversions_ad_performance")}
-full outer union all by name
-select * from ${ref("mart_conversions_organic_performance")}

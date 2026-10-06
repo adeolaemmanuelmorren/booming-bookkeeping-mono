@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Complete versioned session snapshots. Only committed visitor revisions are visible.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `visitor_key` String `json:$.visitor_key`,
+    `revision` UInt64 `json:$.revision`,
+    `publication_id` String `json:$.publication_id`,
+    `session_id` String `json:$.session_id`,
+    `payload_json` String `json:$.payload_json`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, visitor_key, revision, session_id

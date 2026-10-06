@@ -1,0 +1,30 @@
+{
+  "policy_id": "boom-dataform-compat-v1",
+  "tenant_id": "boom",
+  "report_timezone": "America/Los_Angeles",
+  "range_mode": "start_inclusive_end_exclusive",
+  "identity": {
+    "click_identity_mode": "first_party_only",
+    "winner_priority": ["email", "canonical_email", "user_id", "anonymous_id", "phone"],
+    "profile_hash": "upper_hex_md5_of_type_colon_value",
+    "allow_component_split": "shadow_generation_rebuild"
+  },
+  "sessions": {
+    "visitor_key_priority": ["anonymous_id", "user_id", "page_view_id"],
+    "boundary": "timestamp_diff_whole_minutes_greater_than_30",
+    "ordering": ["page_view_timestamp", "page_view_id"]
+  },
+  "bill": {
+    "preserve_generic_row_presence": true,
+    "immediate_vip_requires_positive_net": false,
+    "immediate_vip_product_rules": ["keyboard_rich_challenge_vip", "structured_basic_vip"],
+    "five_k_payment_category": "mentorship",
+    "five_k_nonrepeat_only": true,
+    "five_k_net_comparison": "strictly_greater_than",
+    "five_k_net_threshold": "900.000000000",
+    "five_k_reported_value": 4997,
+    "daily_delivery_mode": "average_each_daily_value",
+    "daily_missing_key_day_mode": "zero",
+    "freshness_anchor": "meta_hourly_delivery"
+  }
+}

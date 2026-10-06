@@ -1,0 +1,89 @@
+DESCRIPTION >
+    Client forms and orders resolved with the same identifier priority used by Dataform:
+    forms use email, phone, anonymous; orders use email then anonymous.
+
+NODE client_conversion_phone_digits
+SQL >
+    SELECT
+        conversions.*,
+        replaceRegexpAll(trim(ifNull(conversions.phone, '')), '[^0-9]', '') AS phone_digits
+    FROM web_conversion_adapter AS conversions
+
+NODE client_conversion_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10, phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'), substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM client_conversion_phone_digits
+
+NODE normalized_client_conversion_identifiers
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(national_phone, '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$')
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            ''
+        ) AS normalized_phone
+    FROM client_conversion_national_phones
+
+NODE profiled_client_conversion_candidates
+SQL >
+    SELECT
+        conversions.*,
+        email_mapping.profile_id AS email_profile_id,
+        phone_mapping.profile_id AS phone_profile_id,
+        anonymous_mapping.profile_id AS anonymous_profile_id
+    FROM normalized_client_conversion_identifiers AS conversions
+    INNER JOIN current_source_generation AS generation
+        ON conversions.source_generation_id = generation.source_generation_id
+    LEFT JOIN pinned_identity_mappings AS email_mapping
+        ON email_mapping.tenant_id = conversions.tenant_id
+       AND email_mapping.identifier_type = 'email'
+       AND email_mapping.identifier_value = conversions.email
+    LEFT JOIN pinned_identity_mappings AS phone_mapping
+        ON conversions.event_kind = 'client_form'
+       AND phone_mapping.tenant_id = conversions.tenant_id
+       AND phone_mapping.identifier_type = 'phone'
+       AND phone_mapping.identifier_value = nullIf(conversions.normalized_phone, '')
+    LEFT JOIN pinned_identity_mappings AS anonymous_mapping
+        ON anonymous_mapping.tenant_id = conversions.tenant_id
+       AND anonymous_mapping.identifier_type = 'anonymous_id'
+       AND anonymous_mapping.identifier_value = conversions.anonymous_id
+
+NODE current_profiled_client_conversion_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_system,
+        event_kind,
+        source_row_id,
+        event_id,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        is_checkout_form,
+        is_payment_confirmed,
+        payment_status,
+        amount,
+        currency,
+        product_id,
+        product_name,
+        products,
+        coalesce(email_profile_id, phone_profile_id, anonymous_profile_id) AS profile_id
+    FROM profiled_client_conversion_candidates
+    QUALIFY row_number() OVER (
+        PARTITION BY event_kind, source_row_id
+        ORDER BY coalesce(email_profile_id, phone_profile_id, anonymous_profile_id)
+    ) = 1

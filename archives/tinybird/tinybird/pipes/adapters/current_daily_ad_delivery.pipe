@@ -1,0 +1,59 @@
+DESCRIPTION >
+    GENERATED from the source registry and canonical contracts. Daily ad delivery
+    preserves provider-native level, reach, and frequency fields.
+
+NODE registered_current_daily_ad_delivery_rows
+SQL >
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.report_generation AS String) AS report_generation,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source AS String) AS source,
+        CAST(rows.date AS Date) AS date,
+        CAST(rows.level AS String) AS level,
+        CAST(rows.account_id AS String) AS account_id,
+        CAST(rows.account_name AS Nullable(String)) AS account_name,
+        CAST(rows.campaign_id AS Nullable(String)) AS campaign_id,
+        CAST(rows.adset_id AS Nullable(String)) AS adset_id,
+        CAST(rows.ad_id AS Nullable(String)) AS ad_id,
+        CAST(rows.campaign_name AS Nullable(String)) AS campaign_name,
+        CAST(rows.adset_name AS Nullable(String)) AS adset_name,
+        CAST(rows.ad_name AS Nullable(String)) AS ad_name,
+        CAST(rows.impressions AS Int64) AS impressions,
+        CAST(rows.clicks AS Nullable(Int64)) AS clicks,
+        CAST(rows.spend AS Decimal(38,9)) AS spend,
+        CAST(rows.reach AS Nullable(Int64)) AS reach,
+        CAST(rows.frequency AS Nullable(Float64)) AS frequency,
+        CAST(rows.currency AS String) AS currency,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version
+    FROM google_daily_ad_delivery_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('google-primary')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.report_generation AS String) AS report_generation,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source AS String) AS source,
+        CAST(rows.date AS Date) AS date,
+        CAST(rows.level AS String) AS level,
+        CAST(rows.account_id AS String) AS account_id,
+        CAST(rows.account_name AS Nullable(String)) AS account_name,
+        CAST(rows.campaign_id AS Nullable(String)) AS campaign_id,
+        CAST(rows.adset_id AS Nullable(String)) AS adset_id,
+        CAST(rows.ad_id AS Nullable(String)) AS ad_id,
+        CAST(rows.campaign_name AS Nullable(String)) AS campaign_name,
+        CAST(rows.adset_name AS Nullable(String)) AS adset_name,
+        CAST(rows.ad_name AS Nullable(String)) AS ad_name,
+        CAST(rows.impressions AS Int64) AS impressions,
+        CAST(rows.clicks AS Nullable(Int64)) AS clicks,
+        CAST(rows.spend AS Decimal(38,9)) AS spend,
+        CAST(rows.reach AS Nullable(Int64)) AS reach,
+        CAST(rows.frequency AS Nullable(Float64)) AS frequency,
+        CAST(rows.currency AS String) AS currency,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version
+    FROM meta_daily_ad_delivery_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('meta-primary')

@@ -1,0 +1,87 @@
+DESCRIPTION >
+    One validated source manifest selected for the next build. Its immutable cutoffs are
+    carried through every adapter and every versioned report row.
+
+NODE source_manifest_versions
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        argMax(
+            tuple(
+                report_generation,
+                source_manifest_digest,
+                connection_inventory_digest,
+                semantic_policy_version,
+                policy_digest,
+                identity_stable_batch_version,
+                legacy_event_cutoff,
+                jitsu_event_cutoff,
+                activecampaign_cutoff,
+                stripe_cutoff,
+                stripe_kajabi_cutoff,
+                meta_cutoff,
+                google_cutoff,
+                manual_cutoff,
+                is_validated,
+                is_build_candidate,
+                created_at,
+                version
+            ),
+            tuple(version, created_at)
+        ) AS current_manifest
+    FROM source_generation_manifests
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, source_generation_id
+
+NODE selected_source_manifest
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        source_manifest_digest,
+        connection_inventory_digest,
+        semantic_policy_version,
+        policy_digest,
+        identity_stable_batch_version,
+        legacy_event_cutoff,
+        jitsu_event_cutoff,
+        activecampaign_cutoff,
+        stripe_cutoff,
+        stripe_kajabi_cutoff,
+        meta_cutoff,
+        google_cutoff,
+        manual_cutoff,
+        created_at,
+        version
+    FROM (
+        SELECT
+            tenant_id,
+            source_generation_id,
+            tupleElement(current_manifest, 1) AS report_generation,
+            tupleElement(current_manifest, 2) AS source_manifest_digest,
+            tupleElement(current_manifest, 3) AS connection_inventory_digest,
+            tupleElement(current_manifest, 4) AS semantic_policy_version,
+            tupleElement(current_manifest, 5) AS policy_digest,
+            tupleElement(current_manifest, 6) AS identity_stable_batch_version,
+            tupleElement(current_manifest, 7) AS legacy_event_cutoff,
+            tupleElement(current_manifest, 8) AS jitsu_event_cutoff,
+            tupleElement(current_manifest, 9) AS activecampaign_cutoff,
+            tupleElement(current_manifest, 10) AS stripe_cutoff,
+            tupleElement(current_manifest, 11) AS stripe_kajabi_cutoff,
+            tupleElement(current_manifest, 12) AS meta_cutoff,
+            tupleElement(current_manifest, 13) AS google_cutoff,
+            tupleElement(current_manifest, 14) AS manual_cutoff,
+            tupleElement(current_manifest, 17) AS created_at,
+            tupleElement(current_manifest, 18) AS version,
+            row_number() OVER (
+                ORDER BY tupleElement(current_manifest, 18) DESC,
+                         tupleElement(current_manifest, 17) DESC,
+                         source_generation_id DESC
+            ) AS manifest_rank
+        FROM source_manifest_versions
+        WHERE tupleElement(current_manifest, 15) = 1
+          AND tupleElement(current_manifest, 16) = 1
+    )
+    WHERE manifest_rank = 1

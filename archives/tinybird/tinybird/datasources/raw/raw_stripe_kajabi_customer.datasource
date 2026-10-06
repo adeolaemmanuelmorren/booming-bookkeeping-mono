@@ -1,0 +1,58 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.stripe_kajabi.customer.
+    Source role: customer_identity_state.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(String) `json:$.id`,
+    `account_balance` Nullable(Int64) `json:$.account_balance`,
+    `balance` Nullable(Int64) `json:$.balance`,
+    `created` Nullable(DateTime64(6)) `json:$.created`,
+    `currency` Nullable(String) `json:$.currency`,
+    `address_city` Nullable(String) `json:$.address_city`,
+    `address_country` Nullable(String) `json:$.address_country`,
+    `address_line_1` Nullable(String) `json:$.address_line_1`,
+    `address_line_2` Nullable(String) `json:$.address_line_2`,
+    `address_postal_code` Nullable(String) `json:$.address_postal_code`,
+    `address_state` Nullable(String) `json:$.address_state`,
+    `name` Nullable(String) `json:$.name`,
+    `bank_account_id` Nullable(String) `json:$.bank_account_id`,
+    `source_id` Nullable(String) `json:$.source_id`,
+    `default_card_id` Nullable(String) `json:$.default_card_id`,
+    `delinquent` Nullable(Bool) `json:$.delinquent`,
+    `description` Nullable(String) `json:$.description`,
+    `email` Nullable(String) `json:$.email`,
+    `phone` Nullable(String) `json:$.phone`,
+    `invoice_prefix` Nullable(String) `json:$.invoice_prefix`,
+    `next_invoice_sequence` Nullable(Int64) `json:$.next_invoice_sequence`,
+    `invoice_settings_default_payment_method` Nullable(String) `json:$.invoice_settings_default_payment_method`,
+    `invoice_settings_footer` Nullable(String) `json:$.invoice_settings_footer`,
+    `livemode` Nullable(Bool) `json:$.livemode`,
+    `metadata` Nullable(String) `json:$.metadata`,
+    `shipping_address_city` Nullable(String) `json:$.shipping_address_city`,
+    `shipping_address_country` Nullable(String) `json:$.shipping_address_country`,
+    `shipping_address_line_1` Nullable(String) `json:$.shipping_address_line_1`,
+    `shipping_address_line_2` Nullable(String) `json:$.shipping_address_line_2`,
+    `shipping_address_postal_code` Nullable(String) `json:$.shipping_address_postal_code`,
+    `shipping_address_state` Nullable(String) `json:$.shipping_address_state`,
+    `shipping_carrier` Nullable(String) `json:$.shipping_carrier`,
+    `shipping_name` Nullable(String) `json:$.shipping_name`,
+    `shipping_phone` Nullable(String) `json:$.shipping_phone`,
+    `shipping_tracking_number` Nullable(String) `json:$.shipping_tracking_number`,
+    `tax_info_tax_id` Nullable(String) `json:$.tax_info_tax_id`,
+    `tax_info_type` Nullable(String) `json:$.tax_info_type`,
+    `tax_exempt` Nullable(String) `json:$.tax_exempt`,
+    `tax_info_verification_status` Nullable(String) `json:$.tax_info_verification_status`,
+    `tax_info_verification_verified_name` Nullable(String) `json:$.tax_info_verification_verified_name`,
+    `is_deleted` Nullable(Bool) `json:$.is_deleted`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(id, ''),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/stripe_kajabi/customer/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

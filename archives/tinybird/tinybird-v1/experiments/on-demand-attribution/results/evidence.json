@@ -1,0 +1,458 @@
+{
+  "checkedAt": "2026-09-06T05:07:23.629Z",
+  "synthetic": true,
+  "runs": [
+    {
+      "name": "fixture",
+      "wallMs": 448,
+      "statistics": {
+        "elapsed": 0.037963943,
+        "rows_read": 4,
+        "bytes_read": 4
+      },
+      "data": [
+        {
+          "conversion_id": 1,
+          "touchpoint_id": 1,
+          "mt": 0.4,
+          "ft": 1,
+          "lt": 0
+        },
+        {
+          "conversion_id": 1,
+          "touchpoint_id": 2,
+          "mt": 0.2,
+          "ft": 0,
+          "lt": 0
+        },
+        {
+          "conversion_id": 1,
+          "touchpoint_id": 3,
+          "mt": 0,
+          "ft": 0,
+          "lt": 0
+        },
+        {
+          "conversion_id": 1,
+          "touchpoint_id": 4,
+          "mt": 0.4,
+          "ft": 0,
+          "lt": 1
+        },
+        {
+          "conversion_id": 2,
+          "touchpoint_id": 6,
+          "mt": 0.5,
+          "ft": 1,
+          "lt": 0
+        },
+        {
+          "conversion_id": 2,
+          "touchpoint_id": 7,
+          "mt": 0.5,
+          "ft": 0,
+          "lt": 1
+        },
+        {
+          "conversion_id": 3,
+          "touchpoint_id": 8,
+          "mt": 1,
+          "ft": 1,
+          "lt": 1
+        },
+        {
+          "conversion_id": 4,
+          "touchpoint_id": 0,
+          "mt": 1,
+          "ft": 1,
+          "lt": 1
+        },
+        {
+          "conversion_id": 5,
+          "touchpoint_id": 0,
+          "mt": 1,
+          "ft": 1,
+          "lt": 1
+        },
+        {
+          "conversion_id": 6,
+          "touchpoint_id": 10,
+          "mt": 0.5,
+          "ft": 1,
+          "lt": 0
+        },
+        {
+          "conversion_id": 6,
+          "touchpoint_id": 11,
+          "mt": 0.5,
+          "ft": 0,
+          "lt": 1
+        },
+        {
+          "conversion_id": 7,
+          "touchpoint_id": 8,
+          "mt": 1,
+          "ft": 1,
+          "lt": 1
+        },
+        {
+          "conversion_id": 8,
+          "touchpoint_id": 1,
+          "mt": 0.5,
+          "ft": 1,
+          "lt": 0
+        },
+        {
+          "conversion_id": 8,
+          "touchpoint_id": 2,
+          "mt": 0.5,
+          "ft": 0,
+          "lt": 1
+        },
+        {
+          "conversion_id": 8,
+          "touchpoint_id": 3,
+          "mt": 0,
+          "ft": 0,
+          "lt": 0
+        }
+      ]
+    },
+    {
+      "name": "fixture-click-window",
+      "wallMs": 155,
+      "statistics": {
+        "elapsed": 0.05041375,
+        "rows_read": 4,
+        "bytes_read": 4
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "revenue_cents": 0,
+          "conversions_mt": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "revenue_cents": 15500,
+          "conversions_mt": 3.7
+        },
+        {
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "revenue_cents": 11000,
+          "conversions_mt": 1.4
+        },
+        {
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "revenue_cents": 3000,
+          "conversions_mt": 2
+        }
+      ]
+    },
+    {
+      "name": "scale-10000-journey-20",
+      "wallMs": 172,
+      "statistics": {
+        "elapsed": 0.064193091,
+        "rows_read": 13500,
+        "bytes_read": 108000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 599.9999999999831,
+          "conversions_ft": 1500,
+          "conversions_lt": 0,
+          "revenue_cents": 3000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 70.80213903743537,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 336363.6363636425
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 296.6844919786012,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 1536363.6363636667
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 276.68449197860406,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 2336363.6363637
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 255.82887700534735,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 290909.0909090915
+        }
+      ],
+      "input": {
+        "touchpoints": 10000,
+        "profiles": 500,
+        "conversions": 1500,
+        "journeyLength": 20
+      },
+      "conservationPassed": true
+    },
+    {
+      "name": "scale-100000-journey-20",
+      "wallMs": 302,
+      "statistics": {
+        "elapsed": 0.197141822,
+        "rows_read": 135000,
+        "bytes_read": 1080000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 5999.999999998925,
+          "conversions_ft": 15000,
+          "conversions_lt": 0,
+          "revenue_cents": 30000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 708.0213903740172,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 3363636.363637192
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 2966.8449197856075,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 15363636.363631194
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 2766.844919785743,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 23363636.363636494
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 2558.2887700532856,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 2909090.9090914153
+        }
+      ],
+      "input": {
+        "touchpoints": 100000,
+        "profiles": 5000,
+        "conversions": 15000,
+        "journeyLength": 20
+      },
+      "conservationPassed": true
+    },
+    {
+      "name": "scale-1000000-journey-20",
+      "wallMs": 1481,
+      "statistics": {
+        "elapsed": 1.376708005,
+        "rows_read": 1350000,
+        "bytes_read": 10800000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 60000.00000014815,
+          "conversions_ft": 150000,
+          "conversions_lt": 0,
+          "revenue_cents": 300000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 7080.213903737206,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 33636363.636409715
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 29668.449198084796,
+          "conversions_ft": 0,
+          "conversions_lt": 50000,
+          "revenue_cents": 153636363.6360563
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 27668.449198052964,
+          "conversions_ft": 0,
+          "conversions_lt": 50000,
+          "revenue_cents": 233636363.63602236
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 25582.887700667772,
+          "conversions_ft": 0,
+          "conversions_lt": 50000,
+          "revenue_cents": 29090909.090929784
+        }
+      ],
+      "input": {
+        "touchpoints": 1000000,
+        "profiles": 50000,
+        "conversions": 150000,
+        "journeyLength": 20
+      },
+      "conservationPassed": true
+    },
+    {
+      "name": "scale-1000000-journey-200",
+      "wallMs": 1444,
+      "statistics": {
+        "elapsed": 1.335923542,
+        "rows_read": 1035000,
+        "bytes_read": 8280000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 5999.999999998925,
+          "conversions_ft": 15000,
+          "conversions_lt": 0,
+          "revenue_cents": 30000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 750.6393614076388,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 3759541.9847458326
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 2771.3405035387536,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 13915791.984768096
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 2755.715503538749,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 23759541.984708812
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 2722.304631489002,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 3565124.0458130613
+        }
+      ],
+      "input": {
+        "touchpoints": 1000000,
+        "profiles": 5000,
+        "conversions": 15000,
+        "journeyLength": 200
+      },
+      "conservationPassed": true
+    }
+  ],
+  "fixturePassed": true,
+  "mockSpendMergePassed": true,
+  "stress": {
+    "passed": false,
+    "error": "Error: HTTP 400: {\"error\": \"[Error] Memory limit (for query) exceeded. Make sure the query just process the required data. (MEMORY_LIMIT_EXCEEDED) (query_id=01M1THTHC333XRHGCN72ZQN9V2)\", \"documentation\": \"https://tinybird.co/docs/guides/best-practices-for-faster-sql.html#memory-limit-reached-title\"}",
+    "touchpoints": 100000,
+    "conversions": 150000,
+    "profiles": 500
+  }
+}

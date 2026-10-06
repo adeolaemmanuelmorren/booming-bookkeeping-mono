@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Minimum and maximum available Meta hourly buckets for one candidate generation.
+
+NODE bill_meta_hour_bound_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        min(hour_start) AS available_start,
+        max(hour_start) AS max_hour_start,
+        now64(6) AS materialized_at
+    FROM current_hourly_ad_delivery
+    WHERE source = 'meta'
+    GROUP BY tenant_id, report_generation

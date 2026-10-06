@@ -1,0 +1,94 @@
+DESCRIPTION >
+    Meta advertiser-time-zone hourly delivery at ad grain. Incremental file versions are
+    deduplicated before aggregation; inline_link_clicks remains the click definition.
+
+NODE current_meta_hourly_source_rows
+SQL >
+    SELECT
+        source.*
+    FROM raw_facebook_ads_basic_ad_hourly AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source._fivetran_synced <= generation.meta_cutoff
+      AND source.date <= toDate(generation.meta_cutoff, 'America/Los_Angeles')
+      AND source.hourly_stats_aggregated_by_advertiser_time_zone IS NOT NULL
+    QUALIFY row_number() OVER (
+        PARTITION BY
+            source.date,
+            source.account_id,
+            source.ad_id,
+            source.hourly_stats_aggregated_by_advertiser_time_zone,
+            source._fivetran_id
+        ORDER BY source._fivetran_synced DESC
+    ) = 1
+
+NODE parsed_meta_hourly_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        parseDateTime64BestEffortOrNull(
+            concat(
+                toString(source.date),
+                ' ',
+                splitByString(
+                    ' - ',
+                    source.hourly_stats_aggregated_by_advertiser_time_zone
+                )[1]
+            ),
+            6,
+            'America/Los_Angeles'
+        ) AS hour_start,
+        source.date,
+        source.hourly_stats_aggregated_by_advertiser_time_zone AS hour_bucket,
+        'advertiser' AS hour_breakdown_type,
+        toString(source.account_id) AS account_id,
+        coalesce(dimensions.campaign_id, toString(source.campaign_id)) AS campaign_id,
+        coalesce(dimensions.adset_id, toString(source.adset_id)) AS adset_id,
+        toString(source.ad_id) AS ad_id,
+        coalesce(dimensions.campaign_name, nullIf(trim(source.campaign_name), '')) AS campaign_name,
+        coalesce(dimensions.adset_name, nullIf(trim(source.adset_name), '')) AS adset_name,
+        coalesce(dimensions.ad_name, nullIf(trim(source.ad_name), '')) AS ad_name,
+        coalesce(source.impressions, toInt64(0)) AS impressions,
+        coalesce(source.inline_link_clicks, toInt64(0)) AS clicks,
+        toDecimal128(coalesce(source.spend, 0), 9) AS spend,
+        source._fivetran_synced AS source_version
+    FROM current_meta_hourly_source_rows AS source
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN meta_ad_dimension_adapter AS dimensions
+        ON dimensions.dimension_level = 'ad'
+       AND toString(source.ad_id) = dimensions.ad_id
+
+NODE current_meta_hourly_delivery_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        any(date) AS date,
+        any(hour_bucket) AS hour_bucket,
+        any(hour_breakdown_type) AS hour_breakdown_type,
+        account_id,
+        campaign_id,
+        adset_id,
+        ad_id,
+        argMax(campaign_name, source_version) AS campaign_name,
+        argMax(adset_name, source_version) AS adset_name,
+        argMax(ad_name, source_version) AS ad_name,
+        sum(impressions) AS impressions,
+        sum(clicks) AS clicks,
+        sum(spend) AS spend,
+        'USD' AS currency,
+        max(source_version) AS source_version
+    FROM parsed_meta_hourly_rows
+    WHERE hour_start IS NOT NULL
+    GROUP BY
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        account_id,
+        campaign_id,
+        adset_id,
+        ad_id

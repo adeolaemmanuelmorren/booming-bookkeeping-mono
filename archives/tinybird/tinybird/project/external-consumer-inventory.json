@@ -1,0 +1,39 @@
+{
+  "status": "incomplete_release_gate",
+  "required_before": "retiring any Dataform action in the Bill runtime closure",
+  "known_consumers": [
+    {
+      "id": "bill-ad-reports-site",
+      "path": "../bill-ad-reports-site",
+      "current_contract": [
+        "GET /v1/report-window",
+        "GET /v1/report-data"
+      ],
+      "owner": "unassigned",
+      "migration_status": "gateway_translation_not_implemented",
+      "evidence": [
+        "../bill-ad-reports-site/app/api/report-data/route.ts"
+      ]
+    },
+    {
+      "id": "performance-reports-site",
+      "path": "../performance-reports-site",
+      "current_contract": [],
+      "owner": "unassigned",
+      "migration_status": "consumer_or_retirement_status_not_confirmed",
+      "evidence": []
+    }
+  ],
+  "discovery_required": [
+    "repository references to each closing Dataform relation",
+    "scheduled queries and exports",
+    "dashboards and spreadsheets",
+    "service accounts and application query logs",
+    "KNYC or other cross-project consumers"
+  ],
+  "signoff": {
+    "owner": "",
+    "approved_at": null,
+    "evidence": []
+  }
+}

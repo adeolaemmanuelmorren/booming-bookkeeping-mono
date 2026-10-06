@@ -1,0 +1,4 @@
+- name: strict_threshold_fixed_value_and_exact_shape
+  description: Covers net amount greater than 900, fixed 4997 revenue, and the filtered exact output shape.
+  parameters: 'p_report_generation=fixture-generation&p_range_start_pacific=2026-08-01T10%3A00&p_range_end_pacific=2026-08-02T10%3A00'
+  expected_result: ''

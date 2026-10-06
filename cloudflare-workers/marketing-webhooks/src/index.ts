@@ -24,6 +24,7 @@ import {
 } from "./handlers/debug-webhook";
 
 export { ReverseEtlDebugStore } from "./durable-objects/reverse-etl-debug-store";
+export { ActiveCampaignSource } from "../../source-gateways/activecampaign";
 
 // =============================================================================
 // HTTP INGESTION HANDLER

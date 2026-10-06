@@ -1,0 +1,16 @@
+DESCRIPTION >
+    Verified complete provider replacements, including scopes with no qualifying conversions.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `source` LowCardinality(String) `json:$.source`,
+    `source_account` LowCardinality(String) `json:$.source_account`,
+    `scope_id` String `json:$.scope_id`,
+    `replacement_id` String `json:$.replacement_id`,
+    `observation_sequence` UInt64 `json:$.observation_sequence`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `row_count` UInt64 `json:$.row_count`,
+    `content_hash` FixedString(64) `json:$.content_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, source, source_account, scope_id, observation_sequence

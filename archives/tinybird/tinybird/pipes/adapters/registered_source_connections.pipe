@@ -1,0 +1,59 @@
+DESCRIPTION >
+    GENERATED non-derived source connections. Generation cutoffs and source-owned
+    validation gates use this registry projection instead of provider-specific lists.
+
+NODE registered_source_connection_rows
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'activecampaign' AS source_id,
+        'activecampaign-primary' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'google-ads' AS source_id,
+        'google-primary' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'manual-attribution' AS source_id,
+        'manual-attribution' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'meta-ads' AS source_id,
+        'meta-primary' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'stripe-kajabi' AS source_id,
+        'stripe-kajabi' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'stripe-primary' AS source_id,
+        'stripe-primary' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'web-events' AS source_id,
+        'boom_domains' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'web-events' AS source_id,
+        'jitsu_data' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest
+    UNION ALL
+    SELECT
+        'boom' AS tenant_id,
+        'web-events' AS source_id,
+        'jitsu_events_api' AS source_connection_id,
+        'B3B982710364049B347393EAF8E25FB80B208AE2BDC37AF0FAF5DEA69D69DFD7' AS connection_inventory_digest

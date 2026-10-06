@@ -1,0 +1,4 @@
+- name: stable_and_pending_first_party_resolution
+  description: Resolves anonymous, user, email, canonical Gmail, and phone identifiers through the active batch plus pending overlay.
+  parameters: request_anonymous_id=anon-alpha&request_user_id=&request_email=Boom.Identity.Test%2Bpromo%40GoogleMail.com&request_phone=%2B1%20%28212%29%20234-5678
+  expected_result: ''

@@ -1,0 +1,338 @@
+DESCRIPTION >
+    Run one on-demand label-propagation iteration for the latest prepared shadow generation.
+
+NODE current_shadow_request_versions
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        argMax(
+            tuple(
+                source_generation_id,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                request_hash
+            ),
+            tuple(requested_at, request_hash)
+        ) AS current_request
+    FROM identity_shadow_requests
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, shadow_generation
+
+NODE shadow_status_versions
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash,
+        argMax(
+            tuple(
+                iteration,
+                run_status,
+                node_count,
+                edge_count,
+                source_generation_id,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                source_cutoff,
+                policy_version,
+                request_hash
+            ),
+            tuple(iteration, computed_at, row_hash)
+        ) AS current_status
+    FROM identity_shadow_work_versions
+    WHERE tenant_id = 'boom'
+      AND record_kind = 'status'
+    GROUP BY
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash
+
+NODE active_shadow_iteration
+SQL >
+    SELECT * EXCEPT generation_rank
+    FROM (
+        SELECT
+            status.tenant_id,
+            status.shadow_generation,
+            tupleElement(status.current_status, 1) AS current_iteration,
+            tupleElement(status.current_status, 2) AS run_status,
+            tupleElement(status.current_status, 3) AS node_count,
+            tupleElement(status.current_status, 4) AS edge_count,
+            status.source_generation_id,
+            tupleElement(status.current_status, 6) AS source_manifest_version,
+            tupleElement(status.current_status, 7) AS source_manifest_digest,
+            tupleElement(status.current_status, 8) AS connection_inventory_digest,
+            tupleElement(status.current_status, 9) AS cutoff_set_digest,
+            tupleElement(status.current_status, 10) AS source_cutoff,
+            tupleElement(status.current_status, 11) AS policy_version,
+            status.request_hash,
+            row_number() OVER (ORDER BY status.shadow_generation DESC) AS generation_rank
+        FROM shadow_status_versions AS status
+        INNER JOIN current_shadow_request_versions AS request
+            ON status.tenant_id = request.tenant_id
+           AND status.shadow_generation = request.shadow_generation
+           AND status.source_generation_id = tupleElement(request.current_request, 1)
+           AND tupleElement(status.current_status, 6) = tupleElement(request.current_request, 2)
+           AND tupleElement(status.current_status, 7) = tupleElement(request.current_request, 3)
+           AND tupleElement(status.current_status, 8) = tupleElement(request.current_request, 4)
+           AND tupleElement(status.current_status, 9) = tupleElement(request.current_request, 5)
+           AND status.request_hash = tupleElement(request.current_request, 6)
+        INNER JOIN current_source_generation AS source_generation
+            ON status.tenant_id = source_generation.tenant_id
+           AND status.source_generation_id = source_generation.source_generation_id
+           AND tupleElement(status.current_status, 6) = source_generation.version
+           AND tupleElement(status.current_status, 7) = source_generation.source_manifest_digest
+           AND tupleElement(status.current_status, 8) = source_generation.connection_inventory_digest
+        INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+            ON status.tenant_id = cutoff_readiness.tenant_id
+           AND status.source_generation_id = cutoff_readiness.source_generation_id
+           AND tupleElement(status.current_status, 6) = cutoff_readiness.source_manifest_version
+           AND tupleElement(status.current_status, 7) = cutoff_readiness.source_manifest_digest
+           AND tupleElement(status.current_status, 8) = cutoff_readiness.connection_inventory_digest
+           AND tupleElement(status.current_status, 9) = cutoff_readiness.cutoff_set_digest
+           AND cutoff_readiness.is_ready = 1
+        WHERE tupleElement(status.current_status, 2) IN ('prepared', 'iterating')
+          AND tupleElement(status.current_status, 1) < 500
+    )
+    WHERE generation_rank = 1
+
+NODE current_shadow_labels
+SQL >
+    SELECT
+        labels.tenant_id,
+        labels.shadow_generation,
+        labels.node_key,
+        argMax(
+            labels.label_key,
+            tuple(labels.iteration, labels.computed_at, labels.row_hash)
+        ) AS label_key
+    FROM identity_shadow_work_versions AS labels
+    INNER JOIN active_shadow_iteration AS active
+        ON labels.tenant_id = active.tenant_id
+       AND labels.shadow_generation = active.shadow_generation
+       AND labels.source_generation_id = active.source_generation_id
+       AND labels.request_hash = active.request_hash
+    WHERE labels.record_kind = 'label'
+      AND labels.iteration <= active.current_iteration
+    GROUP BY labels.tenant_id, labels.shadow_generation, labels.node_key
+
+NODE current_shadow_edges
+SQL >
+    SELECT
+        edges.tenant_id,
+        edges.shadow_generation,
+        edges.left_node_key,
+        edges.right_node_key
+    FROM identity_shadow_work_versions AS edges
+    INNER JOIN active_shadow_iteration AS active
+        ON edges.tenant_id = active.tenant_id
+       AND edges.shadow_generation = active.shadow_generation
+       AND edges.source_generation_id = active.source_generation_id
+       AND edges.request_hash = active.request_hash
+    WHERE edges.record_kind = 'edge'
+
+NODE neighboring_label_candidates
+SQL >
+    SELECT
+        edges.tenant_id,
+        edges.shadow_generation,
+        edges.left_node_key AS node_key,
+        labels.label_key AS candidate_label_key
+    FROM current_shadow_edges AS edges
+    INNER JOIN current_shadow_labels AS labels
+        ON edges.tenant_id = labels.tenant_id
+       AND edges.shadow_generation = labels.shadow_generation
+       AND edges.right_node_key = labels.node_key
+
+    UNION ALL
+
+    SELECT
+        edges.tenant_id,
+        edges.shadow_generation,
+        edges.right_node_key AS node_key,
+        labels.label_key AS candidate_label_key
+    FROM current_shadow_edges AS edges
+    INNER JOIN current_shadow_labels AS labels
+        ON edges.tenant_id = labels.tenant_id
+       AND edges.shadow_generation = labels.shadow_generation
+       AND edges.left_node_key = labels.node_key
+
+NODE minimum_neighbor_labels
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        node_key,
+        min(candidate_label_key) AS minimum_neighbor_label_key
+    FROM neighboring_label_candidates
+    GROUP BY tenant_id, shadow_generation, node_key
+
+NODE next_shadow_labels
+SQL >
+    SELECT
+        current.tenant_id,
+        current.shadow_generation,
+        current.node_key,
+        current.label_key AS prior_label_key,
+        least(
+            current.label_key,
+            coalesce(nullIf(neighbors.minimum_neighbor_label_key, ''), current.label_key)
+        ) AS label_key,
+        toUInt8(label_key != current.label_key) AS changed
+    FROM current_shadow_labels AS current
+    LEFT JOIN minimum_neighbor_labels AS neighbors
+        ON current.tenant_id = neighbors.tenant_id
+       AND current.shadow_generation = neighbors.shadow_generation
+       AND current.node_key = neighbors.node_key
+
+NODE next_iteration_summary
+SQL >
+    SELECT
+        labels.tenant_id,
+        labels.shadow_generation,
+        toUInt16(active.current_iteration + 1) AS iteration,
+        toUInt64(count()) AS node_count,
+        active.edge_count,
+        toUInt64(sum(labels.changed)) AS change_count,
+        active.source_generation_id,
+        active.source_manifest_version,
+        active.source_manifest_digest,
+        active.connection_inventory_digest,
+        active.cutoff_set_digest,
+        active.source_cutoff,
+        active.policy_version,
+        active.request_hash,
+        multiIf(
+            active.current_iteration + 1 >= 500, 'failed_iteration_limit',
+            sum(labels.changed) = 0, 'converged',
+            'iterating'
+        ) AS run_status
+    FROM next_shadow_labels AS labels
+    INNER JOIN active_shadow_iteration AS active
+        ON labels.tenant_id = active.tenant_id
+       AND labels.shadow_generation = active.shadow_generation
+    GROUP BY
+        labels.tenant_id,
+        labels.shadow_generation,
+        active.current_iteration,
+        active.edge_count,
+        active.source_generation_id,
+        active.source_manifest_version,
+        active.source_manifest_digest,
+        active.connection_inventory_digest,
+        active.cutoff_set_digest,
+        active.source_cutoff,
+        active.policy_version,
+        active.request_hash
+
+NODE next_label_rows
+SQL >
+    SELECT
+        labels.tenant_id,
+        labels.shadow_generation,
+        'label' AS record_kind,
+        concat('label:', toString(length(labels.node_key)), ':', labels.node_key) AS record_key,
+        summary.iteration,
+        labels.node_key,
+        '' AS left_node_key,
+        '' AS right_node_key,
+        labels.label_key,
+        labels.prior_label_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        toUInt8(0) AS winner_priority,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        labels.changed,
+        '' AS run_status,
+        toUInt64(0) AS node_count,
+        toUInt64(0) AS edge_count,
+        toUInt64(0) AS change_count,
+        summary.source_generation_id,
+        summary.source_manifest_version,
+        summary.source_manifest_digest,
+        summary.connection_inventory_digest,
+        summary.cutoff_set_digest,
+        summary.source_cutoff,
+        summary.policy_version,
+        summary.request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat(
+            labels.node_key,
+            ':',
+            labels.label_key,
+            ':',
+            toString(summary.iteration),
+            ':',
+            toString(labels.shadow_generation)
+        ))) AS row_hash
+    FROM next_shadow_labels AS labels
+    INNER JOIN next_iteration_summary AS summary
+        ON labels.tenant_id = summary.tenant_id
+       AND labels.shadow_generation = summary.shadow_generation
+
+NODE next_status_row
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        'status' AS record_kind,
+        concat('status:', leftPad(toString(iteration), 3, '0')) AS record_key,
+        iteration,
+        '' AS node_key,
+        '' AS left_node_key,
+        '' AS right_node_key,
+        '' AS label_key,
+        '' AS prior_label_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        toUInt8(0) AS winner_priority,
+        '' AS first_name,
+        '' AS last_name,
+        toDateTime64(0, 6) AS first_seen_at,
+        toDateTime64(0, 6) AS last_seen_at,
+        toUInt8(change_count != 0) AS changed,
+        run_status,
+        node_count,
+        edge_count,
+        change_count,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        source_cutoff,
+        policy_version,
+        request_hash,
+        now64(6) AS computed_at,
+        hex(SHA256(concat(
+            run_status,
+            ':',
+            toString(shadow_generation),
+            ':',
+            toString(iteration),
+            ':',
+            toString(change_count),
+            ':',
+            request_hash
+        ))) AS row_hash
+    FROM next_iteration_summary
+
+NODE next_shadow_work_rows
+SQL >
+    SELECT * FROM next_label_rows
+    UNION ALL
+    SELECT * FROM next_status_row
+
+TYPE COPY
+TARGET_DATASOURCE identity_shadow_work_versions
+COPY_MODE append

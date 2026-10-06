@@ -1,0 +1,82 @@
+DESCRIPTION >
+    Boom-policy registrations resolved to the pinned identity generation by email then
+    normalized phone. Click identifiers are not accepted as evidence.
+
+NODE krc_registration_phone_digits
+SQL >
+    SELECT
+        registrations.*,
+        replaceRegexpAll(trim(ifNull(registrations.phone, '')), '[^0-9]', '') AS phone_digits
+    FROM boom_registration_policy AS registrations
+
+NODE krc_registration_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10, phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'), substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM krc_registration_phone_digits
+
+NODE normalized_krc_registration_identifiers
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(national_phone, '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$')
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            ''
+        ) AS normalized_phone
+    FROM krc_registration_national_phones
+
+NODE profiled_krc_registration_candidates
+SQL >
+    SELECT
+        registrations.*,
+        email_mapping.profile_id AS email_profile_id,
+        phone_mapping.profile_id AS phone_profile_id
+    FROM normalized_krc_registration_identifiers AS registrations
+    INNER JOIN current_source_generation AS generation
+        ON registrations.source_generation_id = generation.source_generation_id
+    LEFT JOIN pinned_identity_mappings AS email_mapping
+        ON email_mapping.tenant_id = registrations.tenant_id
+       AND email_mapping.identifier_type = 'email'
+       AND email_mapping.identifier_value = registrations.email
+    LEFT JOIN pinned_identity_mappings AS phone_mapping
+        ON phone_mapping.tenant_id = registrations.tenant_id
+       AND phone_mapping.identifier_type = 'phone'
+       AND phone_mapping.identifier_value = nullIf(registrations.normalized_phone, '')
+
+NODE current_profiled_krc_registration_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_connection_id,
+        registration_id,
+        contact_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        full_name,
+        submitted_at,
+        registration_date,
+        registration_type,
+        content_name,
+        form_type,
+        event_source,
+        registration_tag_type,
+        canonical_event_id,
+        coalesce(email_profile_id, phone_profile_id) AS profile_id
+    FROM profiled_krc_registration_candidates
+    QUALIFY row_number() OVER (
+        PARTITION BY tenant_id, source_connection_id, registration_id
+        ORDER BY coalesce(email_profile_id, phone_profile_id)
+    ) = 1

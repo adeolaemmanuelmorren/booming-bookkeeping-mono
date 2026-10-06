@@ -1,0 +1,310 @@
+DESCRIPTION >
+    Current client form and order observations from legacy Segment and Jitsu. Source
+    precedence, identifiers, checkout classification, and event grain are owned here.
+
+NODE legacy_client_forms
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'boom_domains' AS source_system,
+        toUInt8(1) AS source_priority,
+        'client_form' AS event_kind,
+        nullIf(trim(forms.id), '') AS source_row_id,
+        nullIf(trim(forms.event_id), '') AS event_id,
+        coalesce(forms.submitted_at, forms.timestamp, forms.sent_at, forms.received_at, forms.loaded_at) AS observed_at,
+        nullIf(trim(forms.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(forms.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(forms.email)), ''),
+            nullIf(lowerUTF8(trim(forms.extra_submitted_fields_checkout_offer_member_email)), ''),
+            nullIf(lowerUTF8(trim(forms.context_traits_email)), ''),
+            nullIf(lowerUTF8(trim(forms.user_id)), '')
+        ) AS email,
+        coalesce(nullIf(trim(forms.phone), ''), nullIf(trim(forms.context_traits_phone), '')) AS phone,
+        nullIf(trim(forms.first_name), '') AS first_name,
+        nullIf(trim(forms.extra_submitted_fields_checkout_offer_member_name), '') AS customer_name,
+        nullIf(trim(forms.form_id), '') AS form_id,
+        nullIf(trim(forms.form_name), '') AS form_name,
+        nullIf(trim(forms.form_action), '') AS form_action,
+        nullIf(trim(coalesce(forms.page_url, forms.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(forms.page_path, forms.context_page_path)), '') AS page_path,
+        toUInt8(
+            lowerUTF8(ifNull(forms.form_id, '')) = 'new_checkout_offer'
+            OR lowerUTF8(ifNull(forms.form_name, '')) = 'new_checkout_offer'
+            OR match(lowerUTF8(ifNull(forms.form_action, '')), '/offers/[^/]+/checkout')
+            OR match(lowerUTF8(ifNull(forms.page_path, '')), '/offers/[^/]+/checkout')
+            OR nullIf(trim(forms.extra_submitted_fields_checkout_offer_payment_method_type), '') IS NOT NULL
+        ) AS is_checkout_form,
+        toUInt8(0) AS is_payment_confirmed,
+        'submitted_unconfirmed' AS payment_status,
+        CAST(NULL AS Nullable(Decimal(38,9))) AS amount,
+        CAST(NULL AS Nullable(String)) AS currency,
+        nullIf(extract(coalesce(forms.form_action, forms.page_path, ''), '(?i)/offers/([^/]+)/checkout'), '') AS product_id,
+        CAST(NULL AS Nullable(String)) AS product_name,
+        CAST(NULL AS Nullable(String)) AS products,
+        greatest(
+            coalesce(forms.loaded_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(forms.received_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(forms.sent_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(forms.timestamp, toDateTime64('1970-01-01 00:00:00', 6, 'UTC'))
+        ) AS source_version
+    FROM raw_boom_domains_form_submitted AS forms
+    CROSS JOIN current_source_generation AS generation
+    WHERE coalesce(forms.loaded_at, forms.received_at, forms.sent_at, forms.timestamp)
+        <= generation.legacy_event_cutoff
+
+NODE jitsu_client_forms
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'jitsu_data' AS source_system,
+        toUInt8(2) AS source_priority,
+        'client_form' AS event_kind,
+        nullIf(trim(forms.message_id), '') AS source_row_id,
+        nullIf(trim(forms.event_id), '') AS event_id,
+        coalesce(forms.submitted_at, forms.timestamp, forms.sent_at, forms.received_at) AS observed_at,
+        nullIf(trim(forms.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(forms.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(forms.email)), ''),
+            nullIf(lowerUTF8(trim(forms.context_traits_email)), ''),
+            nullIf(lowerUTF8(trim(forms.user_id)), '')
+        ) AS email,
+        coalesce(
+            nullIf(trim(forms.phone), ''),
+            nullIf(trim(forms.context_traits_phone), '')
+        ) AS phone,
+        coalesce(nullIf(trim(forms.first_name), ''), nullIf(trim(forms.context_traits_first_name), '')) AS first_name,
+        coalesce(nullIf(trim(forms.name), ''), nullIf(trim(forms.context_traits_name), '')) AS customer_name,
+        nullIf(trim(forms.form_id), '') AS form_id,
+        nullIf(trim(forms.form_name), '') AS form_name,
+        nullIf(trim(forms.form_action), '') AS form_action,
+        nullIf(trim(coalesce(forms.page_url, forms.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(forms.page_path, forms.context_page_path)), '') AS page_path,
+        toUInt8(
+            lowerUTF8(ifNull(forms.form_id, '')) = 'new_checkout_offer'
+            OR lowerUTF8(ifNull(forms.form_name, '')) = 'new_checkout_offer'
+            OR match(lowerUTF8(ifNull(forms.form_action, '')), '/offers/[^/]+/checkout')
+            OR match(lowerUTF8(ifNull(forms.page_path, '')), '/offers/[^/]+/checkout')
+        ) AS is_checkout_form,
+        toUInt8(0) AS is_payment_confirmed,
+        'submitted_unconfirmed' AS payment_status,
+        CAST(NULL AS Nullable(Decimal(38,9))) AS amount,
+        CAST(NULL AS Nullable(String)) AS currency,
+        nullIf(extract(coalesce(forms.form_action, forms.page_path, ''), '(?i)/offers/([^/]+)/checkout'), '') AS product_id,
+        CAST(NULL AS Nullable(String)) AS product_name,
+        CAST(NULL AS Nullable(String)) AS products,
+        greatest(
+            coalesce(forms.received_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(forms.sent_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(forms.timestamp, toDateTime64('1970-01-01 00:00:00', 6, 'UTC'))
+        ) AS source_version
+    FROM raw_jitsu_data_form_submitted AS forms
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN jitsu_events_api_current_versions AS live_tombstone
+        ON live_tombstone.tenant_id = generation.tenant_id
+       AND live_tombstone.message_id = forms.message_id
+       AND live_tombstone.source_deleted = 1
+    WHERE coalesce(forms.received_at, forms.sent_at, forms.timestamp)
+        <= generation.jitsu_event_cutoff
+      AND live_tombstone.message_id IS NULL
+
+NODE legacy_client_orders
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'boom_domains' AS source_system,
+        toUInt8(1) AS source_priority,
+        'client_order' AS event_kind,
+        nullIf(trim(orders.id), '') AS source_row_id,
+        nullIf(trim(orders.event_id), '') AS event_id,
+        coalesce(orders.timestamp, orders.submitted_at, orders.sent_at, orders.received_at, orders.loaded_at) AS observed_at,
+        nullIf(trim(orders.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(orders.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(orders.email)), ''),
+            nullIf(lowerUTF8(trim(orders.context_traits_email)), ''),
+            nullIf(lowerUTF8(trim(orders.user_id)), '')
+        ) AS email,
+        coalesce(nullIf(trim(orders.phone), ''), nullIf(trim(orders.context_traits_phone), '')) AS phone,
+        CAST(NULL AS Nullable(String)) AS first_name,
+        nullIf(trim(orders.name), '') AS customer_name,
+        nullIf(trim(orders.form_id), '') AS form_id,
+        CAST(NULL AS Nullable(String)) AS form_name,
+        nullIf(trim(orders.form_action), '') AS form_action,
+        nullIf(trim(coalesce(orders.page_url, orders.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(orders.page_path, orders.context_page_path)), '') AS page_path,
+        toUInt8(1) AS is_checkout_form,
+        toUInt8(coalesce(orders.is_payment_confirmed, false)) AS is_payment_confirmed,
+        coalesce(nullIf(trim(orders.payment_status), ''), 'submitted_unconfirmed') AS payment_status,
+        orders.value AS amount,
+        nullIf(upperUTF8(trim(orders.currency)), '') AS currency,
+        nullIf(trim(orders.product_id), '') AS product_id,
+        nullIf(trim(orders.product_name), '') AS product_name,
+        nullIf(trim(orders.products), '') AS products,
+        greatest(
+            coalesce(orders.loaded_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(orders.received_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(orders.sent_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(orders.timestamp, toDateTime64('1970-01-01 00:00:00', 6, 'UTC'))
+        ) AS source_version
+    FROM raw_boom_domains_order_completed AS orders
+    CROSS JOIN current_source_generation AS generation
+    WHERE coalesce(orders.loaded_at, orders.received_at, orders.sent_at, orders.timestamp)
+        <= generation.legacy_event_cutoff
+
+NODE jitsu_client_orders
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'jitsu_data' AS source_system,
+        toUInt8(2) AS source_priority,
+        'client_order' AS event_kind,
+        nullIf(trim(orders.message_id), '') AS source_row_id,
+        nullIf(trim(orders.event_id), '') AS event_id,
+        coalesce(orders.timestamp, orders.submitted_at, orders.sent_at, orders.received_at) AS observed_at,
+        nullIf(trim(orders.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(orders.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(orders.email)), ''),
+            nullIf(lowerUTF8(trim(orders.context_traits_email)), ''),
+            nullIf(lowerUTF8(trim(orders.user_id)), '')
+        ) AS email,
+        coalesce(
+            nullIf(trim(orders.phone), ''),
+            nullIf(trim(orders.context_traits_phone), '')
+        ) AS phone,
+        CAST(NULL AS Nullable(String)) AS first_name,
+        coalesce(nullIf(trim(orders.name), ''), nullIf(trim(orders.context_traits_name), '')) AS customer_name,
+        nullIf(trim(orders.form_id), '') AS form_id,
+        nullIf(trim(orders.form_name), '') AS form_name,
+        nullIf(trim(orders.form_action), '') AS form_action,
+        nullIf(trim(coalesce(orders.page_url, orders.context_page_url)), '') AS page_url,
+        nullIf(trim(coalesce(orders.page_path, orders.context_page_path)), '') AS page_path,
+        toUInt8(1) AS is_checkout_form,
+        toUInt8(coalesce(orders.is_payment_confirmed, false)) AS is_payment_confirmed,
+        coalesce(nullIf(trim(orders.payment_status), ''), 'submitted_unconfirmed') AS payment_status,
+        orders.value AS amount,
+        nullIf(upperUTF8(trim(orders.currency)), '') AS currency,
+        nullIf(trim(orders.product_id), '') AS product_id,
+        nullIf(trim(orders.product_name), '') AS product_name,
+        nullIf(trim(orders.products), '') AS products,
+        greatest(
+            coalesce(orders.received_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(orders.sent_at, toDateTime64('1970-01-01 00:00:00', 6, 'UTC')),
+            coalesce(orders.timestamp, toDateTime64('1970-01-01 00:00:00', 6, 'UTC'))
+        ) AS source_version
+    FROM raw_jitsu_data_order_completed AS orders
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN jitsu_events_api_current_versions AS live_tombstone
+        ON live_tombstone.tenant_id = generation.tenant_id
+       AND live_tombstone.message_id = orders.message_id
+       AND live_tombstone.source_deleted = 1
+    WHERE coalesce(orders.received_at, orders.sent_at, orders.timestamp)
+        <= generation.jitsu_event_cutoff
+      AND live_tombstone.message_id IS NULL
+
+NODE live_client_conversions
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        source.tenant_id,
+        'jitsu_events_api' AS source_system,
+        toUInt8(3) AS source_priority,
+        source.event_kind,
+        nullIf(trim(source.message_id), '') AS source_row_id,
+        nullIf(trim(source.message_id), '') AS event_id,
+        source.observed_at,
+        nullIf(trim(source.anonymous_id), '') AS anonymous_id,
+        nullIf(lowerUTF8(trim(source.user_id)), '') AS user_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(source.email)), ''),
+            nullIf(lowerUTF8(trim(source.user_id)), '')
+        ) AS email,
+        nullIf(trim(source.phone), '') AS phone,
+        nullIf(trim(source.first_name), '') AS first_name,
+        nullIf(trim(source.customer_name), '') AS customer_name,
+        nullIf(trim(source.form_id), '') AS form_id,
+        nullIf(trim(source.form_name), '') AS form_name,
+        nullIf(trim(source.form_action), '') AS form_action,
+        nullIf(trim(source.page_url), '') AS page_url,
+        nullIf(trim(source.page_path), '') AS page_path,
+        toUInt8(coalesce(source.is_checkout_form, source.event_kind = 'client_order')) AS is_checkout_form,
+        toUInt8(coalesce(source.is_payment_confirmed, false)) AS is_payment_confirmed,
+        coalesce(nullIf(trim(source.payment_status), ''), 'submitted_unconfirmed') AS payment_status,
+        source.amount,
+        nullIf(upperUTF8(trim(source.currency)), '') AS currency,
+        nullIf(trim(source.product_id), '') AS product_id,
+        nullIf(trim(source.product_name), '') AS product_name,
+        nullIf(trim(source.products), '') AS products,
+        source.ingested_at AS source_version
+    FROM jitsu_events_api_current_versions AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source.tenant_id = 'boom'
+      AND source.event_kind IN ('client_form', 'client_order')
+      AND source.source_deleted = 0
+      AND source.ingested_at <= generation.jitsu_event_cutoff
+
+NODE all_client_conversion_versions
+SQL >
+    SELECT * FROM legacy_client_forms
+    UNION ALL
+    SELECT * FROM jitsu_client_forms
+    UNION ALL
+    SELECT * FROM legacy_client_orders
+    UNION ALL
+    SELECT * FROM jitsu_client_orders
+    UNION ALL
+    SELECT * FROM live_client_conversions
+
+NODE current_client_conversion_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_system,
+        event_kind,
+        source_row_id,
+        event_id,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        customer_name,
+        form_id,
+        form_name,
+        form_action,
+        page_url,
+        page_path,
+        is_checkout_form,
+        is_payment_confirmed,
+        payment_status,
+        amount,
+        currency,
+        product_id,
+        product_name,
+        products,
+        source_version
+    FROM (
+        SELECT
+            *,
+            row_number() OVER (
+                PARTITION BY tenant_id, event_kind, source_row_id
+                ORDER BY source_priority DESC, source_version DESC
+            ) AS source_rank
+        FROM all_client_conversion_versions
+        WHERE 1 = 1
+    )
+    WHERE source_rank = 1

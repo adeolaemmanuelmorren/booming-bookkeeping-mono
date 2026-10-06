@@ -1,0 +1,27 @@
+DESCRIPTION >
+    Identity-state consumer of the canonical provider registry. Provider semantics stay in adapters.
+
+NODE live_identity_observations
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        source_connection_id,
+        source_system,
+        coalesce(
+            source_record_id,
+            concat('__null_partition__:', source_connection_id, ':', source_system)
+        ) AS source_record_id,
+        source_version,
+        source_changed_at,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        source_deleted
+    FROM identity_observation_registry
+    WHERE tenant_id = 'boom'
+      AND source_deleted = 0

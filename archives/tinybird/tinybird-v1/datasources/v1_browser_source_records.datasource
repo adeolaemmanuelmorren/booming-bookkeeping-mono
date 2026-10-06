@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Original browser source evidence, including rejected conflicting revisions.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `fact_id` String `json:$.fact_id`,
+    `source_system` String `json:$.source_system`,
+    `event_kind` String `json:$.event_kind`,
+    `source_record_id` String `json:$.source_record_id`,
+    `source_revision` Int64 `json:$.source_revision`,
+    `payload_json` String `json:$.payload_json`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, fact_id

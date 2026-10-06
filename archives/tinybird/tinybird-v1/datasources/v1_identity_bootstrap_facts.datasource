@@ -1,0 +1,23 @@
+DESCRIPTION >
+    Retained immutable identity baseline state. No TTL.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `baseline_id` String `json:$.baseline_id`,
+    `phase` LowCardinality(String) `json:$.phase`,
+    `component_key` String `json:$.component_key`,
+    `input_key` String `json:$.input_key`,
+    `origin_key` String `json:$.origin_key`,
+    `scope_id` String `json:$.scope_id`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_priority` UInt8 `json:$.source_priority`,
+    `source_version` UInt64 `json:$.source_version`,
+    `fact_json` String `json:$.fact_json`,
+    `fact_hash` FixedString(64) `json:$.fact_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, baseline_id, phase, component_key, fact_kind, fact_key, source_priority, source_version, origin_key
+
+TOKEN v1_facts_runtime READ
+TOKEN v1_facts_runtime APPEND

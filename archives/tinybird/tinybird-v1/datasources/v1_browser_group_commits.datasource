@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Verified group manifests for atomic browser session corrections.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `group_id` String `json:$.group_id`,
+    `sequence` UInt64 `json:$.sequence`,
+    `member_count` UInt32 `json:$.member_count`,
+    `content_hash` FixedString(64) `json:$.content_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, group_id, sequence

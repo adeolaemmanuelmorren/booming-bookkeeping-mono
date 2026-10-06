@@ -1,0 +1,137 @@
+DESCRIPTION >
+    Dataform-compatible generic conversion detour. Every server/client form or payment is
+    joined to every earlier touchpoint; only Meta paid row keys survive for Bill universe.
+
+NODE generic_server_form_events
+SQL >
+    SELECT
+        concat('server_form:', source_connection_id, ':', registration_id) AS conversion_id,
+        profile_id,
+        submitted_at AS conversion_time
+    FROM profiled_krc_registrations
+    WHERE profile_id IS NOT NULL
+      AND submitted_at IS NOT NULL
+
+NODE generic_client_form_events
+SQL >
+    SELECT
+        concat('client_form:', ifNull(source_row_id, '')) AS conversion_id,
+        profile_id,
+        observed_at AS conversion_time
+    FROM profiled_client_conversions
+    WHERE event_kind = 'client_form'
+      AND profile_id IS NOT NULL
+      AND observed_at IS NOT NULL
+
+NODE generic_server_payment_events
+SQL >
+    SELECT
+        concat('server_payment:', payment_source, ':', payment_id) AS conversion_id,
+        profile_id,
+        payment_time AS conversion_time
+    FROM current_attributed_payments
+    WHERE profile_id IS NOT NULL
+      AND payment_time IS NOT NULL
+
+NODE generic_client_payment_events
+SQL >
+    SELECT
+        concat('client_payment:segment_order_', ifNull(source_row_id, '')) AS conversion_id,
+        profile_id,
+        observed_at AS conversion_time
+    FROM profiled_client_conversions
+    WHERE event_kind = 'client_order'
+      AND profile_id IS NOT NULL
+      AND observed_at IS NOT NULL
+
+NODE all_generic_conversion_events
+SQL >
+    SELECT * FROM generic_server_form_events
+    UNION ALL
+    SELECT * FROM generic_client_form_events
+    UNION ALL
+    SELECT * FROM generic_server_payment_events
+    UNION ALL
+    SELECT * FROM generic_client_payment_events
+
+NODE current_meta_names_for_conversion_rows
+SQL >
+    SELECT
+        tenant_id,
+        campaign_id,
+        adset_id,
+        ad_id,
+        argMax(campaign_name, tuple(date, source_version)) AS campaign_name,
+        argMax(adset_name, tuple(date, source_version)) AS adset_name,
+        argMax(ad_name, tuple(date, source_version)) AS ad_name
+    FROM current_daily_ad_delivery
+    WHERE source = 'meta'
+      AND level = 'ad'
+    GROUP BY tenant_id, campaign_id, adset_id, ad_id
+
+NODE generic_conversions_with_prior_touchpoints
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        conversions.conversion_id,
+        touchpoints.touchpoint_id,
+        toStartOfHour(
+            coalesce(touchpoints.session_start_timestamp, conversions.conversion_time),
+            'America/Los_Angeles'
+        ) AS hour_start,
+        lowerUTF8(coalesce(
+            nullIf(trim(touchpoints.utm_source), ''),
+            nullIf(trim(touchpoints.channel_source), ''),
+            'offline'
+        )) AS source,
+        lowerUTF8(coalesce(
+            nullIf(trim(touchpoints.utm_medium), ''),
+            nullIf(trim(touchpoints.channel_medium), ''),
+            'offline'
+        )) AS medium,
+        touchpoints.campaign_id,
+        touchpoints.adset_id,
+        touchpoints.ad_id,
+        coalesce(names.campaign_name, touchpoints.utm_campaign, 'unknown') AS campaign_name,
+        coalesce(names.adset_name, 'unknown') AS adset_name,
+        coalesce(names.ad_name, touchpoints.utm_content, 'unknown') AS ad_name
+    FROM all_generic_conversion_events AS conversions
+    CROSS JOIN current_source_generation AS generation
+    INNER JOIN pinned_session_touchpoints AS touchpoints
+        ON touchpoints.tenant_id = generation.tenant_id
+       AND touchpoints.record_kind = 'touchpoint'
+       AND touchpoints.profile_id = conversions.profile_id
+       AND touchpoints.session_start_timestamp <= conversions.conversion_time
+    LEFT JOIN current_meta_names_for_conversion_rows AS names
+        ON names.tenant_id = generation.tenant_id
+       AND names.campaign_id = touchpoints.campaign_id
+       AND names.adset_id = touchpoints.adset_id
+       AND names.ad_id = touchpoints.ad_id
+
+NODE current_generic_meta_conversion_presence
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        'meta' AS source,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any(campaign_name) AS campaign_name,
+        any(adset_name) AS adset_name,
+        any(ad_name) AS ad_name
+    FROM generic_conversions_with_prior_touchpoints
+    WHERE source = 'meta'
+      AND medium IN ('cpc', 'paid', 'paid_social')
+    GROUP BY
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        campaign_id,
+        adset_id,
+        ad_id

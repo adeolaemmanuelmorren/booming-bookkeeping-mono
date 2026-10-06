@@ -1,0 +1,68 @@
+DESCRIPTION >
+    Latest named adapter-validation record for the current source generation.
+
+NODE current_coverage_versions
+SQL >
+    SELECT
+        validations.tenant_id,
+        validations.source_generation_id,
+        validations.source_manifest_version,
+        validations.source_manifest_digest,
+        validations.connection_inventory_digest,
+        validations.cutoff_set_digest,
+        validations.adapter_id,
+        validations.validation_name,
+        argMax(
+            tuple(
+                validations.contract_name,
+                validations.is_covered,
+                validations.invalid_row_count,
+                validations.blocking_reason,
+                validations.checked_at,
+                validations.version
+            ),
+            tuple(validations.version, validations.checked_at)
+        ) AS current_check
+    FROM adapter_coverage_validations AS validations
+    INNER JOIN current_source_generation AS generation
+        ON validations.tenant_id = generation.tenant_id
+       AND validations.source_generation_id = generation.source_generation_id
+       AND validations.source_manifest_version = generation.version
+       AND validations.source_manifest_digest = generation.source_manifest_digest
+       AND validations.connection_inventory_digest = generation.connection_inventory_digest
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON validations.tenant_id = cutoff_readiness.tenant_id
+       AND validations.source_generation_id = cutoff_readiness.source_generation_id
+       AND validations.source_manifest_version = cutoff_readiness.source_manifest_version
+       AND validations.source_manifest_digest = cutoff_readiness.source_manifest_digest
+       AND validations.connection_inventory_digest = cutoff_readiness.connection_inventory_digest
+       AND validations.cutoff_set_digest = cutoff_readiness.cutoff_set_digest
+       AND cutoff_readiness.is_ready = 1
+    GROUP BY
+        validations.tenant_id,
+        validations.source_generation_id,
+        validations.source_manifest_version,
+        validations.source_manifest_digest,
+        validations.connection_inventory_digest,
+        validations.cutoff_set_digest,
+        validations.adapter_id,
+        validations.validation_name
+
+NODE current_coverage_rows
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        adapter_id,
+        tupleElement(current_check, 1) AS contract_name,
+        validation_name,
+        tupleElement(current_check, 2) AS is_covered,
+        tupleElement(current_check, 3) AS invalid_row_count,
+        tupleElement(current_check, 4) AS blocking_reason,
+        tupleElement(current_check, 5) AS checked_at,
+        tupleElement(current_check, 6) AS version
+    FROM current_coverage_versions

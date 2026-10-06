@@ -1,0 +1,56 @@
+DESCRIPTION >
+    Boom registration policy over canonical lead evidence. Provider adapters emit
+    evidence; this Pipe decides which lead types participate in Bill acquisition.
+
+NODE boom_registration_policy_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_connection_id,
+        lead_id AS registration_id,
+        contact_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        nullIf(
+            trim(concat(ifNull(first_name, ''), ' ', ifNull(last_name, ''))),
+            ''
+        ) AS full_name,
+        occurred_at AS submitted_at,
+        toDate(occurred_at, 'America/Los_Angeles') AS registration_date,
+        lead_type AS registration_type,
+        coalesce(
+            form_name,
+            if(
+                lead_type = 'krc',
+                'Keyboard Rich Challenge Registration',
+                'Booming Bookkeeping Webinar Registration'
+            )
+        ) AS content_name,
+        multiIf(
+            source_connection_id = 'activecampaign-primary', 'activecampaign_tag',
+            form_id IS NOT NULL, 'client_form',
+            'canonical_lead'
+        ) AS form_type,
+        source_system AS event_source,
+        if(
+            source_connection_id = 'activecampaign-primary',
+            'selected_activecampaign_tag',
+            'canonical'
+        ) AS registration_tag_type,
+        concat(
+            'form_submission_',
+            lowerUTF8(hex(SHA256(concat(
+                lowerUTF8(trim(ifNull(email, ''))),
+                '|',
+                lead_type,
+                '|',
+                toString(toDate(occurred_at, 'America/Los_Angeles'))
+            ))))
+        ) AS canonical_event_id,
+        source_version
+    FROM current_lead_evidence
+    WHERE lead_type IN ('krc', 'webinar')

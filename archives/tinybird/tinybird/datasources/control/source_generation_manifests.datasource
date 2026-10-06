@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Immutable source cutoffs for one candidate Boom report generation. Adapters read
+    only the latest validated build candidate, so a rebuild never mixes source vintages.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `report_generation` String `json:$.report_generation`,
+    `source_manifest_digest` String `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `semantic_policy_version` String `json:$.semantic_policy_version`,
+    `policy_digest` FixedString(64) `json:$.policy_digest`,
+    `identity_stable_batch_version` UInt64 `json:$.identity_stable_batch_version`,
+    `legacy_event_cutoff` DateTime64(6) `json:$.legacy_event_cutoff`,
+    `jitsu_event_cutoff` DateTime64(6) `json:$.jitsu_event_cutoff`,
+    `activecampaign_cutoff` DateTime64(6) `json:$.activecampaign_cutoff`,
+    `stripe_cutoff` DateTime64(6) `json:$.stripe_cutoff`,
+    `stripe_kajabi_cutoff` DateTime64(6) `json:$.stripe_kajabi_cutoff`,
+    `meta_cutoff` DateTime64(6) `json:$.meta_cutoff`,
+    `google_cutoff` DateTime64(6) `json:$.google_cutoff`,
+    `manual_cutoff` DateTime64(6) `json:$.manual_cutoff`,
+    `is_validated` UInt8 `json:$.is_validated`,
+    `is_build_candidate` UInt8 `json:$.is_build_candidate`,
+    `created_at` DateTime64(6) `json:$.created_at`,
+    `version` UInt64 `json:$.version`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, source_generation_id, version"

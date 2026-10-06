@@ -1,0 +1,25 @@
+DESCRIPTION >
+    Meta hourly rows projected into the reusable ad-delivery contract.
+
+NODE meta_hourly_ad_delivery_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        'meta-primary' AS source_connection_id,
+        'meta' AS source,
+        hour_start,
+        account_id,
+        campaign_id,
+        adset_id,
+        ad_id,
+        campaign_name,
+        adset_name,
+        ad_name,
+        impressions,
+        clicks,
+        spend,
+        currency,
+        source_version
+    FROM meta_hourly_delivery_adapter

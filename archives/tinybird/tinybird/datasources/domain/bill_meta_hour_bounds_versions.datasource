@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Meta-hour freshness anchor for each built report generation. Endpoints clamp the
+    stored maximum to the current completed Pacific hour at request time.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `available_start` DateTime64(6) `json:$.available_start`,
+    `max_hour_start` DateTime64(6) `json:$.max_hour_start`,
+    `materialized_at` DateTime64(6) `json:$.materialized_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation"

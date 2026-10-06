@@ -1,0 +1,89 @@
+DESCRIPTION >
+    Latest approved activation request for the exact source generation being built.
+    A later rejected request revokes an earlier approval for the same generation.
+
+NODE report_activation_request_versions
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        argMax(
+            tuple(
+                source_generation_id,
+                identity_batch_version,
+                identity_batch_id,
+                session_batch_version,
+                semantic_policy_version,
+                policy_digest,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                build_digest,
+                identity_parity_hash,
+                session_parity_hash,
+                report_parity_hash,
+                approved,
+                requested_by,
+                version,
+                requested_at,
+                request_hash
+            ),
+            tuple(version, requested_at, request_hash)
+        ) AS current_request
+    FROM report_activation_requests
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, report_generation
+
+NODE approved_current_report_activation_request
+SQL >
+    SELECT
+        requests.tenant_id,
+        requests.report_generation,
+        tupleElement(requests.current_request, 1) AS source_generation_id,
+        tupleElement(requests.current_request, 2) AS identity_batch_version,
+        tupleElement(requests.current_request, 3) AS identity_batch_id,
+        tupleElement(requests.current_request, 4) AS session_batch_version,
+        tupleElement(requests.current_request, 5) AS semantic_policy_version,
+        tupleElement(requests.current_request, 6) AS policy_digest,
+        tupleElement(requests.current_request, 7) AS source_manifest_digest,
+        tupleElement(requests.current_request, 8) AS connection_inventory_digest,
+        tupleElement(requests.current_request, 9) AS cutoff_set_digest,
+        tupleElement(requests.current_request, 10) AS build_digest,
+        tupleElement(requests.current_request, 11) AS identity_parity_hash,
+        tupleElement(requests.current_request, 12) AS session_parity_hash,
+        tupleElement(requests.current_request, 13) AS report_parity_hash,
+        tupleElement(requests.current_request, 15) AS requested_by,
+        tupleElement(requests.current_request, 16) AS version,
+        tupleElement(requests.current_request, 17) AS requested_at,
+        tupleElement(requests.current_request, 18) AS request_hash
+    FROM report_activation_request_versions AS requests
+    INNER JOIN current_source_generation AS generation
+        ON requests.tenant_id = generation.tenant_id
+       AND requests.report_generation = generation.report_generation
+       AND tupleElement(requests.current_request, 1) = generation.source_generation_id
+       AND tupleElement(requests.current_request, 2) = generation.identity_stable_batch_version
+       AND tupleElement(requests.current_request, 5) = generation.semantic_policy_version
+       AND tupleElement(requests.current_request, 6) = generation.policy_digest
+       AND tupleElement(requests.current_request, 7) = generation.source_manifest_digest
+       AND tupleElement(requests.current_request, 8) = generation.connection_inventory_digest
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON requests.tenant_id = cutoff_readiness.tenant_id
+       AND tupleElement(requests.current_request, 1) = cutoff_readiness.source_generation_id
+       AND generation.version = cutoff_readiness.source_manifest_version
+       AND tupleElement(requests.current_request, 7) = cutoff_readiness.source_manifest_digest
+       AND tupleElement(requests.current_request, 8) = cutoff_readiness.connection_inventory_digest
+       AND tupleElement(requests.current_request, 9) = cutoff_readiness.cutoff_set_digest
+       AND cutoff_readiness.is_ready = 1
+    WHERE tupleElement(requests.current_request, 14) = 1
+      AND requests.report_generation != ''
+      AND tupleElement(requests.current_request, 2) > 0
+      AND tupleElement(requests.current_request, 2) = tupleElement(requests.current_request, 4)
+      AND tupleElement(requests.current_request, 3) != ''
+      AND tupleElement(requests.current_request, 6) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 8) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 9) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 10) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 11) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 12) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 13) != repeat('0', 64)
+      AND tupleElement(requests.current_request, 16) > 0

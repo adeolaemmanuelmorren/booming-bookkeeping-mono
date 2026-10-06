@@ -1,0 +1,8 @@
+DESCRIPTION >
+    Current website-session touchpoints with the complete session payload.
+
+NODE live_touchpoint_rows
+SQL >
+    SELECT *
+    FROM current_session_state
+    WHERE record_kind = 'touchpoint'

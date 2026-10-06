@@ -1,0 +1,33 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.activecampaign.contact.
+    Source role: lead_identity_state.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `_fivetran_deleted` Nullable(Bool) `json:$._fivetran_deleted`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `anonymized` Nullable(Int64) `json:$.anonymized`,
+    `gravatar` Nullable(Int64) `json:$.gravatar`,
+    `first_name` Nullable(String) `json:$.first_name`,
+    `email` Nullable(String) `json:$.email`,
+    `ip` Nullable(Int64) `json:$.ip`,
+    `last_name` Nullable(String) `json:$.last_name`,
+    `created_timestamp` Nullable(DateTime64(6)) `json:$.created_timestamp`,
+    `created_by` Nullable(Int64) `json:$.created_by`,
+    `deleted` Nullable(Int64) `json:$.deleted`,
+    `phone` Nullable(String) `json:$.phone`,
+    `created_utc_timestamp` Nullable(DateTime64(6)) `json:$.created_utc_timestamp`,
+    `email_domain` Nullable(String) `json:$.email_domain`,
+    `hash` Nullable(String) `json:$.hash`,
+    `deleted_at` Nullable(DateTime64(6)) `json:$.deleted_at`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/activecampaign/contact/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

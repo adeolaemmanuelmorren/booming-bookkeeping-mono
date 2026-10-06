@@ -1,0 +1,124 @@
+{
+  "checked_at": "2026-09-05T22:29:46.343495+00:00",
+  "complete": false,
+  "snapshot_at": "2026-09-05T22:28:00Z",
+  "tables": [
+    {
+      "bytes_processed": "198046576",
+      "ended_at_ms": "1788647381881",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_contact",
+      "source": "raw_activecampaign_contact",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "260929652",
+      "ended_at_ms": "1788647382734",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_contact_tag",
+      "source": "raw_activecampaign_contact_tag",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "73432",
+      "ended_at_ms": "1788647383363",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_tags",
+      "source": "raw_activecampaign_tags",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "251388884",
+      "ended_at_ms": "1788647383833",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_charge",
+      "source": "raw_stripe_charge",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "73424984",
+      "ended_at_ms": "1788647384343",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_customer",
+      "source": "raw_stripe_customer",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "127832170",
+      "ended_at_ms": "1788647384817",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_payment_intent",
+      "source": "raw_stripe_payment_intent",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "63162112",
+      "ended_at_ms": "1788647385351",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_charge",
+      "source": "raw_stripe_kajabi_charge",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "4337107",
+      "ended_at_ms": "1788647385868",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_customer",
+      "source": "raw_stripe_kajabi_customer",
+      "started_at_ms": null,
+      "status": "DONE"
+    },
+    {
+      "bytes_processed": "21035346",
+      "ended_at_ms": "1788647386336",
+      "error_reason": null,
+      "export": {
+        "fileCount": "0",
+        "rowCount": "0"
+      },
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_payment_intent",
+      "source": "raw_stripe_kajabi_payment_intent",
+      "started_at_ms": null,
+      "status": "DONE"
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+DESCRIPTION >
+    Atomically published Bill generation. Partially copied generations remain invisible
+    until a validated active journal record wins.
+
+NODE report_generation_versions
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        argMax(
+            tuple(
+                source_generation_id,
+                identity_stable_batch_version,
+                attribution_stable_generation,
+                semantic_policy_version,
+                policy_digest,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                build_digest,
+                pending_input_digest,
+                validation_status,
+                is_active,
+                activated_at,
+                version
+            ),
+            tuple(version, activated_at)
+        ) AS current_generation
+    FROM report_product_generations
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, report_generation
+
+NODE active_report_generation_row
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        source_generation_id,
+        identity_stable_batch_version,
+        attribution_stable_generation,
+        semantic_policy_version,
+        policy_digest,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        build_digest,
+        pending_input_digest,
+        activated_at,
+        version
+    FROM (
+        SELECT
+            tenant_id,
+            report_generation,
+            tupleElement(current_generation, 1) AS source_generation_id,
+            tupleElement(current_generation, 2) AS identity_stable_batch_version,
+            tupleElement(current_generation, 3) AS attribution_stable_generation,
+            tupleElement(current_generation, 4) AS semantic_policy_version,
+            tupleElement(current_generation, 5) AS policy_digest,
+            tupleElement(current_generation, 6) AS source_manifest_version,
+            tupleElement(current_generation, 7) AS source_manifest_digest,
+            tupleElement(current_generation, 8) AS connection_inventory_digest,
+            tupleElement(current_generation, 9) AS cutoff_set_digest,
+            tupleElement(current_generation, 10) AS build_digest,
+            tupleElement(current_generation, 11) AS pending_input_digest,
+            tupleElement(current_generation, 14) AS activated_at,
+            tupleElement(current_generation, 15) AS version,
+            row_number() OVER (
+                ORDER BY tupleElement(current_generation, 15) DESC,
+                         tupleElement(current_generation, 14) DESC,
+                         report_generation DESC
+            ) AS generation_rank
+        FROM report_generation_versions
+        WHERE tupleElement(current_generation, 12) = 'validated'
+          AND tupleElement(current_generation, 13) = 1
+    )
+    WHERE generation_rank = 1

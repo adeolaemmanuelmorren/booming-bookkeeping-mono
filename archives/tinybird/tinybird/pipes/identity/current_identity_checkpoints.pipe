@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Highest committed contiguous sequence for each identity producer.
+
+NODE live_checkpoint_rows
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        checkpoint_sequence,
+        batch_version,
+        batch_id,
+        committed_at
+    FROM current_identity_state
+    WHERE state_kind = 'checkpoint'

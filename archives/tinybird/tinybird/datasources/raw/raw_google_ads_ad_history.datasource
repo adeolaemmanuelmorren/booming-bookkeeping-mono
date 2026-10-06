@@ -1,0 +1,42 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.google_ads.ad_history.
+    Source role: google_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `ad_group_id` Nullable(Int64) `json:$.ad_group_id`,
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_at` Nullable(DateTime64(6)) `json:$.updated_at`,
+    `action_items` Nullable(String) `json:$.action_items`,
+    `ad_strength` Nullable(String) `json:$.ad_strength`,
+    `added_by_google_ads` Nullable(Bool) `json:$.added_by_google_ads`,
+    `device_preference` Nullable(String) `json:$.device_preference`,
+    `display_url` Nullable(String) `json:$.display_url`,
+    `final_url_suffix` Nullable(String) `json:$.final_url_suffix`,
+    `final_app_urls` Nullable(String) `json:$.final_app_urls`,
+    `final_mobile_urls` Nullable(String) `json:$.final_mobile_urls`,
+    `final_urls` Nullable(String) `json:$.final_urls`,
+    `name` Nullable(String) `json:$.name`,
+    `policy_summary_approval_status` Nullable(String) `json:$.policy_summary_approval_status`,
+    `policy_summary_review_status` Nullable(String) `json:$.policy_summary_review_status`,
+    `status` Nullable(String) `json:$.status`,
+    `system_managed_resource_source` Nullable(String) `json:$.system_managed_resource_source`,
+    `tracking_url_template` Nullable(String) `json:$.tracking_url_template`,
+    `type` Nullable(String) `json:$.type`,
+    `url_collections` Nullable(String) `json:$.url_collections`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `_fivetran_start` Nullable(DateTime64(6)) `json:$._fivetran_start`,
+    `_fivetran_end` Nullable(DateTime64(6)) `json:$._fivetran_end`,
+    `_fivetran_active` Nullable(Bool) `json:$._fivetran_active`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(ad_group_id, toInt64(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(updated_at, toDateTime64(0, 6)),
+    `__tb_sort_4` DateTime64(6) `json:$.__tb_sort_4` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/google_ads/ad_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

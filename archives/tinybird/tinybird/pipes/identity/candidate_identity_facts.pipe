@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Candidate non-deleted logical facts for replay before candidate activation.
+
+NODE candidate_fact_rows
+SQL >
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_observed_at AS observed_at,
+        fact_payload_hash,
+        fact_payload,
+        evidence_keys,
+        batch_version,
+        committed_at
+    FROM candidate_identity_state
+    WHERE state_kind = 'fact'
+      AND fact_deleted = 0

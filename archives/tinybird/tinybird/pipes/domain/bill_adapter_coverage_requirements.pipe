@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Contract-level requirements come from the source registry. Bill-only semantic,
+    ingress, identity, session, and manual-link checks remain explicit here.
+
+NODE required_bill_adapter_contracts
+SQL >
+    SELECT * FROM registered_contract_coverage_requirements
+    UNION ALL
+    SELECT 'source_generation_connection_cutoffs', 'source_connection_cutoff_v1', 'all_registered_connections_complete'
+    UNION ALL
+    SELECT 'web_conversion_adapter' AS adapter_id, 'client_conversion_v1' AS contract_name, 'unique_current_event_grain' AS validation_name
+    UNION ALL
+    SELECT 'web_page_view_adapter', 'page_view_v1', 'unique_current_page_grain'
+    UNION ALL
+    SELECT 'web_identity_observation_adapter', 'identity_observation_v1', 'unique_current_identity_grain'
+    UNION ALL
+    SELECT 'jitsu_events_api_observations', 'durable_ingress_v1', 'gap_free_immutable_producer_delivery'
+    UNION ALL
+    SELECT 'activecampaign_registration_adapter', 'lead_evidence_v1', 'unique_registration_assignment_grain'
+    UNION ALL
+    SELECT 'stripe_primary_payment_adapter', 'boom_classified_payment_v1', 'successful_payment_contract'
+    UNION ALL
+    SELECT 'stripe_kajabi_payment_adapter', 'boom_classified_payment_v1', 'successful_payment_contract'
+    UNION ALL
+    SELECT 'meta_hourly_delivery_adapter', 'ad_delivery_hourly_v1', 'hourly_ad_grain_and_required_fields'
+    UNION ALL
+    SELECT 'meta_daily_delivery_adapter', 'ad_delivery_daily_v1', 'daily_own_level_grain'
+    UNION ALL
+    SELECT 'google_ad_row_presence_adapter', 'ad_delivery_daily_v1', 'google_dependency_row_grain'
+    UNION ALL
+    SELECT 'manual_payment_profile_link_adapter', 'manual_profile_link_v1', 'latest_payment_override_grain'
+    UNION ALL
+    SELECT 'pinned_identity_mappings', 'identity_state_v1', 'candidate_identity_batch_audit'
+    UNION ALL
+    SELECT 'pinned_session_touchpoints', 'session_state_v1', 'candidate_session_batch_audit'

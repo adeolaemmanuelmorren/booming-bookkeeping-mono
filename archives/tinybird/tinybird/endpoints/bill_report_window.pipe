@@ -1,0 +1,71 @@
+DESCRIPTION >
+    Pacific report bounds for one validated generation. Output order matches the current
+    Bill BigQuery query exactly; p_report_generation is a private consistency parameter.
+
+NODE window_requested_generation
+SQL >
+    %
+    SELECT
+        tenant_id,
+        report_generation,
+        product_materialized_at AS bounds_materialized_at
+    FROM published_report_build_stages
+    WHERE tenant_id = 'boom'
+      AND report_generation = {{ String(p_report_generation) }}
+      AND stage_id = 'meta_hour_bounds'
+
+NODE window_pinned_meta_bounds
+SQL >
+    SELECT
+        bounds.report_generation,
+        bounds.available_start,
+        bounds.max_hour_start
+    FROM bill_meta_hour_bounds_versions AS bounds
+    INNER JOIN window_requested_generation AS requested
+        ON bounds.tenant_id = requested.tenant_id
+       AND bounds.report_generation = requested.report_generation
+       AND bounds.materialized_at = requested.bounds_materialized_at
+
+NODE window_completed_hour_bounds
+SQL >
+    SELECT
+        report_generation,
+        available_start,
+        least(
+            max_hour_start + INTERVAL 1 HOUR,
+            toStartOfHour(now64(6), 'America/Los_Angeles')
+        ) AS data_through
+    FROM window_pinned_meta_bounds
+
+NODE window_pacific_clock
+SQL >
+    SELECT
+        *,
+        toDateTime64(
+            concat(
+                toString(toMonday(toDate(data_through, 'America/Los_Angeles'))),
+                ' 10:00:00'
+            ),
+            6,
+            'America/Los_Angeles'
+        ) AS monday_at_ten
+    FROM window_completed_hour_bounds
+
+NODE window_endpoint_output
+SQL >
+    SELECT
+        formatDateTime(available_start, '%Y-%m-%dT%H:%M', 'America/Los_Angeles') AS available_start_pacific,
+        formatDateTime(
+            if(data_through < monday_at_ten, monday_at_ten - INTERVAL 336 HOUR, monday_at_ten - INTERVAL 168 HOUR),
+            '%Y-%m-%dT%H:%M',
+            'America/Los_Angeles'
+        ) AS previous_week_start_pacific,
+        formatDateTime(
+            if(data_through < monday_at_ten, monday_at_ten - INTERVAL 168 HOUR, monday_at_ten),
+            '%Y-%m-%dT%H:%M',
+            'America/Los_Angeles'
+        ) AS active_week_start_pacific,
+        formatDateTime(data_through, '%Y-%m-%dT%H:%M', 'America/Los_Angeles') AS data_through_pacific
+    FROM window_pacific_clock
+
+TYPE endpoint

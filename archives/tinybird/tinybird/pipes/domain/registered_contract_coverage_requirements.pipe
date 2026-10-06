@@ -1,0 +1,75 @@
+DESCRIPTION >
+    GENERATED readiness requirements for every source-registry fan-in entry.
+    Registering a source therefore adds a publication gate in the same change.
+
+NODE required_registered_contract_validations
+SQL >
+    SELECT
+        'google_daily_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'meta_daily_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'meta_hourly_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_hourly_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'stripe_kajabi_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'stripe_primary_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'activecampaign_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'jitsu_tombstone_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'payment_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'web_attribution_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'web_conversion_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'web_identify_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'web_page_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'activecampaign_lead_contract' AS adapter_id,
+        'lead_evidence_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name
+    UNION ALL
+    SELECT
+        'web_form_lead_contract' AS adapter_id,
+        'lead_evidence_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name

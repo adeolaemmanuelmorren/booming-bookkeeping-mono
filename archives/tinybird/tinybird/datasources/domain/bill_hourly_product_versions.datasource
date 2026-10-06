@@ -1,0 +1,35 @@
+DESCRIPTION >
+    Complete versioned hourly Bill product. Endpoint column order is projected from this
+    stable product; build metadata remains internal.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `hour_start` DateTime64(6) `json:$.hour_start`,
+    `source` LowCardinality(String) `json:$.source`,
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `adset_id` Nullable(String) `json:$.adset_id`,
+    `ad_id` Nullable(String) `json:$.ad_id`,
+    `campaign_name` String `json:$.campaign_name`,
+    `adset_name` String `json:$.adset_name`,
+    `ad_name` String `json:$.ad_name`,
+    `spend` Decimal(38,9) `json:$.spend`,
+    `impressions` Int64 `json:$.impressions`,
+    `clicks` Int64 `json:$.clicks`,
+    `last_touch_registrations` Int64 `json:$.last_touch_registrations`,
+    `last_touch_immediate_vips` Int64 `json:$.last_touch_immediate_vips`,
+    `first_touch_registrations` Int64 `json:$.first_touch_registrations`,
+    `first_touch_immediate_vips` Int64 `json:$.first_touch_immediate_vips`,
+    `solo_touch_registrations` Int64 `json:$.solo_touch_registrations`,
+    `solo_touch_immediate_vips` Int64 `json:$.solo_touch_immediate_vips`,
+    `last_touch_5k_purchasers` Int64 `json:$.last_touch_5k_purchasers`,
+    `last_touch_5k_revenue` Int64 `json:$.last_touch_5k_revenue`,
+    `last_touch_immediate_vip_5k_purchasers` Int64 `json:$.last_touch_immediate_vip_5k_purchasers`,
+    `first_touch_5k_purchasers` Int64 `json:$.first_touch_5k_purchasers`,
+    `first_touch_5k_revenue` Int64 `json:$.first_touch_5k_revenue`,
+    `solo_touch_5k_purchasers` Int64 `json:$.solo_touch_5k_purchasers`,
+    `solo_touch_5k_revenue` Int64 `json:$.solo_touch_5k_revenue`,
+    `materialized_at` DateTime64(6) `json:$.materialized_at`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, hour_start, source"

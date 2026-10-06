@@ -1,0 +1,214 @@
+{
+  "checkedAt": "2026-09-06T14:51:46.497Z",
+  "synthetic": true,
+  "persisted": false,
+  "runs": [
+    {
+      "name": "separate-batches",
+      "wallMs": 455,
+      "statistics": {
+        "elapsed": 0.005244549,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            1,
+            9,
+            9,
+            "google"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "late-earlier-touch",
+      "wallMs": 108,
+      "statistics": {
+        "elapsed": 0.005917936,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            4,
+            7,
+            7,
+            "organic"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "timestamp-ties-and-retry",
+      "wallMs": 107,
+      "statistics": {
+        "elapsed": 0.004247471,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            8,
+            7,
+            7,
+            "google"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "append-correction-stays-stale",
+      "wallMs": 112,
+      "statistics": {
+        "elapsed": 0.005069012,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            1,
+            9,
+            9,
+            "google"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "rebuild-from-current-facts",
+      "wallMs": 107,
+      "statistics": {
+        "elapsed": 0.007260932,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            3,
+            12,
+            12,
+            "organic"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "lifetime-summary",
+      "wallMs": 114,
+      "statistics": {
+        "elapsed": 0.00477679,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            1,
+            20,
+            1,
+            "google"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "conversion-time-12-reference",
+      "wallMs": 109,
+      "statistics": {
+        "elapsed": 0.004563485,
+        "rows_read": 1,
+        "bytes_read": 1
+      },
+      "data": [
+        {
+          "profile_id": 1,
+          "first": [
+            2,
+            10,
+            5,
+            "meta"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reference-1000000-touches-150000-conversions",
+      "wallMs": 841,
+      "statistics": {
+        "elapsed": 0.738688785,
+        "rows_read": 1350000,
+        "bytes_read": 10800000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_ft": 150000,
+          "revenue_ft_cents": 750000000
+        }
+      ]
+    },
+    {
+      "name": "states-1000000-touches-150000-conversions",
+      "wallMs": 546,
+      "statistics": {
+        "elapsed": 0.343415266,
+        "rows_read": 1350000,
+        "bytes_read": 10800000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_ft": 150000,
+          "revenue_ft_cents": 750000000
+        }
+      ],
+      "expectedTotalsPassed": true,
+      "referenceMatched": true
+    },
+    {
+      "name": "reference-100000-touches-150000-conversions",
+      "failed": true,
+      "error": "{\"error\": \"[Error] Memory limit (for query) exceeded. Make sure the query just process the required data. (MEMORY_LIMIT_EXCEEDED) (query_id=01M1VK8GYYRAFAM0X5ZB02A571)\", \"documentation\": \"https://tinybird.co/docs/guides/best-practices-for-faster-sql.html#memory-limit-reached-title\"}",
+      "wallMs": 2045
+    },
+    {
+      "name": "states-100000-touches-150000-conversions",
+      "wallMs": 165,
+      "statistics": {
+        "elapsed": 0.058225083,
+        "rows_read": 252000,
+        "bytes_read": 2016000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_ft": 150000,
+          "revenue_ft_cents": 750000000
+        }
+      ],
+      "expectedTotalsPassed": true,
+      "referenceMatched": false
+    }
+  ],
+  "fixtureChecksPassed": true,
+  "correctionRequiresRepair": true,
+  "lifetimeSummaryNotGenerallyEquivalent": true
+}

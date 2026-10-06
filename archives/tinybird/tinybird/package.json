@@ -1,0 +1,19 @@
+{
+  "name": "boom-tinybird-analytics",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render:raw": "node scripts/render-raw-datasources.mjs --render",
+    "render:registry": "node scripts/render-source-registry.mjs",
+    "check:schemas": "node scripts/render-raw-datasources.mjs --check",
+    "check:registry": "node scripts/render-source-registry.mjs --check",
+    "check:parse": "node scripts/parse-project.mjs",
+    "check:schemas:live": "node scripts/render-raw-datasources.mjs --check-live",
+    "export:gcs:plan": "node scripts/export-bigquery-to-gcs.mjs --plan",
+    "export:gcs:backfill": "node scripts/export-bigquery-to-gcs.mjs --mode=backfill",
+    "export:gcs:incremental": "node scripts/export-bigquery-to-gcs.mjs --mode=incremental",
+    "validate": "node scripts/validate-project.mjs",
+    "test": "node scripts/render-source-registry.mjs --check && node scripts/parse-project.mjs && node scripts/validate-project.mjs && node scripts/contract-fanin-oracle.mjs && node scripts/cutoff-oracle.mjs && node scripts/identity-oracle.mjs && node scripts/report-oracle.mjs",
+    "plan:generation": "node scripts/plan-generation.mjs"
+  }
+}

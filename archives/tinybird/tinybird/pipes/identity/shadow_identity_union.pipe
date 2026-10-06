@@ -1,0 +1,405 @@
+DESCRIPTION >
+    Materialize one complete shadow generation only after bounded label propagation converges.
+
+NODE current_shadow_request_versions
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        argMax(
+            tuple(
+                source_generation_id,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                request_hash
+            ),
+            tuple(requested_at, request_hash)
+        ) AS current_request
+    FROM identity_shadow_requests
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, shadow_generation
+
+NODE final_shadow_status_versions
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash,
+        argMax(
+            tuple(
+                iteration,
+                run_status,
+                node_count,
+                edge_count,
+                change_count,
+                source_generation_id,
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                source_cutoff,
+                policy_version,
+                request_hash
+            ),
+            tuple(iteration, computed_at, row_hash)
+        ) AS current_status
+    FROM identity_shadow_work_versions
+    WHERE tenant_id = 'boom'
+      AND record_kind = 'status'
+    GROUP BY
+        tenant_id,
+        shadow_generation,
+        source_generation_id,
+        request_hash
+
+NODE converged_shadow_run
+SQL >
+    SELECT * EXCEPT generation_rank
+    FROM (
+        SELECT
+            status.tenant_id,
+            status.shadow_generation,
+            tupleElement(status.current_status, 1) AS iteration,
+            tupleElement(status.current_status, 3) AS node_count,
+            tupleElement(status.current_status, 4) AS edge_count,
+            status.source_generation_id,
+            tupleElement(status.current_status, 7) AS source_manifest_version,
+            tupleElement(status.current_status, 8) AS source_manifest_digest,
+            tupleElement(status.current_status, 9) AS connection_inventory_digest,
+            tupleElement(status.current_status, 10) AS cutoff_set_digest,
+            tupleElement(status.current_status, 11) AS source_cutoff,
+            tupleElement(status.current_status, 12) AS policy_version,
+            status.request_hash,
+            row_number() OVER (ORDER BY status.shadow_generation DESC) AS generation_rank
+        FROM final_shadow_status_versions AS status
+        INNER JOIN current_source_generation AS source_generation
+            ON status.tenant_id = source_generation.tenant_id
+           AND status.source_generation_id = source_generation.source_generation_id
+           AND tupleElement(status.current_status, 7) = source_generation.version
+           AND tupleElement(status.current_status, 8) = source_generation.source_manifest_digest
+           AND tupleElement(status.current_status, 9) = source_generation.connection_inventory_digest
+        INNER JOIN current_shadow_request_versions AS request
+            ON status.tenant_id = request.tenant_id
+           AND status.shadow_generation = request.shadow_generation
+           AND status.source_generation_id = tupleElement(request.current_request, 1)
+           AND tupleElement(status.current_status, 7) = tupleElement(request.current_request, 2)
+           AND tupleElement(status.current_status, 8) = tupleElement(request.current_request, 3)
+           AND tupleElement(status.current_status, 9) = tupleElement(request.current_request, 4)
+           AND tupleElement(status.current_status, 10) = tupleElement(request.current_request, 5)
+           AND status.request_hash = tupleElement(request.current_request, 6)
+        INNER JOIN (
+            SELECT
+                tenant_id,
+                source_generation_id,
+                max(current_cutoff) AS latest_source_cutoff
+            FROM current_source_connection_cutoffs
+            GROUP BY tenant_id, source_generation_id
+            HAVING count() = countIf(is_complete = 1)
+        ) AS source_cutoffs
+            ON status.tenant_id = source_cutoffs.tenant_id
+           AND source_generation.source_generation_id = source_cutoffs.source_generation_id
+        INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+            ON status.tenant_id = cutoff_readiness.tenant_id
+           AND status.source_generation_id = cutoff_readiness.source_generation_id
+           AND tupleElement(status.current_status, 7) = cutoff_readiness.source_manifest_version
+           AND tupleElement(status.current_status, 8) = cutoff_readiness.source_manifest_digest
+           AND tupleElement(status.current_status, 9) = cutoff_readiness.connection_inventory_digest
+           AND tupleElement(status.current_status, 10) = cutoff_readiness.cutoff_set_digest
+        WHERE tupleElement(status.current_status, 2) = 'converged'
+          AND tupleElement(status.current_status, 1) < 500
+          AND tupleElement(status.current_status, 5) = 0
+          AND source_cutoffs.latest_source_cutoff <= tupleElement(status.current_status, 11)
+          AND cutoff_readiness.is_ready = 1
+    )
+    WHERE generation_rank = 1
+
+NODE final_shadow_nodes
+SQL >
+    SELECT
+        work.tenant_id,
+        work.shadow_generation,
+        work.node_key,
+        argMax(
+            tuple(
+                work.identifier_type,
+                work.identifier_value,
+                work.winner_priority,
+                work.first_name,
+                work.last_name,
+                work.first_seen_at,
+                work.last_seen_at
+            ),
+            tuple(work.computed_at, work.row_hash)
+        ) AS current_node
+    FROM identity_shadow_work_versions AS work
+    INNER JOIN converged_shadow_run AS run
+        ON work.tenant_id = run.tenant_id
+       AND work.shadow_generation = run.shadow_generation
+       AND work.source_generation_id = run.source_generation_id
+       AND work.request_hash = run.request_hash
+    WHERE work.record_kind = 'node'
+    GROUP BY work.tenant_id, work.shadow_generation, work.node_key
+
+NODE final_shadow_labels
+SQL >
+    SELECT
+        work.tenant_id,
+        work.shadow_generation,
+        work.node_key,
+        argMax(
+            work.label_key,
+            tuple(work.iteration, work.computed_at, work.row_hash)
+        ) AS label_key,
+        max(work.iteration) AS iteration
+    FROM identity_shadow_work_versions AS work
+    INNER JOIN converged_shadow_run AS run
+        ON work.tenant_id = run.tenant_id
+       AND work.shadow_generation = run.shadow_generation
+       AND work.source_generation_id = run.source_generation_id
+       AND work.request_hash = run.request_hash
+    WHERE work.record_kind = 'label'
+      AND work.iteration <= run.iteration
+    GROUP BY work.tenant_id, work.shadow_generation, work.node_key
+
+NODE final_shadow_integrity
+SQL >
+    SELECT
+        run.tenant_id,
+        run.shadow_generation,
+        run.source_generation_id,
+        run.source_manifest_version,
+        run.source_manifest_digest,
+        run.connection_inventory_digest,
+        run.cutoff_set_digest,
+        run.iteration,
+        run.node_count,
+        run.edge_count,
+        run.request_hash
+    FROM converged_shadow_run AS run
+    INNER JOIN (
+        SELECT tenant_id, shadow_generation, toUInt64(count()) AS actual_node_count
+        FROM final_shadow_nodes
+        GROUP BY tenant_id, shadow_generation
+    ) AS nodes
+        ON run.tenant_id = nodes.tenant_id
+       AND run.shadow_generation = nodes.shadow_generation
+    INNER JOIN (
+        SELECT tenant_id, shadow_generation, toUInt64(count()) AS actual_label_count, min(iteration) AS minimum_iteration
+        FROM final_shadow_labels
+        GROUP BY tenant_id, shadow_generation
+    ) AS labels
+        ON run.tenant_id = labels.tenant_id
+       AND run.shadow_generation = labels.shadow_generation
+    LEFT JOIN (
+        SELECT
+            work.tenant_id,
+            work.shadow_generation,
+            toUInt64(count()) AS actual_edge_count
+        FROM identity_shadow_work_versions AS work
+        INNER JOIN converged_shadow_run AS run
+            ON work.tenant_id = run.tenant_id
+           AND work.shadow_generation = run.shadow_generation
+           AND work.source_generation_id = run.source_generation_id
+           AND work.request_hash = run.request_hash
+        WHERE work.record_kind = 'edge'
+        GROUP BY work.tenant_id, work.shadow_generation
+    ) AS edges
+        ON run.tenant_id = edges.tenant_id
+       AND run.shadow_generation = edges.shadow_generation
+    WHERE nodes.actual_node_count = run.node_count
+      AND labels.actual_label_count = run.node_count
+      AND labels.minimum_iteration = run.iteration
+      AND coalesce(edges.actual_edge_count, toUInt64(0)) = run.edge_count
+
+NODE final_shadow_component_members
+SQL >
+    SELECT
+        nodes.tenant_id,
+        nodes.shadow_generation,
+        nodes.node_key AS identifier_key,
+        labels.label_key AS component_label,
+        tupleElement(nodes.current_node, 1) AS identifier_type,
+        tupleElement(nodes.current_node, 2) AS identifier_value,
+        tupleElement(nodes.current_node, 3) AS winner_priority,
+        tupleElement(nodes.current_node, 4) AS first_name,
+        tupleElement(nodes.current_node, 5) AS last_name,
+        tupleElement(nodes.current_node, 6) AS first_seen_at,
+        tupleElement(nodes.current_node, 7) AS last_seen_at
+    FROM final_shadow_nodes AS nodes
+    INNER JOIN final_shadow_labels AS labels
+        ON nodes.tenant_id = labels.tenant_id
+       AND nodes.shadow_generation = labels.shadow_generation
+       AND nodes.node_key = labels.node_key
+    INNER JOIN final_shadow_integrity AS integrity
+        ON nodes.tenant_id = integrity.tenant_id
+       AND nodes.shadow_generation = integrity.shadow_generation
+
+NODE final_shadow_component_rollups
+SQL >
+    SELECT
+        tenant_id,
+        shadow_generation,
+        component_label,
+        argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)) AS winner_identifier_key,
+        argMin(identifier_value, tuple(winner_priority, first_seen_at, identifier_value)) AS profile_key,
+        hex(MD5(argMin(identifier_key, tuple(winner_priority, first_seen_at, identifier_value)))) AS profile_id,
+        arraySort(groupUniqArray(identifier_key)) AS member_identifier_keys,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'anonymous_id')) AS anonymous_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'user_id')) AS user_ids,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'email')) AS emails,
+        arraySort(groupUniqArrayIf(identifier_value, identifier_type = 'phone')) AS phones,
+        argMaxIf(first_name, tuple(last_seen_at, identifier_key), first_name != '') AS first_name,
+        argMaxIf(last_name, tuple(last_seen_at, identifier_key), last_name != '') AS last_name,
+        min(first_seen_at) AS first_seen_at,
+        max(last_seen_at) AS last_seen_at
+    FROM final_shadow_component_members
+    GROUP BY tenant_id, shadow_generation, component_label
+
+NODE final_shadow_mapping_rows
+SQL >
+    SELECT
+        members.tenant_id,
+        members.shadow_generation,
+        integrity.source_generation_id,
+        integrity.source_manifest_version,
+        integrity.source_manifest_digest,
+        integrity.connection_inventory_digest,
+        integrity.cutoff_set_digest,
+        integrity.request_hash,
+        'mapping' AS state_kind,
+        concat('mapping:', toString(length(members.identifier_key)), ':', members.identifier_key) AS state_key,
+        members.identifier_type,
+        members.identifier_value,
+        members.identifier_key,
+        components.profile_id,
+        components.profile_key,
+        components.winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        '' AS first_name,
+        '' AS last_name,
+        members.first_seen_at,
+        members.last_seen_at,
+        now64(6) AS built_at,
+        hex(SHA256(concat(
+            members.identifier_key,
+            ':',
+            components.profile_id,
+            ':',
+            toString(members.shadow_generation)
+        ))) AS row_hash
+    FROM final_shadow_component_members AS members
+    INNER JOIN final_shadow_component_rollups AS components
+        ON members.tenant_id = components.tenant_id
+       AND members.shadow_generation = components.shadow_generation
+       AND members.component_label = components.component_label
+    INNER JOIN final_shadow_integrity AS integrity
+        ON members.tenant_id = integrity.tenant_id
+       AND members.shadow_generation = integrity.shadow_generation
+
+NODE final_shadow_profile_rows
+SQL >
+    SELECT
+        profiles.tenant_id,
+        profiles.shadow_generation,
+        integrity.source_generation_id,
+        integrity.source_manifest_version,
+        integrity.source_manifest_digest,
+        integrity.connection_inventory_digest,
+        integrity.cutoff_set_digest,
+        integrity.request_hash,
+        'profile' AS state_kind,
+        concat('profile:', toString(length(profile_id)), ':', profile_id) AS state_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        profile_id,
+        profile_key,
+        winner_identifier_key,
+        member_identifier_keys,
+        anonymous_ids,
+        user_ids,
+        emails,
+        phones,
+        first_name,
+        last_name,
+        first_seen_at,
+        last_seen_at,
+        now64(6) AS built_at,
+        hex(SHA256(concat(
+            profile_id,
+            ':',
+            arrayStringConcat(member_identifier_keys, '|'),
+            ':',
+            toString(profiles.shadow_generation)
+        ))) AS row_hash
+    FROM final_shadow_component_rollups AS profiles
+    INNER JOIN final_shadow_integrity AS integrity
+        ON profiles.tenant_id = integrity.tenant_id
+       AND profiles.shadow_generation = integrity.shadow_generation
+
+NODE final_shadow_audit_row
+SQL >
+    SELECT
+        profiles.tenant_id,
+        profiles.shadow_generation,
+        integrity.source_generation_id,
+        integrity.source_manifest_version,
+        integrity.source_manifest_digest,
+        integrity.connection_inventory_digest,
+        integrity.cutoff_set_digest,
+        integrity.request_hash,
+        'shadow_audit' AS state_kind,
+        concat('shadow_audit:', leftPad(toString(profiles.shadow_generation), 20, '0')) AS state_key,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        '' AS profile_id,
+        '' AS profile_key,
+        '' AS winner_identifier_key,
+        CAST([], 'Array(String)') AS member_identifier_keys,
+        CAST([], 'Array(String)') AS anonymous_ids,
+        CAST([], 'Array(String)') AS user_ids,
+        CAST([], 'Array(String)') AS emails,
+        CAST([], 'Array(String)') AS phones,
+        '' AS first_name,
+        '' AS last_name,
+        min(profiles.first_seen_at) AS first_seen_at,
+        max(profiles.last_seen_at) AS last_seen_at,
+        now64(6) AS built_at,
+        hex(SHA256(concat(
+            integrity.request_hash,
+            ':',
+            toString(integrity.iteration),
+            ':',
+            arrayStringConcat(
+                arraySort(groupArray(concat(profiles.profile_id, ':', toString(length(profiles.member_identifier_keys))))),
+                '|'
+            )
+        ))) AS row_hash
+    FROM final_shadow_component_rollups AS profiles
+    INNER JOIN final_shadow_integrity AS integrity
+        ON profiles.tenant_id = integrity.tenant_id
+       AND profiles.shadow_generation = integrity.shadow_generation
+    GROUP BY
+        profiles.tenant_id,
+        profiles.shadow_generation,
+        integrity.source_generation_id,
+        integrity.source_manifest_version,
+        integrity.source_manifest_digest,
+        integrity.connection_inventory_digest,
+        integrity.cutoff_set_digest,
+        integrity.request_hash,
+        integrity.iteration
+
+NODE complete_shadow_identity_rows
+SQL >
+    SELECT * FROM final_shadow_mapping_rows
+    UNION ALL SELECT * FROM final_shadow_profile_rows
+    UNION ALL SELECT * FROM final_shadow_audit_row

@@ -1,0 +1,26 @@
+DESCRIPTION >
+    Simple versioned identity output. Graph computed externally. Filter to a completed snapshot.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `snapshot_id` String `json:$.snapshot_id`,
+    `bucket` UInt16 `json:$.bucket`,
+    `profile_id` String `json:$.profile_id`,
+    `id_type` String `json:$.id_type`,
+    `id_value_norm` String `json:$.id_value_norm`,
+    `valid` Nullable(UInt8) `json:$.valid`,
+    `validation_meta` Nullable(String) `json:$.validation_meta`,
+    `source` String `json:$.source`,
+    `action` String `json:$.action`,
+    `changed_at` Nullable(DateTime64(6)) `json:$.changed_at`,
+    `first_seen_at` Nullable(DateTime64(6)) `json:$.first_seen_at`,
+    `last_seen_at` Nullable(DateTime64(6)) `json:$.last_seen_at`,
+    `source_stub` Nullable(String) `json:$.source_stub`,
+    `exported_at` DateTime64(3) `json:$.exported_at`,
+    `row_hash` String `json:$.row_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, snapshot_id, bucket, id_type, id_value_norm
+
+TOKEN v1_facts_runtime READ
+TOKEN v1_facts_runtime APPEND

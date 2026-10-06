@@ -1,0 +1,26 @@
+DESCRIPTION >
+    Latest Jitsu Events API logical fact as of the current source cutoff. Tombstone winners
+    remain visible here so every backfill adapter can suppress an older GCS copy.
+
+NODE ranked_jitsu_events_api_versions
+SQL >
+    SELECT
+        source.*,
+        generation.source_generation_id,
+        row_number() OVER (
+            PARTITION BY source.tenant_id, source.message_id
+            ORDER BY
+                source.source_fact_version DESC,
+                source.ingested_at DESC,
+                source.payload_hash DESC
+        ) AS logical_version_rank
+    FROM jitsu_events_api_observations AS source
+    INNER JOIN current_source_generation AS generation
+        ON source.tenant_id = generation.tenant_id
+       AND source.ingested_at <= generation.jitsu_event_cutoff
+
+NODE current_jitsu_events_api_version_rows
+SQL >
+    SELECT *
+    FROM ranked_jitsu_events_api_versions
+    WHERE logical_version_rank = 1

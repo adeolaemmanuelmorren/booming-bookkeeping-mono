@@ -1,0 +1,43 @@
+{
+  "job": "tinybird-identity-live-state",
+  "execution": "tinybird-identity-live-state-b77s5",
+  "project": "able-folio-499722",
+  "region": "us-east4",
+  "startedAt": "2026-09-07T20:52:28.090232Z",
+  "snapshot": "identity-simple-20260907-v1",
+  "sourceBaseline": "boom-identity-20260905-v1",
+  "sourceSeal": "fbe2f19cd5bdd51e521e0d7d89ab1094d999240493e296035a5da14c5332bad6",
+  "build": "27ec5e4a-65bd-4442-aa99-706f7b1b67eb",
+  "imageDigest": "sha256:90361ca4f601d7aae55d39303ef069b587f3897649c1d36c6fcf978bc4f32ba5",
+  "status": "cancelled",
+  "continuousIdentityEnabled": false,
+  "startupVerified": {
+    "at": "2026-09-07T20:53:55.218Z",
+    "candidates": 300000,
+    "expectedCandidates": 10659477,
+    "rssMiB": 670
+  },
+  "validation": {
+    "localTestsPassed": 186,
+    "typecheckPassed": true
+  },
+  "remaining": [],
+  "workerVersion": "952afd44-cf2b-46aa-aadf-6cc8f2765449",
+  "deploymentVerification": {
+    "at": "2026-09-07T20:57:56.035Z",
+    "health": {
+      "service": "boom-tinybird-facts-v1",
+      "ingestion_enabled": false,
+      "identity_ingestion_enabled": false,
+      "browser_mode": "collect"
+    },
+    "identity": {
+      "pending": 0,
+      "publishedVersion": 0,
+      "activeBatch": null,
+      "baseline": null
+    }
+  },
+  "jobDeleted": true,
+  "replacementRetired": true
+}

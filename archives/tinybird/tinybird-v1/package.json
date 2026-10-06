@@ -1,0 +1,16 @@
+{
+  "name": "boom-tinybird-facts-v1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test worker/sessions/*.test.ts test/*.test.ts test/*.test.mjs test/conversions/*.test.mjs",
+    "typecheck": "tsc --noEmit",
+    "worker:check": "wrangler deploy --dry-run --outdir /tmp/boom-tinybird-v1-dry-run"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260905.1",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.5.2",
+    "wrangler": "4.129.0"
+  }
+}

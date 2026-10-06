@@ -1,0 +1,18 @@
+DESCRIPTION >
+    Candidate identifier mappings for replay while the active identity pointer remains pinned.
+
+NODE candidate_mapping_rows
+SQL >
+    SELECT
+        tenant_id,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        profile_id,
+        profile_key,
+        winner_identifier_key,
+        batch_version,
+        batch_id,
+        committed_at
+    FROM candidate_identity_state
+    WHERE state_kind = 'mapping'

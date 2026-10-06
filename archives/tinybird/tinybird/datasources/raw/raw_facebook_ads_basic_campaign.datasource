@@ -1,0 +1,34 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.facebook_ads.basic_campaign.
+    Source role: meta_non_additive_delivery_daily.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `campaign_id` Nullable(String) `json:$.campaign_id`,
+    `date` Nullable(Date) `json:$.date`,
+    `_fivetran_id` Nullable(String) `json:$._fivetran_id`,
+    `account_id` Nullable(Int64) `json:$.account_id`,
+    `impressions` Nullable(Int64) `json:$.impressions`,
+    `inline_link_clicks` Nullable(Int64) `json:$.inline_link_clicks`,
+    `reach` Nullable(Int64) `json:$.reach`,
+    `cost_per_inline_link_click` Nullable(Float64) `json:$.cost_per_inline_link_click`,
+    `cpc` Nullable(Float64) `json:$.cpc`,
+    `cpm` Nullable(Float64) `json:$.cpm`,
+    `ctr` Nullable(Float64) `json:$.ctr`,
+    `frequency` Nullable(Float64) `json:$.frequency`,
+    `spend` Nullable(Float64) `json:$.spend`,
+    `campaign_name` Nullable(String) `json:$.campaign_name`,
+    `inline_link_click_ctr` Nullable(String) `json:$.inline_link_click_ctr`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` Date `json:$.__tb_sort_1` DEFAULT ifNull(date, toDate(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(account_id, toInt64(0)),
+    `__tb_sort_3` String `json:$.__tb_sort_3` DEFAULT ifNull(campaign_id, ''),
+    `__tb_sort_4` String `json:$.__tb_sort_4` DEFAULT ifNull(_fivetran_id, '')
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/facebook_ads/basic_campaign/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

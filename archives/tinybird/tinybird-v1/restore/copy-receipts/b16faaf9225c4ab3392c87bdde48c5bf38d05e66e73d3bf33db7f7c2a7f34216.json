@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-09-05T22:02:45.370697+00:00",
+  "source": "gs://booming-data/tinybird/stripe/charge/backfill/run_date=2026-08-26/run_time=195000/part-000000000012.parquet#1787773909942219",
+  "destination": {
+    "kind": "storage#object",
+    "id": "booming-data/tinybird/v1-preserved/history/raw_stripe_charge/b16faaf9225c4ab3392c87bdde48c5bf38d05e66e73d3bf33db7f7c2a7f34216.parquet/1788645765302560",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/booming-data/o/tinybird%2Fv1-preserved%2Fhistory%2Fraw_stripe_charge%2Fb16faaf9225c4ab3392c87bdde48c5bf38d05e66e73d3bf33db7f7c2a7f34216.parquet",
+    "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/booming-data/o/tinybird%2Fv1-preserved%2Fhistory%2Fraw_stripe_charge%2Fb16faaf9225c4ab3392c87bdde48c5bf38d05e66e73d3bf33db7f7c2a7f34216.parquet?generation=1788645765302560&alt=media",
+    "name": "tinybird/v1-preserved/history/raw_stripe_charge/b16faaf9225c4ab3392c87bdde48c5bf38d05e66e73d3bf33db7f7c2a7f34216.parquet",
+    "bucket": "booming-data",
+    "generation": "1788645765302560",
+    "metageneration": "1",
+    "contentType": "application/octet-stream",
+    "storageClass": "STANDARD",
+    "size": "22677",
+    "md5Hash": "pvWN9v/oRjSnbvaW0zKwZA==",
+    "crc32c": "vcuvMQ==",
+    "etag": "CKCS4du42JYDEAE=",
+    "timeCreated": "2026-09-05T22:02:45.368Z",
+    "updated": "2026-09-05T22:02:45.368Z",
+    "timeStorageClassUpdated": "2026-09-05T22:02:45.368Z",
+    "timeFinalized": "2026-09-05T22:02:45.368Z"
+  },
+  "rows": 2
+}

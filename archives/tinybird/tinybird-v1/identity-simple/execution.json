@@ -1,0 +1,22 @@
+{
+  "job": "tinybird-identity-simple",
+  "execution": "tinybird-identity-simple-bckh5",
+  "project": "able-folio-499722",
+  "region": "us-east4",
+  "snapshot": "identity-simple-20260907-v1",
+  "imageDigest": "sha256:c91ee81b9b02ed194a8924b887a1b77c2934b4e454b50324715e8e67da8a36d9",
+  "sourceBaseline": "boom-identity-20260905-v1",
+  "expectedCandidates": 10659477,
+  "tables": [
+    "identifiers",
+    "profiles",
+    "profile_redirects"
+  ],
+  "status": "completed",
+  "complete": true,
+  "continuousIdentityEnabled": false,
+  "completedAt": "2026-09-07T20:30:08.253Z",
+  "identifiers": 5147878,
+  "profiles": 2408452,
+  "redirects": 0
+}

@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Immutable bootstrap membership index used to build bounded negative-lookup proofs.
+
+SCHEMA >
+    `baseline_id` String `json:$.baseline_id`,
+    `tenant_id` String `json:$.tenant_id`,
+    `index_kind` LowCardinality(String) `json:$.index_kind`,
+    `bucket` UInt32 `json:$.bucket`,
+    `member_key` String `json:$.member_key`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY baseline_id, tenant_id, index_kind, bucket, member_key

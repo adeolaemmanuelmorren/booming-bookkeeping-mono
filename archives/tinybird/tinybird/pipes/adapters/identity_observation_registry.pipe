@@ -1,0 +1,145 @@
+DESCRIPTION >
+    GENERATED from the source registry and canonical contracts. First-party identity
+    observations keep tenant and source-connection lineage.
+
+NODE registered_identity_observation_rows
+SQL >
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM activecampaign_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('activecampaign-primary')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM payment_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('stripe-kajabi', 'stripe-primary')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM jitsu_tombstone_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM web_attribution_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM web_conversion_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM web_identify_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+    UNION ALL
+    SELECT
+        CAST(rows.source_generation_id AS String) AS source_generation_id,
+        CAST(rows.tenant_id AS String) AS tenant_id,
+        CAST(rows.source_connection_id AS String) AS source_connection_id,
+        CAST(rows.source_system AS String) AS source_system,
+        CAST(rows.source_record_id AS Nullable(String)) AS source_record_id,
+        CAST(rows.source_version AS DateTime64(6)) AS source_version,
+        CAST(rows.source_changed_at AS DateTime64(6)) AS source_changed_at,
+        CAST(rows.observed_at AS DateTime64(6)) AS observed_at,
+        CAST(rows.anonymous_id AS Nullable(String)) AS anonymous_id,
+        CAST(rows.user_id AS Nullable(String)) AS user_id,
+        CAST(rows.email AS Nullable(String)) AS email,
+        CAST(rows.phone AS Nullable(String)) AS phone,
+        CAST(rows.first_name AS Nullable(String)) AS first_name,
+        CAST(rows.last_name AS Nullable(String)) AS last_name,
+        CAST(rows.source_deleted AS UInt8) AS source_deleted
+    FROM web_page_identity_contract AS rows
+    WHERE rows.tenant_id = 'boom'
+      AND rows.source_connection_id IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')

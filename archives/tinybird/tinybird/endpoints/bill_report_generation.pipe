@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Active validated generation token and its pinned source, identity, attribution, policy,
+    and pending-input metadata.
+
+NODE bill_generation_endpoint_rows
+SQL >
+    SELECT
+        source_generation_id AS active_universe_generation,
+        toString(identity_stable_batch_version) AS identity_stable_generation,
+        attribution_stable_generation,
+        semantic_policy_version,
+        source_manifest_digest,
+        pending_input_digest,
+        report_generation
+    FROM current_report_generation
+
+TYPE endpoint

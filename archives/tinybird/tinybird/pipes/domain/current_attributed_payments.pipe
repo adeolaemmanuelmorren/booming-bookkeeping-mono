@@ -1,0 +1,131 @@
+DESCRIPTION >
+    Successful payment evidence resolved to the pinned first-party identity generation.
+    Manual payment_id links override email then phone; no click identifier is consulted.
+
+NODE payment_phone_digits
+SQL >
+    SELECT
+        payments.*,
+        replaceRegexpAll(trim(ifNull(payments.payment_phone, '')), '[^0-9]', '') AS phone_digits
+    FROM current_payment_evidence AS payments
+
+NODE payment_national_phones
+SQL >
+    SELECT
+        *,
+        multiIf(
+            length(phone_digits) = 10, phone_digits,
+            length(phone_digits) = 11 AND startsWith(phone_digits, '1'), substring(phone_digits, 2),
+            ''
+        ) AS national_phone
+    FROM payment_phone_digits
+
+NODE normalized_payment_identifiers
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(national_phone, '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$')
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            ''
+        ) AS normalized_phone
+    FROM payment_national_phones
+
+NODE attributed_payment_candidates
+SQL >
+    SELECT
+        payments.*,
+        manual.manual_profile_id,
+        manual_resolution.resolved_profile_id AS resolved_manual_profile_id,
+        manual_resolution.resolution_target_count AS manual_resolution_target_count,
+        email_mapping.profile_id AS email_profile_id,
+        phone_mapping.profile_id AS phone_profile_id,
+        manual.manual_link_created_at,
+        manual.manual_link_created_by
+    FROM normalized_payment_identifiers AS payments
+    INNER JOIN current_source_generation AS generation
+        ON payments.source_generation_id = generation.source_generation_id
+    LEFT JOIN manual_payment_profile_link_adapter AS manual
+        ON payments.source_generation_id = manual.source_generation_id
+       AND payments.tenant_id = manual.tenant_id
+       AND payments.source_connection_id = manual.source_connection_id
+       AND payments.payment_id = manual.payment_id
+    LEFT JOIN pinned_profile_id_resolutions AS manual_resolution
+        ON payments.tenant_id = manual_resolution.tenant_id
+       AND payments.source_generation_id = manual_resolution.source_generation_id
+       AND manual.manual_profile_id = manual_resolution.input_profile_id
+    LEFT JOIN pinned_identity_mappings AS email_mapping
+        ON email_mapping.tenant_id = payments.tenant_id
+       AND email_mapping.identifier_type = 'email'
+       AND email_mapping.identifier_value = payments.payment_email
+    LEFT JOIN pinned_identity_mappings AS phone_mapping
+        ON phone_mapping.tenant_id = payments.tenant_id
+       AND phone_mapping.identifier_type = 'phone'
+       AND phone_mapping.identifier_value = nullIf(payments.normalized_phone, '')
+
+NODE current_attributed_payment_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_connection_id,
+        payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        price_id,
+        plan_id,
+        product_rule,
+        is_bbb_mentorship_installment,
+        payment_sequence_number,
+        payment_occurrence_type,
+        is_repeat_payment,
+        payment_category,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        checkout_session_id,
+        payment_link_id,
+        invoice_billing_reason,
+        checkout_mode,
+        charge_description,
+        receipt_url,
+        livemode,
+        manual_profile_id,
+        if(
+            manual_profile_id IS NOT NULL,
+            nullIf(resolved_manual_profile_id, ''),
+            coalesce(email_profile_id, phone_profile_id)
+        ) AS profile_id,
+        multiIf(
+            manual_profile_id IS NOT NULL, 'manual',
+            email_profile_id IS NOT NULL OR phone_profile_id IS NOT NULL, 'automatic',
+            'unattributed'
+        ) AS attribution_method,
+        manual_link_created_at,
+        manual_link_created_by
+    FROM attributed_payment_candidates
+    QUALIFY row_number() OVER (
+        PARTITION BY tenant_id, source_connection_id, payment_id
+        ORDER BY if(
+            manual_profile_id IS NOT NULL,
+            nullIf(resolved_manual_profile_id, ''),
+            coalesce(email_profile_id, phone_profile_id)
+        )
+    ) = 1

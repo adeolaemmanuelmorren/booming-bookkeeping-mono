@@ -1,0 +1,295 @@
+DESCRIPTION >
+    Successful Kajabi-Stripe payment contract. Kajabi remains its own source and category;
+    invoice-line rules and subscription occurrence are resolved without unavailable tables.
+
+NODE kajabi_charge_state_rows
+SQL >
+    SELECT
+        id AS payment_id,
+        created AS payment_time,
+        lowerUTF8(currency) AS currency,
+        coalesce(amount, toInt64(0)) AS amount_cents,
+        coalesce(amount_refunded, toInt64(0)) AS amount_refunded_cents,
+        paid,
+        status,
+        customer_id,
+        invoice_id,
+        payment_intent_id,
+        payment_method_id,
+        receipt_email,
+        receipt_url,
+        billing_detail_email,
+        billing_detail_name,
+        billing_detail_phone,
+        description AS charge_description,
+        calculated_statement_descriptor,
+        statement_descriptor,
+        nullIf(trim(JSONExtractString(ifNull(metadata, '{}'), 'products')), '') AS metadata_products,
+        livemode,
+        _fivetran_synced AS source_changed_at
+    FROM raw_stripe_kajabi_charge
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_kajabi_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE successful_kajabi_charges
+SQL >
+    SELECT *
+    FROM kajabi_charge_state_rows
+    WHERE paid = true
+      AND status = 'succeeded'
+      AND payment_id IS NOT NULL
+      AND payment_time IS NOT NULL
+
+NODE kajabi_customer_state_rows
+SQL >
+    SELECT
+        id AS customer_id,
+        nullIf(lowerUTF8(trim(email)), '') AS email,
+        nullIf(trim(name), '') AS name,
+        nullIf(trim(phone), '') AS phone,
+        _fivetran_synced AS source_changed_at
+    FROM raw_stripe_kajabi_customer
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_kajabi_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE kajabi_intent_state_rows
+SQL >
+    SELECT
+        id AS payment_intent_id,
+        nullIf(lowerUTF8(trim(receipt_email)), '') AS receipt_email,
+        nullIf(trim(description), '') AS description,
+        _fivetran_synced AS source_changed_at
+    FROM raw_stripe_kajabi_payment_intent
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_kajabi_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE kajabi_invoice_state_rows
+SQL >
+    SELECT
+        id AS invoice_id,
+        subscription_id,
+        billing_reason,
+        nullIf(trim(description), '') AS description
+    FROM raw_stripe_kajabi_invoice
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_kajabi_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE kajabi_invoice_line_state_rows
+SQL >
+    SELECT
+        coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), '')) AS line_item_id,
+        invoice_id,
+        subscription_id,
+        price_id,
+        plan_id,
+        nullIf(trim(description), '') AS line_item_description,
+        coalesce(amount, toInt64(0)) AS amount_cents,
+        quantity
+    FROM raw_stripe_kajabi_invoice_line_item
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.stripe_kajabi_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY coalesce(nullIf(trim(unique_id), ''), nullIf(trim(id), ''))
+        ORDER BY _fivetran_synced DESC
+    ) = 1
+
+NODE kajabi_invoice_line_rollups
+SQL >
+    SELECT
+        invoice_id,
+        argMin(
+            tuple(
+                line_item_id,
+                subscription_id,
+                price_id,
+                plan_id,
+                line_item_description,
+                amount_cents,
+                quantity
+            ),
+            tuple(-amount_cents, line_item_id)
+        ) AS best_line,
+        arrayStringConcat(
+            arraySort(arrayFilter(value -> value != '', groupArray(ifNull(line_item_description, '')))),
+            ', '
+        ) AS complete_line_description
+    FROM kajabi_invoice_line_state_rows
+    GROUP BY invoice_id
+
+NODE enriched_kajabi_payments
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        'stripe_kajabi' AS payment_source,
+        charges.payment_id,
+        charges.payment_time,
+        toDate(charges.payment_time, 'America/Los_Angeles') AS payment_date,
+        charges.customer_id,
+        coalesce(
+            nullIf(lowerUTF8(trim(charges.billing_detail_email)), ''),
+            nullIf(lowerUTF8(trim(charges.receipt_email)), ''),
+            customers.email,
+            intents.receipt_email
+        ) AS payment_email,
+        coalesce(nullIf(trim(charges.billing_detail_name), ''), customers.name) AS payment_name,
+        coalesce(nullIf(trim(charges.billing_detail_phone), ''), customers.phone) AS payment_phone,
+        charges.currency,
+        toDecimal128(charges.amount_cents, 9) / 100 AS amount_paid,
+        toDecimal128(charges.amount_refunded_cents, 9) / 100 AS refund_amount,
+        toDecimal128(charges.amount_cents - charges.amount_refunded_cents, 9) / 100 AS net_amount,
+        toUInt8(charges.amount_refunded_cents > 0) AS has_refund,
+        charges.payment_intent_id,
+        charges.payment_method_id,
+        charges.invoice_id,
+        coalesce(invoices.subscription_id, tupleElement(lines.best_line, 2)) AS subscription_id,
+        invoices.billing_reason AS invoice_billing_reason,
+        tupleElement(lines.best_line, 1) AS line_item_id,
+        tupleElement(lines.best_line, 3) AS price_id,
+        tupleElement(lines.best_line, 4) AS plan_id,
+        tupleElement(lines.best_line, 5) AS line_item_description,
+        lines.complete_line_description,
+        charges.charge_description,
+        charges.calculated_statement_descriptor,
+        charges.statement_descriptor,
+        intents.description AS payment_intent_description,
+        invoices.description AS invoice_description,
+        charges.receipt_url,
+        charges.livemode,
+        greatest(
+            charges.source_changed_at,
+            coalesce(customers.source_changed_at, toDateTime64(0, 6)),
+            coalesce(intents.source_changed_at, toDateTime64(0, 6))
+        ) AS source_changed_at
+    FROM successful_kajabi_charges AS charges
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN kajabi_customer_state_rows AS customers
+        ON charges.customer_id = customers.customer_id
+    LEFT JOIN kajabi_intent_state_rows AS intents
+        ON charges.payment_intent_id = intents.payment_intent_id
+    LEFT JOIN kajabi_invoice_state_rows AS invoices
+        ON charges.invoice_id = invoices.invoice_id
+    LEFT JOIN kajabi_invoice_line_rollups AS lines
+        ON charges.invoice_id = lines.invoice_id
+
+NODE classified_kajabi_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            plan_id = 'subscription_plan_2149288216'
+                OR match(lowerUTF8(ifNull(line_item_description, '')), 'booming bookkeeping mentorship program'),
+                'kajabi_mentorship_monthly',
+            plan_id = 'subscription_plan_255477'
+                OR match(lowerUTF8(ifNull(line_item_description, '')), 'booming bookkeeping business.*installment'),
+                'kajabi_business_installment_legacy',
+            line_item_description IS NOT NULL, 'kajabi_invoice_line',
+            'unclassified'
+        ) AS product_rule
+    FROM enriched_kajabi_payments
+
+NODE named_kajabi_payments
+SQL >
+    SELECT
+        *,
+        multiIf(
+            product_rule = 'kajabi_mentorship_monthly', 'subscription_plan_2149288216',
+            product_rule = 'kajabi_business_installment_legacy', 'subscription_plan_255477',
+            coalesce(plan_id, price_id)
+        ) AS product_id,
+        multiIf(
+            product_rule = 'kajabi_mentorship_monthly', 'Booming Bookkeeping Mentorship Program',
+            product_rule = 'kajabi_business_installment_legacy', 'Booming Bookkeeping Business (Installment Plan)',
+            product_rule = 'kajabi_invoice_line', trim(replaceRegexpAll(
+                replaceRegexpAll(line_item_description, '(?i)^\\s*\\d+\\s*[×x]\\s*', ''),
+                '(?i)\\s*\\(at\\s+\\$[^)]*\\)\\s*$',
+                ''
+            )),
+            'unclassified'
+        ) AS product_name
+    FROM classified_kajabi_payments
+
+NODE sequenced_kajabi_payments
+SQL >
+    SELECT
+        *,
+        row_number() OVER (
+            PARTITION BY if(
+                subscription_id IS NULL,
+                concat('payment:', payment_id),
+                concat('subscription:', subscription_id)
+            )
+            ORDER BY payment_time, payment_id
+        ) AS sequence_number
+    FROM named_kajabi_payments
+
+NODE current_kajabi_payment_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        payment_source,
+        payment_id,
+        payment_time,
+        payment_date,
+        customer_id,
+        payment_email,
+        payment_name,
+        payment_phone,
+        currency,
+        amount_paid,
+        refund_amount,
+        net_amount,
+        has_refund,
+        product_id,
+        product_name,
+        price_id,
+        plan_id,
+        product_rule,
+        toUInt8(0) AS is_bbb_mentorship_installment,
+        if(
+            subscription_id IS NULL,
+            CAST(NULL AS Nullable(Int64)),
+            toInt64(sequence_number)
+        ) AS payment_sequence_number,
+        multiIf(
+            subscription_id IS NULL, 'one_time',
+            invoice_billing_reason = 'subscription_create', 'initial',
+            'renewal'
+        ) AS payment_occurrence_type,
+        toUInt8(
+            subscription_id IS NOT NULL
+            AND coalesce(invoice_billing_reason != 'subscription_create', true)
+        ) AS is_repeat_payment,
+        'kajabi' AS payment_category,
+        payment_intent_id,
+        payment_method_id,
+        invoice_id,
+        subscription_id,
+        CAST(NULL AS Nullable(String)) AS checkout_session_id,
+        CAST(NULL AS Nullable(String)) AS payment_link_id,
+        invoice_billing_reason,
+        CAST(NULL AS Nullable(String)) AS checkout_mode,
+        charge_description,
+        receipt_url,
+        livemode,
+        source_changed_at
+    FROM sequenced_kajabi_payments

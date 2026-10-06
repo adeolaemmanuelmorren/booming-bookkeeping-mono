@@ -1,0 +1,213 @@
+{
+  "checkedAt": "2026-09-05T23:50:35.705Z",
+  "integrationVerified": true,
+  "realtimeReportsReady": false,
+  "commits": {
+    "commits": 12,
+    "latest_version": 12,
+    "published_rows": 1140,
+    "report_ready_commits": 0,
+    "invalid_commits": 0
+  },
+  "sources": [
+    {
+      "source": "activecampaign",
+      "account": "default",
+      "replacements": 50
+    },
+    {
+      "source": "stripe",
+      "account": "kajabi",
+      "replacements": 25
+    },
+    {
+      "source": "stripe",
+      "account": "main",
+      "replacements": 68
+    }
+  ],
+  "identities": [
+    {
+      "kind": "evidence",
+      "records": 426
+    },
+    {
+      "kind": "fact",
+      "records": 114
+    },
+    {
+      "kind": "mapping",
+      "records": 360
+    },
+    {
+      "kind": "profile",
+      "records": 97
+    }
+  ],
+  "publication": {
+    "received": 143,
+    "pending": 0,
+    "version": 12,
+    "activeBatch": null,
+    "prepared": false,
+    "historyComplete": false
+  },
+  "sourceStates": [
+    {
+      "route": {
+        "source": "stripe",
+        "account": "main"
+      },
+      "backfill": {
+        "id": "realtime-v1",
+        "stripeCreatedGte": 1788566400,
+        "startedAt": "2026-09-05T23:47:46.138Z"
+      },
+      "lease": {
+        "active": false,
+        "expiresAt": null
+      },
+      "work": {
+        "pendingInbox": 48,
+        "outboxedInbox": 0,
+        "processedInbox": 68,
+        "pendingOutbox": 0,
+        "publishedOutbox": 68,
+        "cursorCount": 2,
+        "currentScopeCount": 68,
+        "currentRowCount": 68,
+        "immutableVersionCount": 68
+      },
+      "storage": {
+        "databaseBytes": 2854912,
+        "storedJsonBytes": 2019032
+      },
+      "lastSlice": {
+        "startedAt": "2026-09-05T23:47:46.138Z",
+        "succeededAt": "2026-09-05T23:47:50.054Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "nextAlarmAt": null,
+      "paused": true,
+      "hydration": [
+        {
+          "nextStep": "getPrice",
+          "records": 4
+        },
+        {
+          "nextStep": "getProduct",
+          "records": 1
+        },
+        {
+          "nextStep": "initial",
+          "records": 23
+        },
+        {
+          "nextStep": "listCheckoutSessions",
+          "records": 15
+        },
+        {
+          "nextStep": "listInvoiceLines",
+          "records": 2
+        },
+        {
+          "nextStep": "listRefunds",
+          "records": 3
+        }
+      ]
+    },
+    {
+      "route": {
+        "source": "stripe",
+        "account": "kajabi"
+      },
+      "backfill": {
+        "id": "realtime-v1",
+        "stripeCreatedGte": 1788566400,
+        "startedAt": "2026-09-05T23:32:57.810Z"
+      },
+      "lease": {
+        "active": false,
+        "expiresAt": null
+      },
+      "work": {
+        "pendingInbox": 93,
+        "outboxedInbox": 0,
+        "processedInbox": 25,
+        "pendingOutbox": 0,
+        "publishedOutbox": 25,
+        "cursorCount": 2,
+        "currentScopeCount": 25,
+        "currentRowCount": 25,
+        "immutableVersionCount": 25
+      },
+      "storage": {
+        "databaseBytes": 2207744,
+        "storedJsonBytes": 1750752
+      },
+      "lastSlice": {
+        "startedAt": "2026-09-05T23:35:52.697Z",
+        "succeededAt": "2026-09-05T23:36:01.302Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "nextAlarmAt": null,
+      "paused": true,
+      "hydration": [
+        {
+          "nextStep": "initial",
+          "records": 68
+        },
+        {
+          "nextStep": "listRefunds",
+          "records": 25
+        }
+      ]
+    },
+    {
+      "route": {
+        "source": "activecampaign",
+        "account": "default"
+      },
+      "backfill": {
+        "id": "realtime-v1",
+        "stripeCreatedGte": 1788566400,
+        "startedAt": "2026-09-05T23:31:13.597Z"
+      },
+      "lease": {
+        "active": false,
+        "expiresAt": null
+      },
+      "work": {
+        "pendingInbox": 88,
+        "outboxedInbox": 2,
+        "processedInbox": 10,
+        "pendingOutbox": 62,
+        "publishedOutbox": 50,
+        "cursorCount": 2,
+        "currentScopeCount": 50,
+        "currentRowCount": 21,
+        "immutableVersionCount": 112
+      },
+      "storage": {
+        "databaseBytes": 892928,
+        "storedJsonBytes": 495598
+      },
+      "lastSlice": {
+        "startedAt": "2026-09-05T23:32:13.599Z",
+        "succeededAt": "2026-09-05T23:31:50.485Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "nextAlarmAt": null,
+      "paused": true,
+      "hydration": [
+        {
+          "nextStep": "initial",
+          "records": 88
+        }
+      ]
+    }
+  ]
+}

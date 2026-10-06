@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Immutable incoming Jitsu delivery observations. Occurrence key is tenant_id, envelope_hash, event_index.
+    Queue retries share an occurrence key. Repeated upstream deliveries can have different occurrence keys.
+    Readers must deduplicate occurrences and choose source heads by event kind, message ID and source version.
+    Reject conflicting hashes. delivery_event_id also identifies retries of the same upstream batch.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `envelope_hash` String `json:$.envelope_hash`,
+    `event_index` UInt32 `json:$.event_index`,
+    `delivery_event_id` String `json:$.delivery_event_id`,
+    `message_id` String `json:$.message_id`,
+    `event_kind` String `json:$.event_kind`,
+    `received_at` DateTime64(3) `json:$.received_at`,
+    `observation_json` String `json:$.observation_json`,
+    `observation_hash` String `json:$.observation_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, envelope_hash, event_index
+
+TOKEN v1_facts_runtime READ
+TOKEN v1_facts_runtime APPEND

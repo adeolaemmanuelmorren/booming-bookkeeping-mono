@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-09-05T23:31:36.850Z",
+  "status": 200,
+  "ok": true,
+  "stripeMain": {
+    "ok": true,
+    "expansions": [
+      {
+        "field": "customer",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "payment_intent",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "invoice",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "balance_transaction",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "payment_method",
+        "status": 400,
+        "errorCode": null
+      }
+    ],
+    "status": 200,
+    "accountStatus": 403,
+    "errorCode": null,
+    "accountId": null
+  },
+  "stripeKajabi": {
+    "ok": true,
+    "expansions": [
+      {
+        "field": "customer",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "payment_intent",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "invoice",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "balance_transaction",
+        "status": 200,
+        "errorCode": null
+      },
+      {
+        "field": "payment_method",
+        "status": 400,
+        "errorCode": null
+      }
+    ],
+    "status": 200,
+    "accountStatus": 403,
+    "errorCode": null,
+    "accountId": null
+  },
+  "activecampaign": {
+    "ok": true,
+    "status": 200
+  },
+  "distinctStripeAccounts": null
+}

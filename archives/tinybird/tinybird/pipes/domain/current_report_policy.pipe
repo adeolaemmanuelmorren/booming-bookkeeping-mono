@@ -1,0 +1,113 @@
+DESCRIPTION >
+    Active Boom report policy with an explicit Dataform-compatible default. Unsupported
+    policy modes are visible to readiness checks and do not silently change semantics.
+
+NODE configured_report_policy_versions
+SQL >
+    SELECT
+        tenant_id,
+        semantic_policy_version,
+        argMax(
+            tuple(
+                compatibility_mode,
+                report_timezone,
+                range_mode,
+                click_identity_mode,
+                preserve_generic_row_presence,
+                immediate_vip_requires_positive_net,
+                five_k_net_threshold,
+                five_k_reported_value,
+                daily_delivery_mode,
+                is_active,
+                activated_at,
+                version
+            ),
+            tuple(version, activated_at)
+        ) AS current_policy
+    FROM report_compatibility_policy_versions
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, semantic_policy_version
+
+NODE configured_report_policy_rows
+SQL >
+    SELECT
+        tenant_id,
+        semantic_policy_version,
+        tupleElement(current_policy, 1) AS compatibility_mode,
+        tupleElement(current_policy, 2) AS report_timezone,
+        tupleElement(current_policy, 3) AS range_mode,
+        tupleElement(current_policy, 4) AS click_identity_mode,
+        tupleElement(current_policy, 5) AS preserve_generic_row_presence,
+        tupleElement(current_policy, 6) AS immediate_vip_requires_positive_net,
+        tupleElement(current_policy, 7) AS five_k_net_threshold,
+        tupleElement(current_policy, 8) AS five_k_reported_value,
+        tupleElement(current_policy, 9) AS daily_delivery_mode,
+        toUInt8(1) AS is_configured,
+        tupleElement(current_policy, 11) AS activated_at,
+        tupleElement(current_policy, 12) AS version
+    FROM configured_report_policy_versions
+    WHERE tupleElement(current_policy, 10) = 1
+
+NODE default_report_policy_row
+SQL >
+    SELECT
+        'boom' AS tenant_id,
+        'boom-dataform-compat-v1' AS semantic_policy_version,
+        'dataform_compat_v1' AS compatibility_mode,
+        'America/Los_Angeles' AS report_timezone,
+        'start_inclusive_end_exclusive' AS range_mode,
+        'first_party_only' AS click_identity_mode,
+        toUInt8(1) AS preserve_generic_row_presence,
+        toUInt8(0) AS immediate_vip_requires_positive_net,
+        toDecimal128(900, 9) AS five_k_net_threshold,
+        toInt64(4997) AS five_k_reported_value,
+        'daily_own_level' AS daily_delivery_mode,
+        toUInt8(0) AS is_configured,
+        toDateTime64('1970-01-01 00:00:00', 6, 'UTC') AS activated_at,
+        toUInt64(0) AS version
+
+NODE report_policy_candidates
+SQL >
+    SELECT * FROM configured_report_policy_rows
+    UNION ALL
+    SELECT * FROM default_report_policy_row
+
+NODE active_report_policy_row
+SQL >
+    SELECT
+        tenant_id,
+        semantic_policy_version,
+        compatibility_mode,
+        report_timezone,
+        range_mode,
+        click_identity_mode,
+        preserve_generic_row_presence,
+        immediate_vip_requires_positive_net,
+        five_k_net_threshold,
+        five_k_reported_value,
+        daily_delivery_mode,
+        is_configured,
+        activated_at,
+        version,
+        hex(SHA256(toJSONString(tuple(
+            semantic_policy_version,
+            compatibility_mode,
+            report_timezone,
+            range_mode,
+            click_identity_mode,
+            preserve_generic_row_presence,
+            immediate_vip_requires_positive_net,
+            five_k_net_threshold,
+            five_k_reported_value,
+            daily_delivery_mode
+        )))) AS policy_digest
+    FROM (
+        SELECT
+            *,
+            row_number() OVER (
+                PARTITION BY tenant_id
+                ORDER BY is_configured DESC, version DESC, activated_at DESC
+            ) AS policy_rank
+        FROM report_policy_candidates
+    )
+    WHERE policy_rank = 1

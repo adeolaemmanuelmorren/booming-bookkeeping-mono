@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Immutable finite bootstrap state. Visible to live readers only after the baseline seal.
+
+SCHEMA >
+    `baseline_id` String `json:$.baseline_id`,
+    `tenant_id` String `json:$.tenant_id`,
+    `visitor_key` String `json:$.visitor_key`,
+    `page_id` String `json:$.page_id`,
+    `head_hash` FixedString(64) `json:$.head_hash`,
+    `head_json` String `json:$.head_json`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY baseline_id, tenant_id, visitor_key, page_id

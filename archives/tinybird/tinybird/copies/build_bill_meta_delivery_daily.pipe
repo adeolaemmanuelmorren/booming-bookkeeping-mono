@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Append one complete validated shadow generation of daily own-level Meta delivery.
+
+NODE validated_daily_product_copy_rows
+SQL >
+    SELECT product.*
+    FROM bill_meta_delivery_daily_product AS product
+    INNER JOIN bill_build_readiness AS readiness
+        ON product.report_generation = readiness.report_generation
+       AND readiness.is_ready = 1
+
+TYPE COPY
+TARGET_DATASOURCE bill_meta_delivery_daily_versions
+COPY_MODE append

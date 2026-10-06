@@ -1,0 +1,64 @@
+{
+  "bill_report_window": {
+    "parameters": ["p_report_generation"],
+    "columns": [
+      ["available_start_pacific", "String"],
+      ["previous_week_start_pacific", "String"],
+      ["active_week_start_pacific", "String"],
+      ["data_through_pacific", "String"]
+    ]
+  },
+  "bill_live_acquisition": {
+    "parameters": ["p_report_generation", "p_range_start_pacific", "p_range_end_pacific"],
+    "columns": [
+      ["hour_start_pacific", "String"],
+      ["campaign_id", "Nullable(String)"],
+      ["adset_id", "Nullable(String)"],
+      ["ad_id", "Nullable(String)"],
+      ["campaign_name", "String"],
+      ["adset_name", "String"],
+      ["ad_name", "String"],
+      ["spend", "Decimal(38,9)"],
+      ["impressions", "Int64"],
+      ["clicks", "Int64"],
+      ["last_touch_registrations", "Int64"],
+      ["last_touch_immediate_vips", "Int64"],
+      ["first_touch_registrations", "Int64"],
+      ["first_touch_immediate_vips", "Int64"],
+      ["solo_touch_registrations", "Int64"],
+      ["solo_touch_immediate_vips", "Int64"]
+    ],
+    "order_by": ["hour_start_pacific", "campaign_name", "adset_name", "ad_name"]
+  },
+  "bill_5k_performance": {
+    "parameters": ["p_report_generation", "p_range_start_pacific", "p_range_end_pacific"],
+    "columns": [
+      ["hour_start_pacific", "String"],
+      ["campaign_id", "Nullable(String)"],
+      ["adset_id", "Nullable(String)"],
+      ["ad_id", "Nullable(String)"],
+      ["last_touch_5k_purchasers", "Int64"],
+      ["last_touch_5k_revenue", "Int64"],
+      ["last_touch_immediate_vip_5k_purchasers", "Int64"],
+      ["first_touch_5k_purchasers", "Int64"],
+      ["first_touch_5k_revenue", "Int64"],
+      ["solo_touch_5k_purchasers", "Int64"],
+      ["solo_touch_5k_revenue", "Int64"]
+    ],
+    "order_by": ["hour_start_pacific", "campaign_id", "adset_id", "ad_id"]
+  },
+  "bill_meta_delivery_daily": {
+    "parameters": ["p_report_generation", "p_range_start_pacific", "p_range_end_pacific"],
+    "columns": [
+      ["date", "String"],
+      ["level", "String"],
+      ["campaign_id", "Nullable(String)"],
+      ["adset_id", "Nullable(String)"],
+      ["ad_id", "Nullable(String)"],
+      ["impressions", "Int64"],
+      ["reach", "Int64"],
+      ["frequency", "Nullable(Float64)"]
+    ],
+    "order_by": ["date", "level", "campaign_id", "adset_id", "ad_id"]
+  }
+}

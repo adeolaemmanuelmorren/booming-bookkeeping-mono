@@ -1,0 +1,172 @@
+{
+  "scenario": "complete-attribution:44886ecc-f157-42ae-b0c3-945e5d8ff012",
+  "branchId": "4f800e4b-7ce6-4f2a-8dcb-6cfb685e53fa",
+  "checks": [
+    {
+      "name": "initial-and-lost-ack-retries",
+      "version": 1,
+      "affectedProfiles": 3,
+      "reportRows": 4,
+      "wallMs": 125,
+      "statistics": {
+        "elapsed": 0.022357675,
+        "rows_read": 4,
+        "bytes_read": 8176
+      },
+      "passed": true
+    },
+    {
+      "name": "duplicate-and-conflicting-source-version",
+      "passed": true
+    },
+    {
+      "name": "refund",
+      "version": 2,
+      "affectedProfiles": 1,
+      "reportRows": 4,
+      "wallMs": 354,
+      "statistics": {
+        "elapsed": 0.022406368,
+        "rows_read": 25,
+        "bytes_read": 125523
+      },
+      "passed": true
+    },
+    {
+      "name": "late-earlier-touch",
+      "version": 3,
+      "affectedProfiles": 1,
+      "reportRows": 5,
+      "wallMs": 1378,
+      "statistics": {
+        "elapsed": 0.023182992,
+        "rows_read": 27,
+        "bytes_read": 131298
+      },
+      "passed": true
+    },
+    {
+      "name": "touch-correction",
+      "version": 4,
+      "affectedProfiles": 1,
+      "reportRows": 5,
+      "wallMs": 769,
+      "statistics": {
+        "elapsed": 0.022834511,
+        "rows_read": 29,
+        "bytes_read": 137081
+      },
+      "passed": true
+    },
+    {
+      "name": "touch-deletion",
+      "version": 5,
+      "affectedProfiles": 1,
+      "reportRows": 4,
+      "wallMs": 1352,
+      "statistics": {
+        "elapsed": 0.023323685,
+        "rows_read": 37,
+        "bytes_read": 159919
+      },
+      "passed": true
+    },
+    {
+      "name": "atomic-identity-merge",
+      "version": 6,
+      "affectedProfiles": 2,
+      "reportRows": 5,
+      "wallMs": 12620,
+      "statistics": {
+        "elapsed": 0.024714048,
+        "rows_read": 39,
+        "bytes_read": 167564
+      },
+      "passed": true
+    },
+    {
+      "name": "atomic-identity-split",
+      "version": 7,
+      "affectedProfiles": 2,
+      "reportRows": 4,
+      "wallMs": 10238,
+      "statistics": {
+        "elapsed": 0.023591982,
+        "rows_read": 42,
+        "bytes_read": 173714
+      },
+      "passed": true
+    },
+    {
+      "name": "late-identity-link",
+      "version": 8,
+      "affectedProfiles": 2,
+      "reportRows": 4,
+      "wallMs": 9682,
+      "statistics": {
+        "elapsed": 0.096773535,
+        "rows_read": 44,
+        "bytes_read": 177803
+      },
+      "passed": true
+    },
+    {
+      "name": "shared-session-across-profiles",
+      "version": 9,
+      "affectedProfiles": 2,
+      "reportRows": 5,
+      "wallMs": 8763,
+      "statistics": {
+        "elapsed": 0.025446584,
+        "rows_read": 47,
+        "bytes_read": 189236
+      },
+      "passed": true
+    },
+    {
+      "name": "conversion-deletion",
+      "version": 10,
+      "affectedProfiles": 1,
+      "reportRows": 4,
+      "wallMs": 10317,
+      "statistics": {
+        "elapsed": 0.022553387,
+        "rows_read": 49,
+        "bytes_read": 191389
+      },
+      "passed": true
+    },
+    {
+      "name": "identity-link-removal",
+      "version": 11,
+      "affectedProfiles": 2,
+      "reportRows": 4,
+      "wallMs": 10277,
+      "statistics": {
+        "elapsed": 0.024072028,
+        "rows_read": 51,
+        "bytes_read": 193581
+      },
+      "passed": true
+    },
+    {
+      "name": "click-window-and-empty-window",
+      "passed": true
+    },
+    {
+      "name": "missing-chunk-fails-closed-and-recovers",
+      "passed": true
+    },
+    {
+      "name": "ad-grain-full-outer-merge-and-metric-conservation",
+      "passed": true
+    },
+    {
+      "name": "conflicting-concurrent-version-rejected",
+      "passed": true
+    }
+  ],
+  "reader": "single-commit-scan",
+  "liveAdApiTested": false,
+  "verified": true
+}

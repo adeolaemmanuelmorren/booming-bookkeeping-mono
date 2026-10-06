@@ -1,0 +1,180 @@
+DESCRIPTION >
+    Complete hourly Meta delivery and KRC attribution product for both Bill report shapes.
+    The row universe preserves the otherwise-unused generic conversion detour.
+
+NODE aggregated_meta_hourly_delivery
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        'meta' AS source,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any(campaign_name) AS campaign_name,
+        any(adset_name) AS adset_name,
+        any(ad_name) AS ad_name,
+        sum(spend) AS spend,
+        sum(impressions) AS impressions,
+        sum(clicks) AS clicks
+    FROM current_hourly_ad_delivery
+    WHERE source = 'meta'
+    GROUP BY
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        hour_start,
+        campaign_id,
+        adset_id,
+        ad_id
+
+NODE generic_conversion_delivery_universe
+SQL >
+    SELECT
+        coalesce(delivery.source_generation_id, conversions.source_generation_id) AS source_generation_id,
+        coalesce(delivery.report_generation, conversions.report_generation) AS report_generation,
+        coalesce(delivery.tenant_id, conversions.tenant_id) AS tenant_id,
+        coalesce(delivery.hour_start, conversions.hour_start) AS hour_start,
+        'meta' AS source,
+        coalesce(delivery.campaign_id, conversions.campaign_id) AS campaign_id,
+        coalesce(delivery.adset_id, conversions.adset_id) AS adset_id,
+        coalesce(delivery.ad_id, conversions.ad_id) AS ad_id,
+        coalesce(delivery.campaign_name, conversions.campaign_name, 'unknown') AS campaign_name,
+        coalesce(delivery.adset_name, conversions.adset_name, 'unknown') AS adset_name,
+        coalesce(delivery.ad_name, conversions.ad_name, 'unknown') AS ad_name,
+        coalesce(delivery.spend, toDecimal128(0, 9)) AS spend,
+        coalesce(delivery.impressions, toInt64(0)) AS impressions,
+        coalesce(delivery.clicks, toInt64(0)) AS clicks
+    FROM aggregated_meta_hourly_delivery AS delivery
+    FULL OUTER JOIN generic_conversion_row_presence AS conversions
+        ON delivery.hour_start = conversions.hour_start
+       AND isNotDistinctFrom(delivery.campaign_id, conversions.campaign_id)
+       AND isNotDistinctFrom(delivery.adset_id, conversions.adset_id)
+       AND isNotDistinctFrom(delivery.ad_id, conversions.ad_id)
+
+NODE first_touch_attribution_rows
+SQL >
+    SELECT
+        'first' AS attribution_method,
+        first_touch_click_hour AS hour_start,
+        first_touch_campaign_id AS campaign_id,
+        first_touch_adset_id AS adset_id,
+        first_touch_ad_id AS ad_id,
+        first_touch_campaign_name AS campaign_name,
+        first_touch_adset_name AS adset_name,
+        first_touch_ad_name AS ad_name,
+        registration_id,
+        is_immediate_vip,
+        is_5k_purchaser
+    FROM current_bill_krc_acquisition_build AS acquisition
+    WHERE acquisition.first_touch_click_hour IS NOT NULL
+
+NODE last_touch_attribution_rows
+SQL >
+    SELECT
+        'last' AS attribution_method,
+        last_touch_click_hour AS hour_start,
+        last_touch_campaign_id AS campaign_id,
+        last_touch_adset_id AS adset_id,
+        last_touch_ad_id AS ad_id,
+        last_touch_campaign_name AS campaign_name,
+        last_touch_adset_name AS adset_name,
+        last_touch_ad_name AS ad_name,
+        registration_id,
+        is_immediate_vip,
+        is_5k_purchaser
+    FROM current_bill_krc_acquisition_build AS acquisition
+    WHERE acquisition.last_touch_click_hour IS NOT NULL
+
+NODE solo_touch_attribution_rows
+SQL >
+    SELECT
+        'solo' AS attribution_method,
+        first_touch_click_hour AS hour_start,
+        first_touch_campaign_id AS campaign_id,
+        first_touch_adset_id AS adset_id,
+        first_touch_ad_id AS ad_id,
+        first_touch_campaign_name AS campaign_name,
+        first_touch_adset_name AS adset_name,
+        first_touch_ad_name AS ad_name,
+        registration_id,
+        is_immediate_vip,
+        is_5k_purchaser
+    FROM current_bill_krc_acquisition_build AS acquisition
+    WHERE acquisition.is_solo_touch = 1
+      AND acquisition.first_touch_click_hour IS NOT NULL
+
+NODE all_krc_attribution_method_rows
+SQL >
+    SELECT * FROM first_touch_attribution_rows
+    UNION ALL
+    SELECT * FROM last_touch_attribution_rows
+    UNION ALL
+    SELECT * FROM solo_touch_attribution_rows
+
+NODE hourly_krc_attribution
+SQL >
+    SELECT
+        hour_start,
+        campaign_id,
+        adset_id,
+        ad_id,
+        any(campaign_name) AS campaign_name,
+        any(adset_name) AS adset_name,
+        any(ad_name) AS ad_name,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'last')) AS last_touch_registrations,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'last' AND is_immediate_vip = 1)) AS last_touch_immediate_vips,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'first')) AS first_touch_registrations,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'first' AND is_immediate_vip = 1)) AS first_touch_immediate_vips,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'solo')) AS solo_touch_registrations,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'solo' AND is_immediate_vip = 1)) AS solo_touch_immediate_vips,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'last' AND is_5k_purchaser = 1)) AS last_touch_5k_purchasers,
+        toInt64(uniqExactIf(
+            registration_id,
+            attribution_method = 'last' AND is_immediate_vip = 1 AND is_5k_purchaser = 1
+        )) AS last_touch_immediate_vip_5k_purchasers,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'first' AND is_5k_purchaser = 1)) AS first_touch_5k_purchasers,
+        toInt64(uniqExactIf(registration_id, attribution_method = 'solo' AND is_5k_purchaser = 1)) AS solo_touch_5k_purchasers
+    FROM all_krc_attribution_method_rows
+    GROUP BY hour_start, campaign_id, adset_id, ad_id
+
+NODE bill_hourly_product_rows
+SQL >
+    SELECT
+        coalesce(delivery.tenant_id, 'boom') AS tenant_id,
+        generation.report_generation,
+        coalesce(delivery.hour_start, attribution.hour_start) AS hour_start,
+        'meta' AS source,
+        coalesce(delivery.campaign_id, attribution.campaign_id) AS campaign_id,
+        coalesce(delivery.adset_id, attribution.adset_id) AS adset_id,
+        coalesce(delivery.ad_id, attribution.ad_id) AS ad_id,
+        coalesce(delivery.campaign_name, attribution.campaign_name, 'Unknown campaign') AS campaign_name,
+        coalesce(delivery.adset_name, attribution.adset_name, 'Unknown ad set') AS adset_name,
+        coalesce(delivery.ad_name, attribution.ad_name, 'Unknown ad') AS ad_name,
+        coalesce(delivery.spend, toDecimal128(0, 9)) AS spend,
+        coalesce(delivery.impressions, toInt64(0)) AS impressions,
+        coalesce(delivery.clicks, toInt64(0)) AS clicks,
+        coalesce(attribution.last_touch_registrations, toInt64(0)) AS last_touch_registrations,
+        coalesce(attribution.last_touch_immediate_vips, toInt64(0)) AS last_touch_immediate_vips,
+        coalesce(attribution.first_touch_registrations, toInt64(0)) AS first_touch_registrations,
+        coalesce(attribution.first_touch_immediate_vips, toInt64(0)) AS first_touch_immediate_vips,
+        coalesce(attribution.solo_touch_registrations, toInt64(0)) AS solo_touch_registrations,
+        coalesce(attribution.solo_touch_immediate_vips, toInt64(0)) AS solo_touch_immediate_vips,
+        coalesce(attribution.last_touch_5k_purchasers, toInt64(0)) AS last_touch_5k_purchasers,
+        coalesce(attribution.last_touch_5k_purchasers, toInt64(0)) * policy.five_k_reported_value AS last_touch_5k_revenue,
+        coalesce(attribution.last_touch_immediate_vip_5k_purchasers, toInt64(0)) AS last_touch_immediate_vip_5k_purchasers,
+        coalesce(attribution.first_touch_5k_purchasers, toInt64(0)) AS first_touch_5k_purchasers,
+        coalesce(attribution.first_touch_5k_purchasers, toInt64(0)) * policy.five_k_reported_value AS first_touch_5k_revenue,
+        coalesce(attribution.solo_touch_5k_purchasers, toInt64(0)) AS solo_touch_5k_purchasers,
+        coalesce(attribution.solo_touch_5k_purchasers, toInt64(0)) * policy.five_k_reported_value AS solo_touch_5k_revenue,
+        now64(6) AS materialized_at
+    FROM generic_conversion_delivery_universe AS delivery
+    FULL OUTER JOIN hourly_krc_attribution AS attribution
+        ON delivery.hour_start = attribution.hour_start
+       AND isNotDistinctFrom(delivery.campaign_id, attribution.campaign_id)
+       AND isNotDistinctFrom(delivery.adset_id, attribution.adset_id)
+       AND isNotDistinctFrom(delivery.ad_id, attribution.ad_id)
+    CROSS JOIN current_source_generation AS generation
+    CROSS JOIN current_report_policy AS policy

@@ -1,0 +1,30 @@
+[
+  {
+    "worker": "bigquery-tinybird-sync",
+    "filename": "bigquery-tinybird-sync.multipart",
+    "content_type": "multipart/form-data; boundary=4675b61a521fb1d51e9be1bf21b77970b2d21eb27a3654c5bf30b6cfd53e",
+    "bytes": 1184877,
+    "sha256": "be73fdcc661db6c096bf44843ae1ad84db8f7ea4e97bb99e2441f7b88b238094"
+  },
+  {
+    "worker": "jitsu-tinybird-ingest",
+    "filename": "jitsu-tinybird-ingest.multipart",
+    "content_type": "multipart/form-data; boundary=11892029bd114a49b7e88d8f80daadb5f512cbc49f585e3a2cc0dae80cbe",
+    "bytes": 70186,
+    "sha256": "41c68d19fb3a055f6e4d26384f818eb38aa87ec008be9d3c1258e214b9f23601"
+  },
+  {
+    "worker": "marketing-webhooks",
+    "filename": "marketing-webhooks.multipart",
+    "content_type": "multipart/form-data; boundary=d5349e7c43bb63081ee4dc5a461637cfec2d49a849748eb3f270ec12a12a",
+    "bytes": 277112,
+    "sha256": "fd7217cc311555fc7f8c29b1073aee7dbd83b4632dd134f33da25bf201b0ffaa"
+  },
+  {
+    "worker": "boom-bookkeeping-segment-proxy",
+    "filename": "boom-bookkeeping-segment-proxy.multipart",
+    "content_type": "multipart/form-data; boundary=23dbfe0d2cac0cfb4ee6cee5e01d66ea9718b54142f222f268f11f9b4006",
+    "bytes": 230215,
+    "sha256": "af588462203b5ef21c811b1fe6c4130dcc35c156e00e67da9c239f5cc357afeb"
+  }
+]

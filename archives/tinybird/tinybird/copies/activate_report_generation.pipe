@@ -1,0 +1,96 @@
+DESCRIPTION >
+    Publish one report pointer only after identity activation, session replay, product
+    validation, adapter readiness, and the exact operator approval all agree.
+
+NODE report_generation_to_activate
+SQL >
+    SELECT
+        request.*,
+        identity_audit.input_hash AS stable_input_digest,
+        identity_audit.committed_at AS identity_activated_at,
+        session_audit.row_hash AS session_audit_hash,
+        session_audit.committed_at AS session_committed_at,
+        build.source_manifest_version,
+        build.validated_at AS report_validated_at
+    FROM current_report_activation_request AS request
+    INNER JOIN current_identity_state AS identity_audit
+        ON request.tenant_id = identity_audit.tenant_id
+       AND request.identity_batch_version = identity_audit.batch_version
+       AND request.identity_batch_id = identity_audit.batch_id
+    INNER JOIN current_session_state AS session_audit
+        ON request.tenant_id = session_audit.tenant_id
+       AND request.session_batch_version = session_audit.batch_version
+       AND request.identity_batch_id = session_audit.batch_id
+    INNER JOIN current_report_build_validation AS build
+        ON request.tenant_id = build.tenant_id
+       AND request.source_generation_id = build.source_generation_id
+       AND request.report_generation = build.report_generation
+       AND request.build_digest = build.build_digest
+       AND request.source_manifest_digest = build.source_manifest_digest
+       AND request.connection_inventory_digest = build.connection_inventory_digest
+       AND request.cutoff_set_digest = build.cutoff_set_digest
+       AND request.policy_digest = build.policy_digest
+    INNER JOIN bill_build_readiness AS readiness
+        ON request.tenant_id = readiness.tenant_id
+       AND request.source_generation_id = readiness.source_generation_id
+       AND request.report_generation = readiness.report_generation
+       AND request.identity_batch_version = readiness.identity_stable_batch_version
+       AND request.source_manifest_digest = readiness.source_manifest_digest
+       AND request.connection_inventory_digest = readiness.connection_inventory_digest
+       AND request.cutoff_set_digest = readiness.cutoff_set_digest
+       AND request.policy_digest = readiness.policy_digest
+    LEFT JOIN (
+        SELECT tenant_id, max(version) AS latest_publication_version
+        FROM report_product_generations
+        WHERE tenant_id = 'boom'
+        GROUP BY tenant_id
+    ) AS published
+        ON request.tenant_id = published.tenant_id
+    WHERE identity_audit.state_kind = 'activation_audit'
+      AND session_audit.record_kind = 'batch_audit'
+      AND build.required_stage_count = 4
+      AND build.passed_stage_count = 4
+      AND build.is_valid = 1
+      AND readiness.is_ready = 1
+      AND build.validated_at >= session_audit.committed_at
+      AND request.requested_at >= build.validated_at
+      AND request.version > coalesce(published.latest_publication_version, toUInt64(0))
+      AND NOT EXISTS (
+          SELECT 1
+          FROM report_product_generations AS existing
+          WHERE existing.tenant_id = request.tenant_id
+            AND existing.report_generation = request.report_generation
+            AND existing.validation_status = 'validated'
+            AND existing.is_active = 1
+      )
+
+NODE validated_report_generation_row
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        source_generation_id,
+        identity_batch_version AS identity_stable_batch_version,
+        concat(
+            'session:',
+            toString(session_batch_version),
+            ':',
+            session_audit_hash
+        ) AS attribution_stable_generation,
+        semantic_policy_version,
+        policy_digest,
+        source_manifest_version,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        build_digest,
+        stable_input_digest AS pending_input_digest,
+        'validated' AS validation_status,
+        toUInt8(1) AS is_active,
+        now64(6) AS activated_at,
+        version
+    FROM report_generation_to_activate
+
+TYPE COPY
+TARGET_DATASOURCE report_product_generations
+COPY_MODE append

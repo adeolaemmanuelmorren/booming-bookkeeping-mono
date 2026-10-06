@@ -1,0 +1,30 @@
+DESCRIPTION >
+    Web form and order observations projected into the canonical identity contract.
+
+NODE web_conversion_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        source_system AS source_connection_id,
+        concat(source_system, ':', event_kind) AS source_system,
+        source_row_id AS source_record_id,
+        conversions.observed_at AS source_version,
+        conversions.source_version AS source_changed_at,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        if(
+            event_kind = 'client_order',
+            arrayElement(splitByChar(' ', trim(ifNull(customer_name, ''))), 1),
+            first_name
+        ) AS first_name,
+        if(
+            event_kind = 'client_order',
+            arrayElement(splitByChar(' ', trim(ifNull(customer_name, ''))), -1),
+            CAST(NULL AS Nullable(String))
+        ) AS last_name,
+        toUInt8(0) AS source_deleted
+    FROM web_conversion_adapter AS conversions

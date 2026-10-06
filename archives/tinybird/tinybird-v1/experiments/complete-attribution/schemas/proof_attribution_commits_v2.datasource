@@ -1,0 +1,12 @@
+DESCRIPTION >
+    Synthetic attribution proof only.
+
+SCHEMA >
+    `scenario` String `json:$.scenario`,
+    `version` UInt64 `json:$.version`,
+    `transaction_id` String `json:$.transaction_id`,
+    `profiles` Array(String) `json:$.profiles[:]`,
+    `chunk_ids` Array(Array(String)) `json:$.chunk_ids[:]`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY scenario, version

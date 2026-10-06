@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Stable profiles whose complete historical facts must be reconsidered because of pending identity input.
+
+NODE touched_profiles
+SQL >
+    SELECT
+        tenant_id,
+        prior_profile_id AS profile_id,
+        'pending_identity_edge' AS dirty_reason,
+        hex(
+            MD5(
+                arrayStringConcat(
+                    arraySort(groupUniqArray(concat(producer_id, ':', event_id))),
+                    '|'
+                )
+            )
+        ) AS pending_digest
+    FROM pending_identity_union
+    WHERE prior_profile_id != ''
+    GROUP BY tenant_id, prior_profile_id

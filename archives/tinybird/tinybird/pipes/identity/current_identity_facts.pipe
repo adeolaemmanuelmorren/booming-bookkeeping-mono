@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Current non-deleted identity-bearing logical facts with submitted evidence retained for late binding.
+
+NODE live_fact_rows
+SQL >
+    SELECT
+        tenant_id,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_observed_at AS observed_at,
+        fact_payload_hash,
+        fact_payload,
+        evidence_keys,
+        producer_id,
+        batch_version,
+        committed_at
+    FROM current_identity_state
+    WHERE state_kind = 'fact'
+      AND fact_deleted = 0

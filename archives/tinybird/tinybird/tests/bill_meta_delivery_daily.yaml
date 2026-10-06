@@ -1,0 +1,4 @@
+- name: daily_own_level_rows
+  description: Returns native campaign, ad-set, and ad daily reach/frequency without hierarchy rollups.
+  parameters: 'p_report_generation=fixture-generation&p_range_start_pacific=2026-08-01T10%3A00&p_range_end_pacific=2026-08-03T10%3A00'
+  expected_result: ''

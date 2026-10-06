@@ -1,0 +1,513 @@
+DESCRIPTION >
+    GENERATED contract checks for every registered fan-in resource. Required fields,
+    declared grain, source generation, tenant, and allowed connections fail closed.
+
+NODE registered_contract_validation_rows
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'google_daily_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source), ''))
+                    OR empty(ifNull(toString(rows.account_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('google-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.date, rows.level, rows.account_id, rows.campaign_id, rows.adset_id, rows.ad_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source AS String) AS source,
+            CAST(contract_rows.account_id AS String) AS account_id,
+            CAST(contract_rows.date AS Date) AS date,
+            CAST(contract_rows.level AS String) AS level,
+            CAST(contract_rows.campaign_id AS Nullable(String)) AS campaign_id,
+            CAST(contract_rows.adset_id AS Nullable(String)) AS adset_id,
+            CAST(contract_rows.ad_id AS Nullable(String)) AS ad_id,
+            toUInt8(1) AS contract_row_present
+        FROM google_daily_ad_delivery_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'meta_daily_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source), ''))
+                    OR empty(ifNull(toString(rows.account_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('meta-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.date, rows.level, rows.account_id, rows.campaign_id, rows.adset_id, rows.ad_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source AS String) AS source,
+            CAST(contract_rows.account_id AS String) AS account_id,
+            CAST(contract_rows.date AS Date) AS date,
+            CAST(contract_rows.level AS String) AS level,
+            CAST(contract_rows.campaign_id AS Nullable(String)) AS campaign_id,
+            CAST(contract_rows.adset_id AS Nullable(String)) AS adset_id,
+            CAST(contract_rows.ad_id AS Nullable(String)) AS ad_id,
+            toUInt8(1) AS contract_row_present
+        FROM meta_daily_ad_delivery_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'meta_hourly_ad_delivery_contract' AS adapter_id,
+        'ad_delivery_hourly_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source), ''))
+                    OR empty(ifNull(toString(rows.account_id), ''))
+                    OR empty(ifNull(toString(rows.ad_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('meta-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.hour_start, rows.account_id, rows.campaign_id, rows.adset_id, rows.ad_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source AS String) AS source,
+            CAST(contract_rows.account_id AS String) AS account_id,
+            CAST(contract_rows.ad_id AS String) AS ad_id,
+            CAST(contract_rows.hour_start AS DateTime64(6)) AS hour_start,
+            CAST(contract_rows.campaign_id AS Nullable(String)) AS campaign_id,
+            CAST(contract_rows.adset_id AS Nullable(String)) AS adset_id,
+            toUInt8(1) AS contract_row_present
+        FROM meta_hourly_ad_delivery_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'stripe_kajabi_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.payment_source), ''))
+                    OR empty(ifNull(toString(rows.payment_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('stripe-kajabi')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.payment_source, rows.payment_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST('stripe-kajabi' AS String) AS source_connection_id,
+            CAST(contract_rows.payment_source AS String) AS payment_source,
+            CAST(contract_rows.payment_id AS String) AS payment_id,
+            toUInt8(1) AS contract_row_present
+        FROM stripe_kajabi_payment_adapter AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'stripe_primary_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.payment_source), ''))
+                    OR empty(ifNull(toString(rows.payment_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('stripe-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.payment_source, rows.payment_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST('stripe-primary' AS String) AS source_connection_id,
+            CAST(contract_rows.payment_source AS String) AS payment_source,
+            CAST(contract_rows.payment_id AS String) AS payment_id,
+            toUInt8(1) AS contract_row_present
+        FROM stripe_primary_payment_adapter AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'activecampaign_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('activecampaign-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM activecampaign_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'jitsu_tombstone_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM jitsu_tombstone_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'payment_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('stripe-kajabi', 'stripe-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM payment_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_attribution_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM web_attribution_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_conversion_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM web_conversion_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_identify_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM web_identify_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_page_identity_contract' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.source_system), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.source_system, rows.source_record_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.source_system AS String) AS source_system,
+            CAST(contract_rows.source_record_id AS Nullable(String)) AS source_record_id,
+            toUInt8(1) AS contract_row_present
+        FROM web_page_identity_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'activecampaign_lead_contract' AS adapter_id,
+        'lead_evidence_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.lead_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('activecampaign-primary')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.lead_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.lead_id AS String) AS lead_id,
+            toUInt8(1) AS contract_row_present
+        FROM activecampaign_lead_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_form_lead_contract' AS adapter_id,
+        'lead_evidence_v1' AS contract_name,
+        'canonical_required_fields_and_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                rows.contract_row_present = 1
+                AND (
+                    empty(ifNull(toString(rows.source_generation_id), ''))
+                    OR empty(ifNull(toString(rows.tenant_id), ''))
+                    OR empty(ifNull(toString(rows.source_connection_id), ''))
+                    OR empty(ifNull(toString(rows.lead_id), ''))
+                    OR rows.tenant_id != generation.tenant_id
+                    OR rows.source_generation_id != generation.source_generation_id
+                    OR rows.source_connection_id NOT IN ('boom_domains', 'jitsu_data', 'jitsu_events_api')
+                )
+            )
+            + countIf(rows.contract_row_present = 1)
+            - uniqExactIf(tuple(rows.tenant_id, rows.source_connection_id, rows.lead_id), rows.contract_row_present = 1)
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN (
+        SELECT
+            CAST(contract_rows.source_generation_id AS String) AS source_generation_id,
+            CAST(contract_rows.tenant_id AS String) AS tenant_id,
+            CAST(contract_rows.source_connection_id AS String) AS source_connection_id,
+            CAST(contract_rows.lead_id AS String) AS lead_id,
+            toUInt8(1) AS contract_row_present
+        FROM web_form_lead_contract AS contract_rows
+    ) AS rows ON 1 = 1
+    GROUP BY generation.tenant_id, generation.source_generation_id

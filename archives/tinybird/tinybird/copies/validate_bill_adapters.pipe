@@ -1,0 +1,11 @@
+DESCRIPTION >
+    Persist named adapter validation records for the current source build candidate.
+
+NODE adapter_validation_copy_rows
+SQL >
+    SELECT *
+    FROM bill_adapter_coverage_checks
+
+TYPE COPY
+TARGET_DATASOURCE adapter_coverage_validations
+COPY_MODE append

@@ -1,0 +1,212 @@
+{
+  "checkedAt": "2026-09-06T03:13:02.518Z",
+  "publication": {
+    "received": 10158,
+    "pending": 100,
+    "pendingSources": [
+      {
+        "source": "activecampaign",
+        "account": "default",
+        "records": 2
+      },
+      {
+        "source": "browser",
+        "account": "default",
+        "records": 95
+      },
+      {
+        "source": "history",
+        "account": "default",
+        "records": 3
+      }
+    ],
+    "version": 269,
+    "activeBatch": "0f101e75-a8cb-4ecf-81d4-ca450a914784",
+    "prepared": true,
+    "roundPending": 100,
+    "baselineId": "b_e5513a7d121c37c704075641",
+    "historyComplete": true
+  },
+  "sources": [
+    {
+      "route": {
+        "source": "stripe",
+        "account": "main"
+      },
+      "work": {
+        "pendingInbox": 0,
+        "outboxedInbox": 0,
+        "processedInbox": 138,
+        "pendingOutbox": 0,
+        "publishedOutbox": 138,
+        "cursorCount": 2,
+        "currentScopeCount": 128,
+        "currentRowCount": 128,
+        "immutableVersionCount": 138
+      },
+      "pending": [],
+      "discoveredThrough": "2026-09-06T03:11:59.000Z",
+      "lastSlice": {
+        "startedAt": "2026-09-06T03:12:09.566Z",
+        "succeededAt": "2026-09-06T03:12:11.014Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "paused": true
+    },
+    {
+      "route": {
+        "source": "stripe",
+        "account": "kajabi"
+      },
+      "work": {
+        "pendingInbox": 0,
+        "outboxedInbox": 0,
+        "processedInbox": 133,
+        "pendingOutbox": 0,
+        "publishedOutbox": 133,
+        "cursorCount": 2,
+        "currentScopeCount": 127,
+        "currentRowCount": 127,
+        "immutableVersionCount": 133
+      },
+      "pending": [],
+      "discoveredThrough": "2026-09-06T03:11:59.000Z",
+      "lastSlice": {
+        "startedAt": "2026-09-06T03:12:09.352Z",
+        "succeededAt": "2026-09-06T03:12:10.580Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "paused": true
+    },
+    {
+      "route": {
+        "source": "activecampaign",
+        "account": "default"
+      },
+      "work": {
+        "pendingInbox": 0,
+        "outboxedInbox": 0,
+        "processedInbox": 457,
+        "pendingOutbox": 0,
+        "publishedOutbox": 657,
+        "cursorCount": 2,
+        "currentScopeCount": 553,
+        "currentRowCount": 431,
+        "immutableVersionCount": 657
+      },
+      "pending": [],
+      "discoveredThrough": "2026-09-06T03:11:39.472Z",
+      "lastSlice": {
+        "startedAt": "2026-09-06T03:12:09.270Z",
+        "succeededAt": "2026-09-06T03:12:16.819Z",
+        "errorCode": null,
+        "errorStatus": null
+      },
+      "paused": true
+    }
+  ],
+  "commits": [
+    {
+      "batch_version": 270,
+      "baseline_id": "b_e5513a7d121c37c704075641",
+      "committed_at": {
+        "value": "2026-09-06T03:12:50.918Z"
+      },
+      "history_complete": true,
+      "source_count": 100,
+      "identity_count": 1253
+    },
+    {
+      "batch_version": 269,
+      "baseline_id": "b_e5513a7d121c37c704075641",
+      "committed_at": {
+        "value": "2026-09-06T03:12:31.522Z"
+      },
+      "history_complete": true,
+      "source_count": 66,
+      "identity_count": 2501
+    },
+    {
+      "batch_version": 268,
+      "baseline_id": "b_e5513a7d121c37c704075641",
+      "committed_at": {
+        "value": "2026-09-06T03:12:15.225Z"
+      },
+      "history_complete": false,
+      "source_count": 100,
+      "identity_count": 594
+    },
+    {
+      "batch_version": 267,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:11:01.760Z"
+      },
+      "history_complete": true,
+      "source_count": 65,
+      "identity_count": 373
+    },
+    {
+      "batch_version": 266,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:10:44.242Z"
+      },
+      "history_complete": true,
+      "source_count": 1,
+      "identity_count": 46
+    },
+    {
+      "batch_version": 265,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:10:29.375Z"
+      },
+      "history_complete": false,
+      "source_count": 100,
+      "identity_count": 467
+    },
+    {
+      "batch_version": 264,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:10:11.233Z"
+      },
+      "history_complete": true,
+      "source_count": 6,
+      "identity_count": 29
+    },
+    {
+      "batch_version": 263,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:09:53.128Z"
+      },
+      "history_complete": true,
+      "source_count": 3,
+      "identity_count": 582
+    },
+    {
+      "batch_version": 262,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:09:38.248Z"
+      },
+      "history_complete": false,
+      "source_count": 100,
+      "identity_count": 483
+    },
+    {
+      "batch_version": 261,
+      "baseline_id": "b_86dd93dab3dec71071fe380a",
+      "committed_at": {
+        "value": "2026-09-06T03:09:20.107Z"
+      },
+      "history_complete": true,
+      "source_count": 92,
+      "identity_count": 626
+    }
+  ]
+}

@@ -1,0 +1,148 @@
+{
+  "project_id": "boom",
+  "tenant_id": "boom",
+  "generated_files": {
+    "boom_classified_payment_v1": "pipes/adapters/current_payment_evidence.pipe",
+    "lead_evidence_v1": "pipes/adapters/current_lead_evidence.pipe",
+    "ad_delivery_hourly_v1": "pipes/adapters/current_hourly_ad_delivery.pipe",
+    "ad_delivery_daily_v1": "pipes/adapters/current_daily_ad_delivery.pipe",
+    "identity_observation_v1": "pipes/adapters/identity_observation_registry.pipe",
+    "registered_source_connections": "pipes/adapters/registered_source_connections.pipe",
+    "registered_contract_coverage_checks": "pipes/adapters/registered_contract_coverage_checks.pipe",
+    "registered_contract_coverage_requirements": "pipes/domain/registered_contract_coverage_requirements.pipe"
+  },
+  "contract_fan_ins": {
+    "boom_classified_payment_v1": [
+      {
+        "source_id": "stripe-primary",
+        "source_connection_id": "stripe-primary",
+        "resource": "stripe_primary_payment_adapter"
+      },
+      {
+        "source_id": "stripe-kajabi",
+        "source_connection_id": "stripe-kajabi",
+        "resource": "stripe_kajabi_payment_adapter"
+      }
+    ],
+    "lead_evidence_v1": [
+      {"source_id": "activecampaign", "resource": "activecampaign_lead_contract"},
+      {"source_id": "web-events", "resource": "web_form_lead_contract"}
+    ],
+    "ad_delivery_hourly_v1": [
+      {"source_id": "meta-ads", "resource": "meta_hourly_ad_delivery_contract"}
+    ],
+    "ad_delivery_daily_v1": [
+      {"source_id": "google-ads", "resource": "google_daily_ad_delivery_contract"},
+      {"source_id": "meta-ads", "resource": "meta_daily_ad_delivery_contract"}
+    ],
+    "identity_observation_v1": [
+      {"source_id": "web-events", "resource": "web_identify_identity_contract"},
+      {"source_id": "web-events", "resource": "web_conversion_identity_contract"},
+      {"source_id": "web-events", "resource": "web_page_identity_contract"},
+      {"source_id": "web-events", "resource": "web_attribution_identity_contract"},
+      {"source_id": "activecampaign", "resource": "activecampaign_identity_contract"},
+      {
+        "source_id": "registered-payments",
+        "resource": "payment_identity_contract",
+        "derived_from_contract": "boom_classified_payment_v1"
+      },
+      {"source_id": "web-events", "resource": "jitsu_tombstone_identity_contract"}
+    ]
+  },
+  "sources": [
+    {
+      "id": "web-events",
+      "source_connection_ids": ["boom_domains", "jitsu_data", "jitsu_events_api"],
+      "adapters": [
+        "jitsu_events_api_current_versions",
+        "web_identity_observation_adapter",
+        "web_page_view_adapter",
+        "web_conversion_adapter",
+        "web_attribution_observation_adapter"
+      ],
+      "contract_resources": [
+        "web_identify_identity_contract",
+        "web_conversion_identity_contract",
+        "web_page_identity_contract",
+        "web_attribution_identity_contract",
+        "web_form_lead_contract",
+        "jitsu_tombstone_identity_contract"
+      ],
+      "inputs": ["boom_domains", "jitsu_data", "jitsu_events_api"],
+      "contracts": ["identity_observation_v1", "lead_evidence_v1"],
+      "native_contracts": ["page_view_v1", "lead_event_v1", "payment_event_v1"],
+      "precedence": ["jitsu_events_api", "jitsu_data", "boom_domains"]
+    },
+    {
+      "id": "activecampaign",
+      "source_connection_ids": ["activecampaign-primary"],
+      "policy_binding": "boom-registration-policy-v1",
+      "adapters": ["activecampaign_registration_adapter"],
+      "contract_resources": ["activecampaign_identity_contract", "activecampaign_lead_contract"],
+      "inputs": ["activecampaign.contact", "activecampaign.contact_tag", "activecampaign.tags"],
+      "contracts": ["identity_observation_v1", "lead_evidence_v1"]
+    },
+    {
+      "id": "stripe-primary",
+      "source_connection_ids": ["stripe-primary"],
+      "policy_binding": "boom-payment-classification-v1",
+      "adapters": ["stripe_primary_payment_adapter"],
+      "contract_resources": [],
+      "inputs": ["stripe"],
+      "contracts": ["identity_observation_v1", "boom_classified_payment_v1"]
+    },
+    {
+      "id": "stripe-kajabi",
+      "source_connection_ids": ["stripe-kajabi"],
+      "policy_binding": "boom-payment-classification-v1",
+      "adapters": ["stripe_kajabi_payment_adapter"],
+      "contract_resources": [],
+      "inputs": ["stripe_kajabi"],
+      "contracts": ["identity_observation_v1", "boom_classified_payment_v1"]
+    },
+    {
+      "id": "meta-ads",
+      "source_connection_ids": ["meta-primary"],
+      "adapters": [
+        "meta_ad_dimension_adapter",
+        "meta_hourly_delivery_adapter",
+        "meta_daily_delivery_adapter"
+      ],
+      "contract_resources": ["meta_hourly_ad_delivery_contract", "meta_daily_ad_delivery_contract"],
+      "inputs": ["facebook_ads"],
+      "contracts": ["ad_delivery_hourly_v1", "ad_delivery_daily_v1"]
+    },
+    {
+      "id": "google-ads",
+      "source_connection_ids": ["google-primary"],
+      "adapters": ["google_ad_row_presence_adapter"],
+      "contract_resources": ["google_daily_ad_delivery_contract"],
+      "inputs": ["google_ads"],
+      "contracts": ["ad_delivery_daily_v1"]
+    },
+    {
+      "id": "manual-attribution",
+      "source_connection_ids": ["manual-attribution"],
+      "adapters": ["manual_payment_profile_link_adapter"],
+      "contract_resources": [],
+      "inputs": ["manual_attribution.manual_payment_profile_link_events"],
+      "contracts": [],
+      "native_contracts": ["manual_profile_link_v1"]
+    }
+  ],
+  "shared_domains": [
+    "identity_observation_registry",
+    "current_payment_evidence",
+    "current_lead_evidence",
+    "current_hourly_ad_delivery",
+    "current_daily_ad_delivery",
+    "registered_source_connections",
+    "registered_contract_coverage_checks",
+    "registered_contract_coverage_requirements",
+    "current_source_connection_cutoffs",
+    "source_generation_cutoff_readiness",
+    "pinned_identity_mappings",
+    "pinned_profile_id_resolutions",
+    "pinned_session_touchpoints"
+  ]
+}

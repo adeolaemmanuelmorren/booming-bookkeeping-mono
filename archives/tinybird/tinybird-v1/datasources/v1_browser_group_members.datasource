@@ -1,0 +1,15 @@
+DESCRIPTION >
+    Complete visitor snapshot references for each atomic browser publication.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `group_id` String `json:$.group_id`,
+    `sequence` UInt64 `json:$.sequence`,
+    `member_index` UInt32 `json:$.member_index`,
+    `visitor_key` String `json:$.visitor_key`,
+    `revision` UInt64 `json:$.revision`,
+    `publication_id` String `json:$.publication_id`,
+    `payload_json` String `json:$.payload_json`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, group_id, visitor_key

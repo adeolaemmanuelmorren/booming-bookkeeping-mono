@@ -1,0 +1,38 @@
+DESCRIPTION >
+    Preserved source records for the one-time V1 history restore.
+
+SCHEMA >
+    `id` Nullable(String) `json:$.id`,
+    `active` Nullable(Bool) `json:$.active`,
+    `currency` Nullable(String) `json:$.currency`,
+    `nickname` Nullable(String) `json:$.nickname`,
+    `recurring_aggregate_usage` Nullable(String) `json:$.recurring_aggregate_usage`,
+    `recurring_interval` Nullable(String) `json:$.recurring_interval`,
+    `recurring_interval_count` Nullable(Int64) `json:$.recurring_interval_count`,
+    `recurring_usage_type` Nullable(String) `json:$.recurring_usage_type`,
+    `type` Nullable(String) `json:$.type`,
+    `unit_amount` Nullable(Int64) `json:$.unit_amount`,
+    `billing_scheme` Nullable(String) `json:$.billing_scheme`,
+    `created` Nullable(DateTime64(6)) `json:$.created`,
+    `livemode` Nullable(Bool) `json:$.livemode`,
+    `metadata` Nullable(String) `json:$.metadata`,
+    `lookup_key` Nullable(String) `json:$.lookup_key`,
+    `tiers_mode` Nullable(String) `json:$.tiers_mode`,
+    `transform_quantity_divide_by` Nullable(Int64) `json:$.transform_quantity_divide_by`,
+    `transform_quantity_round` Nullable(String) `json:$.transform_quantity_round`,
+    `unit_amount_decimal` Nullable(String) `json:$.unit_amount_decimal`,
+    `tax_behavior` Nullable(String) `json:$.tax_behavior`,
+    `is_deleted` Nullable(Bool) `json:$.is_deleted`,
+    `invoice_item_id` Nullable(String) `json:$.invoice_item_id`,
+    `product_id` Nullable(String) `json:$.product_id`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(id, ''),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME v1_history_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/v1-preserved/history/raw_stripe_price/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

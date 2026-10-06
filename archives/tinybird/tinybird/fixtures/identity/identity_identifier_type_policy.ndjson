@@ -1,0 +1,5 @@
+{"tenant_id":"boom","identifier_type":"anonymous_id","normalization_family":"trim_exact","winner_priority":4,"relation_mode":"connect","is_public":1,"is_enabled":1,"policy_version":1,"updated_at":"2026-08-24 00:00:00.000000"}
+{"tenant_id":"boom","identifier_type":"user_id","normalization_family":"lower_trim","winner_priority":3,"relation_mode":"connect","is_public":1,"is_enabled":1,"policy_version":1,"updated_at":"2026-08-24 00:00:00.000000"}
+{"tenant_id":"boom","identifier_type":"email","normalization_family":"lower_trim","winner_priority":1,"relation_mode":"connect","is_public":1,"is_enabled":1,"policy_version":1,"updated_at":"2026-08-24 00:00:00.000000"}
+{"tenant_id":"boom","identifier_type":"canonical_email","normalization_family":"gmail_alias","winner_priority":2,"relation_mode":"connect","is_public":0,"is_enabled":1,"policy_version":1,"updated_at":"2026-08-24 00:00:00.000000"}
+{"tenant_id":"boom","identifier_type":"phone","normalization_family":"nanp_exact","winner_priority":5,"relation_mode":"connect","is_public":1,"is_enabled":1,"policy_version":1,"updated_at":"2026-08-24 00:00:00.000000"}

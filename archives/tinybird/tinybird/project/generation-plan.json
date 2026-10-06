@@ -1,0 +1,43 @@
+{
+  "version": 4,
+  "publication_rule": "Only a validated active-universe control record makes a generation readable.",
+  "stages": [
+    {"id": "acquire_generation_lock", "kind": "controller_lock", "resource": "identity_and_session_writers", "after": []},
+    {"id": "pin_inputs", "kind": "append_control", "resource": "source_generation_manifests", "after": ["acquire_generation_lock"]},
+    {"id": "import_gcs_sources", "kind": "trigger_imports", "resource": "raw_fivetran_datasources", "after": ["pin_inputs"]},
+    {"id": "record_connection_cutoffs", "kind": "append_control", "resource": "source_generation_connection_cutoffs", "after": ["import_gcs_sources"]},
+    {"id": "validate_connection_cutoffs", "kind": "assert_query", "resource": "source_generation_cutoff_readiness", "after": ["record_connection_cutoffs"]},
+    {"id": "enqueue_source_identity", "kind": "run_copy", "resource": "identity_enqueue_source_generation", "after": ["validate_connection_cutoffs"]},
+    {"id": "compact_identity", "kind": "run_copy", "resource": "identity_compact_state", "after": ["enqueue_source_identity"]},
+    {"id": "resolve_corrections_if_required", "kind": "conditional_shadow_workflow", "resource": "identity_shadow_publish", "after": ["compact_identity"]},
+    {"id": "resessionize_dirty_visitors", "kind": "run_copy", "resource": "session_resessionize_dirty_visitors", "after": ["resolve_corrections_if_required"]},
+    {"id": "validate_adapters", "kind": "run_copy", "resource": "validate_bill_adapters", "after": ["resessionize_dirty_visitors"]},
+    {"id": "build_krc_acquisition", "kind": "run_copy", "resource": "build_bill_krc_acquisition", "after": ["validate_adapters"]},
+    {"id": "build_hourly_performance", "kind": "run_copy", "resource": "build_bill_hourly_product", "after": ["build_krc_acquisition"]},
+    {"id": "build_meta_delivery_daily", "kind": "run_copy", "resource": "build_bill_meta_delivery_daily", "after": ["validate_adapters"]},
+    {"id": "build_meta_hour_bounds", "kind": "run_copy", "resource": "build_bill_meta_hour_bounds", "after": ["validate_adapters"]},
+    {"id": "validate_report_products", "kind": "run_copy", "resource": "validate_bill_product_build", "after": ["build_hourly_performance", "build_meta_delivery_daily", "build_meta_hour_bounds"]},
+    {"id": "approve_generation", "kind": "append_control", "resource": "report_activation_requests", "after": ["validate_report_products"]},
+    {"id": "activate_hidden_identity_if_required", "kind": "conditional_copy", "resource": "identity_activate_candidate", "after": ["approve_generation"]},
+    {"id": "activate_report_generation", "kind": "run_copy", "resource": "activate_report_generation", "after": ["activate_hidden_identity_if_required"]},
+    {"id": "release_generation_lock", "kind": "controller_unlock", "resource": "identity_and_session_writers", "after": ["activate_report_generation"]}
+  ],
+  "correction_rebuild": [
+    "pause_scheduled_writers",
+    "allocate_shadow_universe",
+    "replay_current_non_deleted_facts",
+    "rebuild_components",
+    "rebuild_sessions",
+    "build_krc_acquisition",
+    "build_hourly_performance",
+    "build_meta_delivery_daily",
+    "build_meta_hour_bounds",
+    "catch_up_contiguous_cursors",
+    "run_oracle_and_invariant_checks",
+    "persist_product_build_validation",
+    "append_exact_report_activation_request",
+    "activate_shadow_identity",
+    "activate_report_generation",
+    "resume_scheduled_writers"
+  ]
+}

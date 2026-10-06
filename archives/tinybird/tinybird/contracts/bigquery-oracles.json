@@ -1,0 +1,35 @@
+{
+  "captured_at": "2026-08-25T00:00:00-10:00",
+  "project": "able-folio-499722",
+  "dataset": "booming_data_analytics",
+  "range": {
+    "start_pacific": "2026-08-17T10:00",
+    "end_pacific": "2026-08-24T10:00"
+  },
+  "ordered_results": {
+    "bill_live_acquisition": {
+      "row_count": 18216,
+      "sha256": "e758db5008cad1a3bc88d1066488524b80b9199a9ccb802e33b2a76c5e9bee33",
+      "totals": {
+        "spend": "467632.99",
+        "impressions": 8893345,
+        "clicks": 133625,
+        "last_touch_registrations": 4864,
+        "last_touch_immediate_vips": 207,
+        "first_touch_registrations": 3953,
+        "first_touch_immediate_vips": 146,
+        "solo_touch_registrations": 3552,
+        "solo_touch_immediate_vips": 123
+      }
+    },
+    "bill_5k_performance": {
+      "row_count": 1,
+      "sha256": "8837041eaa6b9cf94908db614dbbc8787d7646f84f893642284d53d84b94f779"
+    },
+    "bill_meta_delivery_daily": {
+      "row_count": 1226,
+      "sha256": "e5fb477997aa2c51486b6094d614fb425a9f64391c2a606c95a805cb6da0db51"
+    }
+  },
+  "warning": "The payment source and current mart were one newly-synced Kajabi row apart during the audit. Capture production fixtures only at one completed source and Dataform generation."
+}

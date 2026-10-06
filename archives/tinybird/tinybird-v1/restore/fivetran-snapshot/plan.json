@@ -1,0 +1,89 @@
+{
+  "location": "US",
+  "project": "able-folio-499722",
+  "run_id": "20260905T222800Z",
+  "snapshot_at": "2026-09-05T22:28:00Z",
+  "tables": [
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_contact",
+      "landing": "v1_snapshot_activecampaign_contact",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `_fivetran_deleted`,\n  `_fivetran_synced`,\n  `anonymized`,\n  `gravatar`,\n  `first_name`,\n  `email`,\n  `ip`,\n  `last_name`,\n  `created_timestamp`,\n  `created_by`,\n  `deleted`,\n  `phone`,\n  `created_utc_timestamp`,\n  `email_domain`,\n  `hash`,\n  `deleted_at`\nFROM `able-folio-499722.activecampaign.contact` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "e2c7c7e5448d31280a40d8c565455a87c8aa28d3d90c31730cc255e100d73731",
+      "source": "raw_activecampaign_contact",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_contact_tag",
+      "landing": "v1_snapshot_activecampaign_contact_tag",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact_tag/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact_tag/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `_fivetran_deleted`,\n  `contact`,\n  `_fivetran_synced`,\n  `c_date`,\n  `updated_timestamp`,\n  `created_timestamp`,\n  `tags`\nFROM `able-folio-499722.activecampaign.contact_tag` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "0d655fbed9dd9f3d5cefdfa1c3e2010325bd8c50c885ea6a453ae0eb2461a4e0",
+      "source": "raw_activecampaign_contact_tag",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact_tag/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_activecampaign_tags",
+      "landing": "v1_snapshot_activecampaign_tags",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_tags/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_tags/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `tag_type`,\n  `tags`,\n  `subscriber_count`,\n  `created_by`,\n  `updated_timestamp`,\n  `updated_by`,\n  `created_timestamp`,\n  `description`,\n  `_fivetran_deleted`,\n  `_fivetran_synced`,\n  `c_date`\nFROM `able-folio-499722.activecampaign.tags` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "cbef5daa0e058a8007f4785006b7ae2c728c8d8f5a29b765e62c9bc3289a1c32",
+      "source": "raw_activecampaign_tags",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_tags/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_charge",
+      "landing": "v1_snapshot_stripe_charge",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_charge/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_charge/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `connected_account_id`,\n  `amount`,\n  `amount_captured`,\n  `amount_refunded`,\n  `application`,\n  `billing_detail_address_city`,\n  `billing_detail_address_country`,\n  `billing_detail_address_line_1`,\n  `billing_detail_address_line_2`,\n  `billing_detail_address_postal_code`,\n  `billing_detail_address_state`,\n  `billing_detail_email`,\n  `billing_detail_name`,\n  `billing_detail_phone`,\n  `application_fee_amount`,\n  `calculated_statement_descriptor`,\n  `captured`,\n  `created`,\n  `currency`,\n  `description`,\n  `destination`,\n  `failure_code`,\n  `failure_message`,\n  `fraud_details_user_report`,\n  `fraud_details_stripe_report`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `on_behalf_of`,\n  `outcome_network_decline_code`,\n  `outcome_network_status`,\n  `outcome_reason`,\n  `outcome_risk_level`,\n  `outcome_risk_score`,\n  `outcome_seller_message`,\n  `outcome_type`,\n  `paid`,\n  `receipt_email`,\n  `receipt_number`,\n  `receipt_url`,\n  `refunded`,\n  `shipping_address_city`,\n  `shipping_address_country`,\n  `shipping_address_line_1`,\n  `shipping_address_line_2`,\n  `shipping_address_postal_code`,\n  `shipping_address_state`,\n  `shipping_carrier`,\n  `shipping_name`,\n  `shipping_phone`,\n  `shipping_tracking_number`,\n  `card_id`,\n  `bank_account_id`,\n  `source_id`,\n  `source_transfer`,\n  `statement_descriptor`,\n  `statement_descriptor_suffix`,\n  `status`,\n  `transfer_data_destination`,\n  `transfer_group`,\n  `balance_transaction_id`,\n  `customer_id`,\n  `failure_balance_transaction_id`,\n  `invoice_id`,\n  `payment_intent_id`,\n  `payment_method_id`,\n  `transfer_id`,\n  `_fivetran_synced`,\n  `rule_rule`\nFROM `able-folio-499722.stripe.charge` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "4f53df8452e3498d270c1fe7b20731d34a625b4e898cab07613e15df8c8dbb40",
+      "source": "raw_stripe_charge",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_charge/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_customer",
+      "landing": "v1_snapshot_stripe_customer",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_customer/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_customer/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `account_balance`,\n  `balance`,\n  `created`,\n  `currency`,\n  `address_city`,\n  `address_country`,\n  `address_line_1`,\n  `address_line_2`,\n  `address_postal_code`,\n  `address_state`,\n  `name`,\n  `bank_account_id`,\n  `source_id`,\n  `default_card_id`,\n  `delinquent`,\n  `description`,\n  `email`,\n  `phone`,\n  `invoice_prefix`,\n  `next_invoice_sequence`,\n  `invoice_settings_default_payment_method`,\n  `invoice_settings_footer`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `shipping_address_city`,\n  `shipping_address_country`,\n  `shipping_address_line_1`,\n  `shipping_address_line_2`,\n  `shipping_address_postal_code`,\n  `shipping_address_state`,\n  `shipping_carrier`,\n  `shipping_name`,\n  `shipping_phone`,\n  `shipping_tracking_number`,\n  `tax_info_tax_id`,\n  `tax_info_type`,\n  `tax_exempt`,\n  `tax_info_verification_status`,\n  `tax_info_verification_verified_name`,\n  `is_deleted`,\n  `_fivetran_synced`\nFROM `able-folio-499722.stripe.customer` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "fced7c7b98084952e2deb75b0fb3e0ff53813383a69aef2e15930b5a5100dc68",
+      "source": "raw_stripe_customer",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_customer/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_payment_intent",
+      "landing": "v1_snapshot_stripe_payment_intent",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_payment_intent/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_payment_intent/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `connected_account_id`,\n  TO_JSON_STRING(`payment_method_types`) AS `payment_method_types`,\n  `amount`,\n  `amount_capturable`,\n  `amount_received`,\n  `application`,\n  `application_fee_amount`,\n  `canceled_at`,\n  `cancellation_reason`,\n  `capture_method`,\n  `confirmation_method`,\n  `created`,\n  `currency`,\n  `description`,\n  `last_payment_error_type`,\n  `last_payment_error_code`,\n  `last_payment_error_decline_code`,\n  `last_payment_error_network_decline_code`,\n  `last_payment_error_doc_url`,\n  `last_payment_error_message`,\n  `last_payment_error_param`,\n  `last_payment_error_source_id`,\n  `last_payment_error_charge_id`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `on_behalf_of`,\n  `receipt_email`,\n  `statement_descriptor`,\n  `status`,\n  `transfer_data_destination`,\n  `transfer_group`,\n  `payment_method_id`,\n  `customer_id`,\n  `source_id`,\n  `_fivetran_synced`,\n  `latest_charge_id`\nFROM `able-folio-499722.stripe.payment_intent` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "6bef15675ade76d7a71963532b098a769ab72d12deaa472ed6ae79674a46a908",
+      "source": "raw_stripe_payment_intent",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_payment_intent/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_charge",
+      "landing": "v1_snapshot_stripe_kajabi_charge",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_charge/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_charge/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `connected_account_id`,\n  `amount`,\n  `amount_captured`,\n  `amount_refunded`,\n  `application`,\n  `billing_detail_address_city`,\n  `billing_detail_address_country`,\n  `billing_detail_address_line_1`,\n  `billing_detail_address_line_2`,\n  `billing_detail_address_postal_code`,\n  `billing_detail_address_state`,\n  `billing_detail_email`,\n  `billing_detail_name`,\n  `billing_detail_phone`,\n  `application_fee_amount`,\n  `calculated_statement_descriptor`,\n  `captured`,\n  `created`,\n  `currency`,\n  `description`,\n  `destination`,\n  `failure_code`,\n  `failure_message`,\n  `fraud_details_user_report`,\n  `fraud_details_stripe_report`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `on_behalf_of`,\n  `outcome_network_decline_code`,\n  `outcome_network_status`,\n  `outcome_reason`,\n  `outcome_risk_level`,\n  `outcome_risk_score`,\n  `outcome_seller_message`,\n  `outcome_type`,\n  `paid`,\n  `receipt_email`,\n  `receipt_number`,\n  `receipt_url`,\n  `refunded`,\n  `shipping_address_city`,\n  `shipping_address_country`,\n  `shipping_address_line_1`,\n  `shipping_address_line_2`,\n  `shipping_address_postal_code`,\n  `shipping_address_state`,\n  `shipping_carrier`,\n  `shipping_name`,\n  `shipping_phone`,\n  `shipping_tracking_number`,\n  `card_id`,\n  `bank_account_id`,\n  `source_id`,\n  `source_transfer`,\n  `statement_descriptor`,\n  `statement_descriptor_suffix`,\n  `status`,\n  `transfer_data_destination`,\n  `transfer_group`,\n  `balance_transaction_id`,\n  `customer_id`,\n  `failure_balance_transaction_id`,\n  `invoice_id`,\n  `payment_intent_id`,\n  `payment_method_id`,\n  `transfer_id`,\n  `_fivetran_synced`,\n  `rule_rule`\nFROM `able-folio-499722.stripe_kajabi.charge` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "6be7f54eeda7225f0cfc0006f8705c49e1f388b2b066ce67cbc75eea12d3f768",
+      "source": "raw_stripe_kajabi_charge",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_charge/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_customer",
+      "landing": "v1_snapshot_stripe_kajabi_customer",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_customer/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_customer/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `account_balance`,\n  `balance`,\n  `created`,\n  `currency`,\n  `address_city`,\n  `address_country`,\n  `address_line_1`,\n  `address_line_2`,\n  `address_postal_code`,\n  `address_state`,\n  `name`,\n  `bank_account_id`,\n  `source_id`,\n  `default_card_id`,\n  `delinquent`,\n  `description`,\n  `email`,\n  `phone`,\n  `invoice_prefix`,\n  `next_invoice_sequence`,\n  `invoice_settings_default_payment_method`,\n  `invoice_settings_footer`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `shipping_address_city`,\n  `shipping_address_country`,\n  `shipping_address_line_1`,\n  `shipping_address_line_2`,\n  `shipping_address_postal_code`,\n  `shipping_address_state`,\n  `shipping_carrier`,\n  `shipping_name`,\n  `shipping_phone`,\n  `shipping_tracking_number`,\n  `tax_info_tax_id`,\n  `tax_info_type`,\n  `tax_exempt`,\n  `tax_info_verification_status`,\n  `tax_info_verification_verified_name`,\n  `is_deleted`,\n  `_fivetran_synced`\nFROM `able-folio-499722.stripe_kajabi.customer` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "ff0854c9481a0934f31afa66a6b02e1a9840277d65f4847c663bd4d80f798b1e",
+      "source": "raw_stripe_kajabi_customer",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_customer/part-*.parquet"
+    },
+    {
+      "job_id": "tinybird_v1_snapshot_20260905T222800Z_raw_stripe_kajabi_payment_intent",
+      "landing": "v1_snapshot_stripe_kajabi_payment_intent",
+      "prefix": "tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_payment_intent/",
+      "query": "EXPORT DATA OPTIONS(uri='gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_payment_intent/part-*.parquet', format='PARQUET', overwrite=false) AS\nSELECT\n  `id`,\n  `connected_account_id`,\n  TO_JSON_STRING(`payment_method_types`) AS `payment_method_types`,\n  `amount`,\n  `amount_capturable`,\n  `amount_received`,\n  `application`,\n  `application_fee_amount`,\n  `canceled_at`,\n  `cancellation_reason`,\n  `capture_method`,\n  `confirmation_method`,\n  `created`,\n  `currency`,\n  `description`,\n  `last_payment_error_type`,\n  `last_payment_error_code`,\n  `last_payment_error_decline_code`,\n  `last_payment_error_network_decline_code`,\n  `last_payment_error_doc_url`,\n  `last_payment_error_message`,\n  `last_payment_error_param`,\n  `last_payment_error_source_id`,\n  `last_payment_error_charge_id`,\n  `livemode`,\n  TO_JSON_STRING(`metadata`) AS `metadata`,\n  `on_behalf_of`,\n  `receipt_email`,\n  `statement_descriptor`,\n  `status`,\n  `transfer_data_destination`,\n  `transfer_group`,\n  `payment_method_id`,\n  `customer_id`,\n  `source_id`,\n  `_fivetran_synced`,\n  `latest_charge_id`\nFROM `able-folio-499722.stripe_kajabi.payment_intent` FOR SYSTEM_TIME AS OF TIMESTAMP '2026-09-05T22:28:00Z'",
+      "query_sha256": "87139d1965eb098ba986d5919b9d8f9503527a0198f1443c989f9c41c84e2c09",
+      "source": "raw_stripe_kajabi_payment_intent",
+      "uri": "gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_stripe_kajabi_payment_intent/part-*.parquet"
+    }
+  ]
+}

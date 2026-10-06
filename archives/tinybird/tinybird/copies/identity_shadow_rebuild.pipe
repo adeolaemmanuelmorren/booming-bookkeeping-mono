@@ -1,0 +1,10 @@
+DESCRIPTION >
+    Materialize the next requested complete shadow identity universe without changing live state.
+
+NODE shadow_rows_to_build
+SQL >
+    SELECT * FROM shadow_identity_union
+
+TYPE COPY
+TARGET_DATASOURCE identity_shadow_state_versions
+COPY_MODE append

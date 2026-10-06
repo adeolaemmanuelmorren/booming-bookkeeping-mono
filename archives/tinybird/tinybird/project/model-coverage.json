@@ -1,0 +1,587 @@
+{
+  "schema_version": 2,
+  "scope": "The 60 Dataform actions in Bill's report-runtime dependency closure. This is an ownership inventory, not proof of executed parity.",
+  "expected_action_count": 60,
+  "expected_assertion_count": 18,
+  "parity_gates": {
+    "raw_source_replay": "Replay production-shaped imported rows in a Tinybird branch and reconcile source counts, latest-wins behavior, corrections, and deletions.",
+    "source_freshness_rollups": "Execute freshness, raw-to-adapter spend, timezone, and hourly-to-daily rollup checks in a Tinybird branch.",
+    "identity_session_reconciliation": "Execute Tinybird identity, profile, mapping, touchpoint, and session outputs and reconcile them to one completed Dataform generation.",
+    "payments_leads_reconciliation": "Execute Tinybird payment and lead outputs and reconcile classifications, occurrence, identity, and row-level results to Dataform.",
+    "ordered_bill_report_hashes": "Execute all four Bill report queries in Tinybird and match the ordered BigQuery oracle hashes, types, nulls, and range boundaries."
+  },
+  "evidence_profiles": {
+    "activecampaign_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/contract-fanin-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "payments_leads_reconciliation"]
+    },
+    "meta_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/report-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "source_freshness_rollups", "ordered_bill_report_hashes"]
+    },
+    "google_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/contract-fanin-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "source_freshness_rollups"]
+    },
+    "manual_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/contract-fanin-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "payments_leads_reconciliation"]
+    },
+    "web_conversion_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/contract-fanin-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "payments_leads_reconciliation"]
+    },
+    "web_identity_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/identity-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "identity_session_reconciliation"]
+    },
+    "stripe_source": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/contract-fanin-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "payments_leads_reconciliation"]
+    },
+    "stripe_dependency_elimination": {
+      "structural_files": ["contracts/raw-bigquery-schemas.json", "scripts/report-oracle.mjs"],
+      "parity_gates": ["raw_source_replay", "ordered_bill_report_hashes"]
+    },
+    "identity_domain": {
+      "structural_files": ["scripts/identity-oracle.mjs", "tests/identity_validation_manifest.json"],
+      "parity_gates": ["identity_session_reconciliation"]
+    },
+    "identity_report_dependency": {
+      "structural_files": ["scripts/identity-oracle.mjs", "scripts/report-oracle.mjs"],
+      "parity_gates": ["identity_session_reconciliation", "ordered_bill_report_hashes"]
+    },
+    "payment_domain": {
+      "structural_files": ["scripts/contract-fanin-oracle.mjs", "scripts/report-oracle.mjs"],
+      "parity_gates": ["payments_leads_reconciliation", "ordered_bill_report_hashes"]
+    },
+    "lead_domain": {
+      "structural_files": ["scripts/contract-fanin-oracle.mjs", "scripts/report-oracle.mjs"],
+      "parity_gates": ["payments_leads_reconciliation", "ordered_bill_report_hashes"]
+    },
+    "bill_report": {
+      "structural_files": ["scripts/report-oracle.mjs", "tests/bill_validation_manifest.json"],
+      "parity_gates": ["ordered_bill_report_hashes"]
+    },
+    "bill_ad_report": {
+      "structural_files": ["scripts/report-oracle.mjs", "tests/bill_validation_manifest.json"],
+      "parity_gates": ["source_freshness_rollups", "ordered_bill_report_hashes"]
+    },
+    "unimplemented_meta_release_check": {
+      "structural_files": ["PARITY.md"],
+      "parity_gates": ["source_freshness_rollups", "ordered_bill_report_hashes"]
+    },
+    "excluded_bill_semantic": {
+      "structural_files": ["scripts/report-oracle.mjs", "PARITY.md"],
+      "parity_gates": ["ordered_bill_report_hashes"]
+    }
+  },
+  "actions": [
+    {
+      "action": "definitions/sources/activecampaign/stg_activecampaign_contact_tags.sqlx",
+      "tinybird_resources": ["raw_activecampaign_contact_tag", "activecampaign_registration_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "activecampaign_source"
+    },
+    {
+      "action": "definitions/sources/activecampaign/stg_activecampaign_contacts.sqlx",
+      "tinybird_resources": ["raw_activecampaign_contact", "activecampaign_registration_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "activecampaign_source"
+    },
+    {
+      "action": "definitions/sources/activecampaign/stg_activecampaign_tags.sqlx",
+      "tinybird_resources": ["raw_activecampaign_tags", "activecampaign_registration_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "activecampaign_source"
+    },
+    {
+      "action": "definitions/sources/facebook/stg_facebook_ads.sqlx",
+      "tinybird_resources": ["meta_daily_delivery_adapter", "meta_ad_dimension_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "meta_source"
+    },
+    {
+      "action": "definitions/sources/facebook/stg_facebook_ads_hourly.sqlx",
+      "tinybird_resources": ["meta_hourly_delivery_adapter", "meta_ad_dimension_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "meta_source"
+    },
+    {
+      "action": "definitions/sources/googleads/stg_google_ads.sqlx",
+      "tinybird_resources": ["google_ad_row_presence_adapter", "google_daily_ad_delivery_contract"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "google_source"
+    },
+    {
+      "action": "definitions/sources/manual_attribution/manual_payment_profile_link_events.sqlx",
+      "tinybird_resources": ["raw_manual_attribution_manual_payment_profile_link_events", "manual_payment_profile_link_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "manual_source"
+    },
+    {
+      "action": "definitions/sources/segment/stg_form_submissions_client_side.sqlx",
+      "tinybird_resources": ["raw_boom_domains_form_submitted", "web_conversion_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "web_conversion_source"
+    },
+    {
+      "action": "definitions/sources/segment/stg_identifies.sqlx",
+      "tinybird_resources": ["raw_boom_domains_identifies", "web_identity_observation_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "web_identity_source"
+    },
+    {
+      "action": "definitions/sources/segment/stg_order_completed.sqlx",
+      "tinybird_resources": ["raw_boom_domains_order_completed", "web_conversion_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "web_conversion_source"
+    },
+    {
+      "action": "definitions/sources/segment/stg_page_views.sqlx",
+      "tinybird_resources": ["raw_boom_domains_pages", "web_page_view_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "web_identity_source"
+    },
+    {
+      "action": "definitions/sources/segment/stg_segment_attribution_params.sqlx",
+      "tinybird_resources": ["raw_boom_domains_attr", "web_attribution_observation_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "web_identity_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_charges.sqlx",
+      "tinybird_resources": ["raw_stripe_charge", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_checkout_session_line_items.sqlx",
+      "tinybird_resources": ["raw_stripe_checkout_session_line_item", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_checkout_sessions.sqlx",
+      "tinybird_resources": ["raw_stripe_checkout_session", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_coupons.sqlx",
+      "tinybird_resources": ["raw_stripe_coupon", "stripe_primary_payment_adapter"],
+      "disposition": "dependency_eliminated_for_bill_output",
+      "evidence_profile": "stripe_dependency_elimination"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_customers.sqlx",
+      "tinybird_resources": ["raw_stripe_customer", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_discounts.sqlx",
+      "tinybird_resources": ["raw_stripe_discount", "stripe_primary_payment_adapter"],
+      "disposition": "dependency_eliminated_for_bill_output",
+      "evidence_profile": "stripe_dependency_elimination"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_invoice_line_items.sqlx",
+      "tinybird_resources": ["raw_stripe_invoice_line_item", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_invoices.sqlx",
+      "tinybird_resources": ["raw_stripe_invoice", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_payment_intents.sqlx",
+      "tinybird_resources": ["raw_stripe_payment_intent", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_payment_link_line_items.sqlx",
+      "tinybird_resources": ["raw_stripe_payment_link_line_item", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_plans.sqlx",
+      "tinybird_resources": ["raw_stripe_plan", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_prices.sqlx",
+      "tinybird_resources": ["raw_stripe_price", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_products.sqlx",
+      "tinybird_resources": ["raw_stripe_product", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_promotion_codes.sqlx",
+      "tinybird_resources": ["raw_stripe_promotion_code", "stripe_primary_payment_adapter"],
+      "disposition": "dependency_eliminated_for_bill_output",
+      "evidence_profile": "stripe_dependency_elimination"
+    },
+    {
+      "action": "definitions/sources/stripe/stg_stripe_subscription_items.sqlx",
+      "tinybird_resources": ["raw_stripe_subscription_item", "stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe_kajabi/stg_stripe_kajabi_charges.sqlx",
+      "tinybird_resources": ["raw_stripe_kajabi_charge", "stripe_kajabi_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe_kajabi/stg_stripe_kajabi_customers.sqlx",
+      "tinybird_resources": ["raw_stripe_kajabi_customer", "stripe_kajabi_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe_kajabi/stg_stripe_kajabi_invoice_line_items.sqlx",
+      "tinybird_resources": ["raw_stripe_kajabi_invoice_line_item", "stripe_kajabi_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe_kajabi/stg_stripe_kajabi_invoices.sqlx",
+      "tinybird_resources": ["raw_stripe_kajabi_invoice", "stripe_kajabi_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/sources/stripe_kajabi/stg_stripe_kajabi_payment_intents.sqlx",
+      "tinybird_resources": ["raw_stripe_kajabi_payment_intent", "stripe_kajabi_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "stripe_source"
+    },
+    {
+      "action": "definitions/intermediate/sessionization/int_events_sessionized.sqlx",
+      "tinybird_resources": ["session_resessionize_dirty_visitors", "current_session_state"],
+      "disposition": "ported",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/intermediate/sessionization/mart_sessions.sqlx",
+      "tinybird_resources": ["current_session_state", "session_state_versions"],
+      "disposition": "ported",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/intermediate/unification/int_identifier_profile_lookup.sqlx",
+      "tinybird_resources": ["pinned_identity_mappings", "pinned_profile_id_resolutions"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/intermediate/unification/int_identity_events.sqlx",
+      "tinybird_resources": ["source_generation_identity_events", "identity_observations"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/intermediate/unification/int_resolved_identifiers.sqlx",
+      "tinybird_resources": ["current_identity_profiles", "current_identity_mappings"],
+      "disposition": "ported",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/intermediate/unification/int_staging_edges.sqlx",
+      "tinybird_resources": ["candidate_identity_facts", "candidate_identity_mappings"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "action": "definitions/output/touchpoints/mart_touchpoints_all.sqlx",
+      "tinybird_resources": ["pinned_session_touchpoints", "current_touchpoint_state"],
+      "disposition": "ported",
+      "evidence_profile": "identity_report_dependency"
+    },
+    {
+      "action": "definitions/intermediate/activecampaign/int_activecampaign_form_submissions.sqlx",
+      "tinybird_resources": ["activecampaign_registration_adapter", "current_lead_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "lead_domain"
+    },
+    {
+      "action": "definitions/intermediate/manual_attribution/int_manual_payment_profile_links_latest.sqlx",
+      "tinybird_resources": ["manual_payment_profile_link_adapter", "payment_identity_contract"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_report_dependency"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_all_stripe_payments.sqlx",
+      "tinybird_resources": ["current_payment_evidence", "current_attributed_payments"],
+      "disposition": "ported",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_stripe_line_item_candidates.sqlx",
+      "tinybird_resources": ["stripe_primary_payment_adapter"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_stripe_payment_discounts.sqlx",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "current_payment_evidence"],
+      "disposition": "dependency_eliminated_for_bill_output",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_stripe_payment_enrichment.sqlx",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "current_payment_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_stripe_payment_occurrence.sqlx",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "current_payment_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe/int_stripe_payment_product_resolution.sqlx",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "current_payment_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe_kajabi/int_stripe_kajabi_payment_enrichment.sqlx",
+      "tinybird_resources": ["stripe_kajabi_payment_adapter", "current_payment_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/intermediate/stripe_kajabi/int_stripe_kajabi_payment_occurrence.sqlx",
+      "tinybird_resources": ["stripe_kajabi_payment_adapter", "current_payment_evidence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/output/funnel/mart_form_submissions_client_side.sqlx",
+      "tinybird_resources": ["profiled_client_conversions", "current_lead_evidence"],
+      "disposition": "ported",
+      "evidence_profile": "lead_domain"
+    },
+    {
+      "action": "definitions/output/funnel/mart_form_submissions_server_side.sqlx",
+      "tinybird_resources": ["profiled_krc_registrations", "current_lead_evidence"],
+      "disposition": "ported",
+      "evidence_profile": "lead_domain"
+    },
+    {
+      "action": "definitions/output/payments/mart_payments.sqlx",
+      "tinybird_resources": ["current_payment_evidence", "current_attributed_payments"],
+      "disposition": "ported",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/output/payments/mart_payments_client_side.sqlx",
+      "tinybird_resources": ["profiled_client_conversions", "generic_conversion_row_presence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "action": "definitions/output/ads/mart_ad_performance.sqlx",
+      "tinybird_resources": ["current_daily_ad_delivery", "generic_conversion_row_presence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "bill_ad_report"
+    },
+    {
+      "action": "definitions/output/ads/mart_ad_performance_hourly.sqlx",
+      "tinybird_resources": ["current_hourly_ad_delivery", "generic_conversion_row_presence"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "bill_ad_report"
+    },
+    {
+      "action": "definitions/output/ads/mart_meta_delivery_daily.sqlx",
+      "tinybird_resources": ["current_daily_ad_delivery", "bill_meta_delivery_daily_product"],
+      "disposition": "ported",
+      "evidence_profile": "bill_ad_report"
+    },
+    {
+      "action": "definitions/output/attribution/mart_conversions_ad_performance_hourly.sqlx",
+      "tinybird_resources": ["generic_conversion_row_presence", "bill_hourly_product"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_report_dependency"
+    },
+    {
+      "action": "definitions/output/attribution/mart_conversions_with_touchpoints.sqlx",
+      "tinybird_resources": ["generic_conversion_row_presence", "pinned_session_touchpoints"],
+      "disposition": "collapsed_into_resource",
+      "evidence_profile": "identity_report_dependency"
+    },
+    {
+      "action": "definitions/output/attribution/mart_krc_acquisition.sqlx",
+      "tinybird_resources": ["profiled_krc_registrations", "bill_krc_acquisition_product"],
+      "disposition": "ported",
+      "evidence_profile": "bill_report"
+    },
+    {
+      "action": "definitions/output/attribution/mart_meta_krc_reporting_hourly.sqlx",
+      "tinybird_resources": ["bill_hourly_product", "bill_hourly_product_versions"],
+      "disposition": "ported",
+      "evidence_profile": "bill_report"
+    }
+  ],
+  "assertions": [
+    {
+      "assertion": "definitions/assertions/assert_bbb_installments_use_existing_classifications.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "current_payment_evidence"],
+      "disposition": "structural_rule_lock_plus_branch_gate",
+      "operational_equivalent": "The Stripe adapter owns installment classification; branch reconciliation must prove the classified payment rows match Dataform.",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "assertion": "definitions/assertions/assert_identity_identifier_single_profile.sqlx",
+      "scope": "shared_dependency",
+      "tinybird_resources": ["current_identity_mappings", "current_identity_profiles"],
+      "disposition": "structural_rule_lock_plus_branch_gate",
+      "operational_equivalent": "The identity oracle locks one current profile per normalized identifier; branch reconciliation must execute the invariant on Tinybird output.",
+      "evidence_profile": "identity_domain"
+    },
+    {
+      "assertion": "definitions/assertions/assert_ineligible_attribution_weights_are_zero.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["generic_conversion_row_presence"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "Bill's product uses explicit first-, last-, and solo-touch rows rather than the general weighted-attribution mart; final report hashes cover the retained behavior.",
+      "evidence_profile": "excluded_bill_semantic"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_ad_cost_google_matches_staging.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["google_ad_row_presence_adapter", "google_daily_ad_delivery_contract"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "The four Bill report products do not expose the general Google ad-cost mart. A broader migration must add an executed Google cost reconciliation before claiming parity for that mart.",
+      "evidence_profile": "google_source"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_ad_cost_meta_matches_staging.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["meta_daily_delivery_adapter", "meta_hourly_delivery_adapter"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "The general Meta ad-cost mart is outside Bill's four outputs; Bill spend is still required to pass source rollup and ordered-report reconciliation.",
+      "evidence_profile": "meta_source"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_ad_performance_google_matches_staging.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["google_ad_row_presence_adapter", "google_daily_ad_delivery_contract"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "Google performance totals are not returned by Bill's four endpoints. A broader migration must execute this reconciliation separately.",
+      "evidence_profile": "google_source"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_conversions_ad_performance_hourly_rolls_up_to_daily.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["generic_conversion_row_presence", "bill_hourly_product"],
+      "disposition": "branch_gate_only",
+      "operational_equivalent": "No local SQL execution proves this rollup. The branch must compare hourly conversion rows and their daily aggregate to Dataform and the ordered report hashes.",
+      "evidence_profile": "bill_ad_report"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_payments_matches_successful_charges.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["current_payment_evidence", "current_attributed_payments"],
+      "disposition": "branch_gate_only",
+      "operational_equivalent": "The branch must reconcile eligible successful charges to current payment evidence and attributed payments at row level.",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_payments_occurrence_logic.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["stripe_primary_payment_adapter", "stripe_kajabi_payment_adapter", "current_payment_evidence"],
+      "disposition": "structural_rule_lock_plus_branch_gate",
+      "operational_equivalent": "Payment adapters own occurrence classification; the branch must reconcile occurrence values and ordering to Dataform.",
+      "evidence_profile": "payment_domain"
+    },
+    {
+      "assertion": "definitions/assertions/assert_mart_revenue_attribution_reconciles.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["current_attributed_payments"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "The general revenue-attribution mart is outside Bill's four report outputs. Bill's fixed purchaser value remains covered by ordered report hashes.",
+      "evidence_profile": "excluded_bill_semantic"
+    },
+    {
+      "assertion": "definitions/assertions/assert_meta_paid_clicks_are_identified.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["profiled_krc_registrations", "bill_krc_acquisition_product"],
+      "disposition": "branch_gate_only",
+      "operational_equivalent": "The branch must prove every retained paid Meta click resolves to the expected profile and KRC acquisition row.",
+      "evidence_profile": "identity_report_dependency"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_facebook_ads_freshness.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["meta_daily_delivery_adapter", "current_source_generation"],
+      "disposition": "unimplemented_release_gate",
+      "operational_equivalent": "Not implemented locally: add and execute a source-generation freshness validation before activation, then fail publication when the Meta daily source is stale.",
+      "evidence_profile": "unimplemented_meta_release_check"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_facebook_ads_hourly_matches_raw_spend.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["meta_hourly_delivery_adapter", "current_hourly_ad_delivery"],
+      "disposition": "unimplemented_release_gate",
+      "operational_equivalent": "Not implemented locally: execute raw-to-adapter hourly spend reconciliation in the branch and make it a publication gate.",
+      "evidence_profile": "unimplemented_meta_release_check"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_facebook_ads_hourly_rolls_up_to_daily.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["meta_hourly_delivery_adapter", "meta_daily_delivery_adapter"],
+      "disposition": "unimplemented_release_gate",
+      "operational_equivalent": "Not implemented locally: execute hourly-to-daily impressions, clicks, and spend reconciliation in the branch while keeping reach and frequency non-additive.",
+      "evidence_profile": "unimplemented_meta_release_check"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_facebook_ads_hourly_uses_advertiser_timezone.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["meta_hourly_delivery_adapter", "bill_report_window"],
+      "disposition": "structural_rule_lock_plus_branch_gate",
+      "operational_equivalent": "The adapter and report-window resources encode timezone handling; a branch replay across DST boundaries must prove advertiser-time semantics.",
+      "evidence_profile": "bill_ad_report"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_facebook_ads_matches_raw_spend.sqlx",
+      "scope": "bill_release",
+      "tinybird_resources": ["meta_daily_delivery_adapter", "current_daily_ad_delivery"],
+      "disposition": "unimplemented_release_gate",
+      "operational_equivalent": "Not implemented locally: execute raw-to-adapter daily spend reconciliation in the branch and make it a publication gate.",
+      "evidence_profile": "unimplemented_meta_release_check"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_google_ads_freshness.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["google_ad_row_presence_adapter", "current_source_generation"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "Bill's four Meta report outputs do not consume Google delivery. A full migration still needs an executed Google freshness publication gate.",
+      "evidence_profile": "google_source"
+    },
+    {
+      "assertion": "definitions/assertions/assert_stg_google_ads_matches_raw_spend.sqlx",
+      "scope": "outside_bill_output",
+      "tinybird_resources": ["google_ad_row_presence_adapter", "google_daily_ad_delivery_contract"],
+      "disposition": "outside_bill_output",
+      "operational_equivalent": "Bill's four Meta report outputs do not consume Google spend. A full migration still needs an executed raw-to-adapter Google spend reconciliation.",
+      "evidence_profile": "google_source"
+    }
+  ]
+}

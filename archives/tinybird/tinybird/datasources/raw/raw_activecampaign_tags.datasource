@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.activecampaign.tags.
+    Source role: lead_registration_classification.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(String) `json:$.id`,
+    `tag_type` Nullable(String) `json:$.tag_type`,
+    `tags` Nullable(String) `json:$.tags`,
+    `subscriber_count` Nullable(String) `json:$.subscriber_count`,
+    `created_by` Nullable(String) `json:$.created_by`,
+    `updated_timestamp` Nullable(String) `json:$.updated_timestamp`,
+    `updated_by` Nullable(String) `json:$.updated_by`,
+    `created_timestamp` Nullable(String) `json:$.created_timestamp`,
+    `description` Nullable(String) `json:$.description`,
+    `_fivetran_deleted` Nullable(Bool) `json:$._fivetran_deleted`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `c_date` Nullable(DateTime64(6)) `json:$.c_date`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(id, ''),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/activecampaign/tags/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

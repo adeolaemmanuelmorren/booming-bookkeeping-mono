@@ -1,0 +1,25 @@
+{
+  "verified_at": "2026-09-05T21:58:17.813391+00:00",
+  "source": "gs://booming-data/tinybird/activecampaign/contact/incremental/run_date=2026-09-03/run_time=032000/part-000000000001.parquet#1788406484785508",
+  "destination": {
+    "kind": "storage#object",
+    "id": "booming-data/tinybird/v1-preserved/history/raw_activecampaign_contact/aa6f50714f92eaa0aece3027146a26310e1b86f06227e4d06dd69787b7f4f601.parquet/1788645497754297",
+    "selfLink": "https://www.googleapis.com/storage/v1/b/booming-data/o/tinybird%2Fv1-preserved%2Fhistory%2Fraw_activecampaign_contact%2Faa6f50714f92eaa0aece3027146a26310e1b86f06227e4d06dd69787b7f4f601.parquet",
+    "mediaLink": "https://storage.googleapis.com/download/storage/v1/b/booming-data/o/tinybird%2Fv1-preserved%2Fhistory%2Fraw_activecampaign_contact%2Faa6f50714f92eaa0aece3027146a26310e1b86f06227e4d06dd69787b7f4f601.parquet?generation=1788645497754297&alt=media",
+    "name": "tinybird/v1-preserved/history/raw_activecampaign_contact/aa6f50714f92eaa0aece3027146a26310e1b86f06227e4d06dd69787b7f4f601.parquet",
+    "bucket": "booming-data",
+    "generation": "1788645497754297",
+    "metageneration": "1",
+    "contentType": "application/octet-stream",
+    "storageClass": "STANDARD",
+    "size": "55767",
+    "md5Hash": "MkEmRaqf5FK/Xbdwhpooyg==",
+    "crc32c": "E36uOQ==",
+    "etag": "CLmll9y32JYDEAE=",
+    "timeCreated": "2026-09-05T21:58:17.828Z",
+    "updated": "2026-09-05T21:58:17.828Z",
+    "timeStorageClassUpdated": "2026-09-05T21:58:17.828Z",
+    "timeFinalized": "2026-09-05T21:58:17.828Z"
+  },
+  "rows": 363
+}

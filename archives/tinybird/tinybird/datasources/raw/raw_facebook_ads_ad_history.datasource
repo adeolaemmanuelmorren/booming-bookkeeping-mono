@@ -1,0 +1,39 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.facebook_ads.ad_history.
+    Source role: meta_ad_dimension_history.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `updated_time` Nullable(DateTime64(6)) `json:$.updated_time`,
+    `account_id` Nullable(Int64) `json:$.account_id`,
+    `campaign_id` Nullable(Int64) `json:$.campaign_id`,
+    `creative_id` Nullable(Int64) `json:$.creative_id`,
+    `bid_amount` Nullable(Int64) `json:$.bid_amount`,
+    `bid_type` Nullable(String) `json:$.bid_type`,
+    `configured_status` Nullable(String) `json:$.configured_status`,
+    `conversion_domain` Nullable(String) `json:$.conversion_domain`,
+    `created_time` Nullable(DateTime64(6)) `json:$.created_time`,
+    `effective_status` Nullable(String) `json:$.effective_status`,
+    `last_updated_by_app_id` Nullable(String) `json:$.last_updated_by_app_id`,
+    `name` Nullable(String) `json:$.name`,
+    `preview_shareable_link` Nullable(String) `json:$.preview_shareable_link`,
+    `status` Nullable(String) `json:$.status`,
+    `ad_set_id` Nullable(Int64) `json:$.ad_set_id`,
+    `ad_source_id` Nullable(Int64) `json:$.ad_source_id`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `bid_info_actions` Nullable(Int64) `json:$.bid_info_actions`,
+    `placement_specific_instagram_unrealistic_outcomes` Nullable(String) `json:$.placement_specific_instagram_unrealistic_outcomes`,
+    `placement_specific_facebook_unrealistic_outcomes` Nullable(String) `json:$.placement_specific_facebook_unrealistic_outcomes`,
+    `global_discriminatory_practices` Nullable(String) `json:$.global_discriminatory_practices`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(updated_time, toDateTime64(0, 6)),
+    `__tb_sort_3` DateTime64(6) `json:$.__tb_sort_3` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/facebook_ads/ad_history/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

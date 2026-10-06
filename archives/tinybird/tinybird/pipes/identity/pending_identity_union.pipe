@@ -1,0 +1,159 @@
+DESCRIPTION >
+    Exact sequential union for the bounded pending first-party graph using arrayFold.
+
+NODE pending_identifiers
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        event_id,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        winner_priority,
+        min(observed_at) AS first_seen_at,
+        max(observed_at) AS last_seen_at,
+        argMax(first_name, tuple(observed_at, event_id)) AS first_name,
+        argMax(last_name, tuple(observed_at, event_id)) AS last_name
+    FROM normalize_identity_input
+    WHERE record_kind = 'identifier'
+    GROUP BY
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        event_id,
+        identifier_type,
+        identifier_value,
+        identifier_key,
+        winner_priority
+
+NODE pending_meta_nodes
+SQL >
+    SELECT
+        pending.*,
+        mappings.profile_id AS prior_profile_id,
+        if(
+            mappings.profile_id = '',
+            concat('identifier:', pending.identifier_key),
+            concat('profile:', mappings.profile_id)
+        ) AS meta_node
+    FROM pending_identifiers AS pending
+    LEFT JOIN current_identity_mappings AS mappings
+        ON pending.tenant_id = mappings.tenant_id
+       AND pending.identifier_key = mappings.identifier_key
+
+NODE event_anchors
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        event_id,
+        min(meta_node) AS anchor_node
+    FROM pending_meta_nodes
+    GROUP BY tenant_id, producer_id, event_id
+
+NODE pending_meta_edges
+SQL >
+    SELECT DISTINCT
+        nodes.tenant_id,
+        least(anchors.anchor_node, nodes.meta_node) AS left_node,
+        greatest(anchors.anchor_node, nodes.meta_node) AS right_node
+    FROM pending_meta_nodes AS nodes
+    INNER JOIN event_anchors AS anchors
+        ON nodes.tenant_id = anchors.tenant_id
+       AND nodes.producer_id = anchors.producer_id
+       AND nodes.event_id = anchors.event_id
+    WHERE anchors.anchor_node != nodes.meta_node
+
+NODE packed_meta_nodes
+SQL >
+    SELECT
+        tenant_id,
+        arraySort(groupUniqArray(meta_node)) AS meta_nodes
+    FROM pending_meta_nodes
+    GROUP BY tenant_id
+
+NODE packed_meta_edges
+SQL >
+    SELECT
+        tenant_id,
+        arraySort(groupUniqArray(tuple(left_node, right_node))) AS meta_edges
+    FROM pending_meta_edges
+    GROUP BY tenant_id
+
+NODE bounded_graph
+SQL >
+    SELECT
+        nodes.tenant_id,
+        nodes.meta_nodes,
+        ifNull(
+            edges.meta_edges,
+            CAST([], 'Array(Tuple(String, String))')
+        ) AS meta_edges,
+        arrayEnumerate(nodes.meta_nodes) AS initial_labels
+    FROM packed_meta_nodes AS nodes
+    LEFT JOIN packed_meta_edges AS edges
+        ON nodes.tenant_id = edges.tenant_id
+
+NODE folded_graph
+SQL >
+    SELECT
+        tenant_id,
+        meta_nodes,
+        arrayFold(
+            (labels, edge) -> if(
+                labels[indexOf(meta_nodes, tupleElement(edge, 1))]
+                    = labels[indexOf(meta_nodes, tupleElement(edge, 2))],
+                labels,
+                arrayMap(
+                    label -> if(
+                        label = greatest(
+                            labels[indexOf(meta_nodes, tupleElement(edge, 1))],
+                            labels[indexOf(meta_nodes, tupleElement(edge, 2))]
+                        ),
+                        least(
+                            labels[indexOf(meta_nodes, tupleElement(edge, 1))],
+                            labels[indexOf(meta_nodes, tupleElement(edge, 2))]
+                        ),
+                        label
+                    ),
+                    labels
+                )
+            ),
+            meta_edges,
+            initial_labels
+        ) AS final_labels
+    FROM bounded_graph
+
+NODE component_labels
+SQL >
+    SELECT
+        tenant_id,
+        tupleElement(node_label, 1) AS meta_node,
+        tupleElement(node_label, 2) AS component_label
+    FROM folded_graph
+    ARRAY JOIN arrayZip(meta_nodes, final_labels) AS node_label
+
+NODE pending_component_rows
+SQL >
+    SELECT
+        nodes.tenant_id,
+        nodes.producer_id,
+        nodes.producer_sequence,
+        nodes.event_id,
+        nodes.identifier_type,
+        nodes.identifier_value,
+        nodes.identifier_key,
+        nodes.winner_priority,
+        nodes.first_seen_at,
+        nodes.last_seen_at,
+        nodes.first_name,
+        nodes.last_name,
+        nodes.prior_profile_id,
+        nodes.meta_node,
+        labels.component_label
+    FROM pending_meta_nodes AS nodes
+    INNER JOIN component_labels AS labels
+        ON nodes.tenant_id = labels.tenant_id
+       AND nodes.meta_node = labels.meta_node

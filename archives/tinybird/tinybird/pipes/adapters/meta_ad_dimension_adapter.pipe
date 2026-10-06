@@ -1,0 +1,111 @@
+DESCRIPTION >
+    Latest Meta campaign, ad-set, and ad names at one source cutoff. Hierarchy rows share
+    one typed contract so delivery adapters do not duplicate history-selection logic.
+
+NODE latest_meta_campaign_rows
+SQL >
+    SELECT
+        toString(id) AS campaign_id,
+        nullIf(trim(name), '') AS campaign_name,
+        coalesce(updated_time, _fivetran_synced) AS dimension_updated_at
+    FROM raw_facebook_ads_campaign_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.meta_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_meta_adset_rows
+SQL >
+    SELECT
+        toString(id) AS adset_id,
+        toString(campaign_id) AS campaign_id,
+        nullIf(trim(name), '') AS adset_name,
+        coalesce(updated_time, _fivetran_synced) AS dimension_updated_at
+    FROM raw_facebook_ads_ad_set_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.meta_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_meta_ad_rows
+SQL >
+    SELECT
+        toString(id) AS ad_id,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_set_id) AS adset_id,
+        nullIf(trim(name), '') AS ad_name,
+        coalesce(updated_time, _fivetran_synced) AS dimension_updated_at
+    FROM raw_facebook_ads_ad_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.meta_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_time DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE campaign_dimension_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        'campaign' AS dimension_level,
+        campaigns.campaign_id,
+        CAST(NULL AS Nullable(String)) AS adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        campaigns.campaign_name,
+        CAST(NULL AS Nullable(String)) AS adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        campaigns.dimension_updated_at
+    FROM latest_meta_campaign_rows AS campaigns
+    CROSS JOIN current_source_generation AS generation
+
+NODE adset_dimension_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        'adset' AS dimension_level,
+        adsets.campaign_id,
+        adsets.adset_id,
+        CAST(NULL AS Nullable(String)) AS ad_id,
+        campaigns.campaign_name,
+        adsets.adset_name,
+        CAST(NULL AS Nullable(String)) AS ad_name,
+        greatest(adsets.dimension_updated_at, campaigns.dimension_updated_at) AS dimension_updated_at
+    FROM latest_meta_adset_rows AS adsets
+    LEFT JOIN latest_meta_campaign_rows AS campaigns
+        ON adsets.campaign_id = campaigns.campaign_id
+    CROSS JOIN current_source_generation AS generation
+
+NODE ad_dimension_contract_rows
+SQL >
+    SELECT
+        generation.source_generation_id,
+        'ad' AS dimension_level,
+        coalesce(ads.campaign_id, adsets.campaign_id) AS campaign_id,
+        ads.adset_id,
+        ads.ad_id,
+        campaigns.campaign_name,
+        adsets.adset_name,
+        ads.ad_name,
+        greatest(
+            ads.dimension_updated_at,
+            adsets.dimension_updated_at,
+            campaigns.dimension_updated_at
+        ) AS dimension_updated_at
+    FROM latest_meta_ad_rows AS ads
+    LEFT JOIN latest_meta_adset_rows AS adsets
+        ON ads.adset_id = adsets.adset_id
+    LEFT JOIN latest_meta_campaign_rows AS campaigns
+        ON coalesce(ads.campaign_id, adsets.campaign_id) = campaigns.campaign_id
+    CROSS JOIN current_source_generation AS generation
+
+NODE current_meta_dimension_rows
+SQL >
+    SELECT * FROM campaign_dimension_contract_rows
+    UNION ALL
+    SELECT * FROM adset_dimension_contract_rows
+    UNION ALL
+    SELECT * FROM ad_dimension_contract_rows

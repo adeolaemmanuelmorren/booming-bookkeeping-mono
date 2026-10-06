@@ -1,0 +1,27 @@
+DESCRIPTION >
+    Authoritative normalized identity and identity-bearing fact deliveries for tenant boom.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `producer_id` LowCardinality(String) `json:$.producer_id`,
+    `producer_sequence` UInt64 `json:$.producer_sequence`,
+    `event_id` String `json:$.event_id`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`,
+    `event_kind` LowCardinality(String) `json:$.event_kind`,
+    `observed_at` DateTime64(6) `json:$.observed_at`,
+    `ingested_at` DateTime64(6) `json:$.ingested_at`,
+    `anonymous_id` String `json:$.anonymous_id`,
+    `user_id` String `json:$.user_id`,
+    `email` String `json:$.email`,
+    `phone` String `json:$.phone`,
+    `first_name` String `json:$.first_name`,
+    `last_name` String `json:$.last_name`,
+    `fact_kind` LowCardinality(String) `json:$.fact_kind`,
+    `fact_key` String `json:$.fact_key`,
+    `source_fact_version` UInt64 `json:$.source_fact_version`,
+    `fact_deleted` UInt8 `json:$.fact_deleted`,
+    `fact_payload_hash` FixedString(64) `json:$.fact_payload_hash`,
+    `fact_payload` String `json:$.fact_payload`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, producer_id, producer_sequence, event_id"

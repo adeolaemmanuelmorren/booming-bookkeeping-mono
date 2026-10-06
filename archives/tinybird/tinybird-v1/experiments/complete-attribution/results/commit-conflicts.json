@@ -1,0 +1,10 @@
+{
+  "verified": true,
+  "scenario": "manifest-fault:56f1aaa6-ee40-4287-beb5-4b3290230be4",
+  "checks": [
+    "all-profiles-retired",
+    "duplicate-empty-commit",
+    "same-transaction-id-different-content-rejected"
+  ],
+  "finalConflictCheck": "distinct-manifest-count-before-profile-expansion"
+}

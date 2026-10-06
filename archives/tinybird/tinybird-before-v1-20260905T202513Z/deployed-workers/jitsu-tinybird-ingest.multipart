@@ -1,0 +1,823 @@
+--11892029bd114a49b7e88d8f80daadb5f512cbc49f585e3a2cc0dae80cbe
+Content-Disposition: form-data; name="index.js"
+
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+
+// src/json.ts
+var textEncoder = new TextEncoder();
+var RequestError = class extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+  status;
+  static {
+    __name(this, "RequestError");
+  }
+};
+function isJsonObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+__name(isJsonObject, "isJsonObject");
+function stableStringify(value) {
+  return JSON.stringify(sortJson(value));
+}
+__name(stableStringify, "stableStringify");
+function utf8ByteLength(value) {
+  return textEncoder.encode(value).byteLength;
+}
+__name(utf8ByteLength, "utf8ByteLength");
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", textEncoder.encode(value));
+  return Array.from(
+    new Uint8Array(digest),
+    (byte) => byte.toString(16).padStart(2, "0")
+  ).join("").toUpperCase();
+}
+__name(sha256Hex, "sha256Hex");
+async function constantTimeEqual(actual, expected) {
+  const [actualDigest, expectedDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", textEncoder.encode(actual)),
+    crypto.subtle.digest("SHA-256", textEncoder.encode(expected))
+  ]);
+  const actualBytes = new Uint8Array(actualDigest);
+  const expectedBytes = new Uint8Array(expectedDigest);
+  let difference = 0;
+  for (let index = 0; index < actualBytes.length; index += 1) {
+    difference |= actualBytes[index] ^ expectedBytes[index];
+  }
+  return difference === 0;
+}
+__name(constantTimeEqual, "constantTimeEqual");
+function sortJson(value) {
+  if (Array.isArray(value)) {
+    return value.map(sortJson);
+  }
+  if (!isJsonObject(value)) {
+    return value;
+  }
+  const sorted = /* @__PURE__ */ Object.create(null);
+  for (const key of Object.keys(value).sort()) {
+    sorted[key] = sortJson(value[key]);
+  }
+  return sorted;
+}
+__name(sortJson, "sortJson");
+
+// src/jitsu.ts
+var MAX_REQUEST_BYTES = 1e7;
+var MAX_EVENTS_PER_REQUEST = 1e4;
+var MAX_QUEUE_MESSAGE_BYTES = 12e4;
+var QUEUE_SCHEMA_VERSION = "jitsu_events_api_v1";
+async function parseJitsuRequest(request) {
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    throw new RequestError("Request body exceeds 10 MB", 413);
+  }
+  const body = await request.text();
+  if (utf8ByteLength(body) > MAX_REQUEST_BYTES) {
+    throw new RequestError("Request body exceeds 10 MB", 413);
+  }
+  if (body.trim() === "") {
+    throw new RequestError("Request body is empty", 400);
+  }
+  const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+  const events = contentType.includes("ndjson") ? parseNdjson(body) : parseJson(body);
+  if (events.length === 0) {
+    throw new RequestError("Request contains no Jitsu events", 400);
+  }
+  if (events.length > MAX_EVENTS_PER_REQUEST) {
+    throw new RequestError("Request contains more than 10,000 events", 413);
+  }
+  return events;
+}
+__name(parseJitsuRequest, "parseJitsuRequest");
+async function buildJitsuDelivery(events, tenantId, maxQueueMessageBytes = MAX_QUEUE_MESSAGE_BYTES) {
+  const trimmedTenantId = tenantId.trim();
+  if (trimmedTenantId === "") {
+    throw new RequestError("TENANT_ID is not configured", 503);
+  }
+  const acceptedAt = (/* @__PURE__ */ new Date()).toISOString();
+  const drafts = await Promise.all(
+    events.map((event, index) => buildObservationDraft(event, index, acceptedAt))
+  );
+  drafts.sort(compareDrafts);
+  rejectConflictingMessageIds(drafts);
+  const batchFingerprint = drafts.map((draft) => `${draft.message_id}:${draft.payload_hash}`).join("\n");
+  const batchHash = await sha256Hex(
+    `${QUEUE_SCHEMA_VERSION}
+${trimmedTenantId}
+${batchFingerprint}`
+  );
+  const producerId = `jitsu-webhook-v1:${batchHash}`;
+  const observations = await Promise.all(
+    drafts.map(async (draft, index) => {
+      const producerSequence = index + 1;
+      const deliveryEventId = await sha256Hex(
+        `${producerId}:${producerSequence}:${draft.message_id}:${draft.payload_hash}`
+      );
+      return {
+        tenant_id: trimmedTenantId,
+        producer_id: producerId,
+        producer_sequence: producerSequence,
+        delivery_event_id: deliveryEventId,
+        ...draft
+      };
+    })
+  );
+  return {
+    producerId,
+    observations,
+    envelopes: buildQueueEnvelopes(
+      producerId,
+      observations,
+      maxQueueMessageBytes
+    )
+  };
+}
+__name(buildJitsuDelivery, "buildJitsuDelivery");
+function buildQueueEnvelopes(producerId, observations, maxBytes = MAX_QUEUE_MESSAGE_BYTES) {
+  const envelopes = [];
+  let events = [];
+  for (const observation of observations) {
+    const candidate = createEnvelope(producerId, [...events, observation]);
+    if (queueEnvelopeBytes(candidate) <= maxBytes) {
+      events = candidate.events;
+      continue;
+    }
+    if (events.length === 0) {
+      throw new RequestError(
+        `Jitsu event ${observation.message_id} exceeds the Queue message limit`,
+        413
+      );
+    }
+    envelopes.push(createEnvelope(producerId, events));
+    const singleEventEnvelope = createEnvelope(producerId, [observation]);
+    if (queueEnvelopeBytes(singleEventEnvelope) > maxBytes) {
+      throw new RequestError(
+        `Jitsu event ${observation.message_id} exceeds the Queue message limit`,
+        413
+      );
+    }
+    events = [observation];
+  }
+  if (events.length > 0) {
+    envelopes.push(createEnvelope(producerId, events));
+  }
+  return envelopes;
+}
+__name(buildQueueEnvelopes, "buildQueueEnvelopes");
+function queueEnvelopeBytes(envelope) {
+  return utf8ByteLength(JSON.stringify(envelope));
+}
+__name(queueEnvelopeBytes, "queueEnvelopeBytes");
+function parseJson(body) {
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    throw new RequestError("Request body is not valid JSON", 400);
+  }
+  return extractEvents(parsed);
+}
+__name(parseJson, "parseJson");
+function parseNdjson(body) {
+  const events = [];
+  const lines = body.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (line.trim() === "") {
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      throw new RequestError(`NDJSON line ${index + 1} is not valid JSON`, 400);
+    }
+    events.push(...extractEvents(parsed));
+  }
+  return events;
+}
+__name(parseNdjson, "parseNdjson");
+function extractEvents(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap(extractEvents);
+  }
+  if (!isJsonObject(value)) {
+    throw new RequestError("Every Jitsu event must be a JSON object", 400);
+  }
+  if (Array.isArray(value.batch)) {
+    return value.batch.flatMap(extractEvents);
+  }
+  if (Array.isArray(value.events)) {
+    return value.events.flatMap(extractEvents);
+  }
+  return [value];
+}
+__name(extractEvents, "extractEvents");
+async function buildObservationDraft(event, index, acceptedAt) {
+  const properties = objectValue(event.properties);
+  const context = objectValue(event.context);
+  const traits = {
+    ...objectValue(context.traits),
+    ...objectValue(event.traits)
+  };
+  const page = objectValue(context.page);
+  const attribution = objectValue(context.attribution);
+  const campaign = objectValue(context.campaign);
+  const factPayload = stableStringify(event);
+  const factPayloadHash = await sha256Hex(factPayload);
+  const messageId = firstString(
+    event.messageId,
+    event.message_id,
+    event.id,
+    properties.event_id,
+    properties.message_id
+  ) ?? `jitsu_${factPayloadHash}`;
+  const observedAt = firstTimestamp(
+    event.timestamp,
+    event.sentAt,
+    event.sent_at,
+    event.receivedAt,
+    event.received_at,
+    properties.timestamp
+  );
+  const sourceVersionAt = firstTimestamp(
+    event.receivedAt,
+    event.received_at,
+    event.sentAt,
+    event.sent_at,
+    event.timestamp
+  );
+  if (!observedAt || !sourceVersionAt) {
+    throw new RequestError(
+      `Jitsu event ${messageId || index + 1} has no valid timestamp`,
+      400
+    );
+  }
+  const sourceFactVersion = Date.parse(sourceVersionAt) * 1e3;
+  const eventName = firstString(event.event, event.name, properties.event_name);
+  const eventType = firstString(event.type, event.event_type);
+  const bodyWithoutHash = {
+    payload_hash: "",
+    message_id: messageId,
+    event_kind: eventKind(eventType, eventName),
+    observed_at: observedAt,
+    // The Queue consumer replaces this with the Tinybird delivery-attempt time.
+    // Keeping it operational (rather than upstream-authored) makes incremental
+    // scans include events that spent longer than the overlap window in Queue.
+    ingested_at: acceptedAt,
+    event_timestamp: firstTimestamp(event.timestamp),
+    anonymous_id: firstString(
+      event.anonymousId,
+      event.anonymous_id,
+      traits.anonymousId,
+      traits.anonymous_id
+    ),
+    user_id: firstString(event.userId, event.user_id, traits.userId, traits.user_id),
+    email: firstString(event.email, traits.email, properties.email),
+    phone: firstString(
+      event.phone,
+      traits.phone,
+      traits.phone_number,
+      traits.phoneNumber,
+      properties.phone,
+      properties.phone_number
+    ),
+    first_name: firstString(
+      event.first_name,
+      event.firstName,
+      traits.first_name,
+      traits.firstName,
+      properties.first_name,
+      properties.firstName
+    ),
+    last_name: firstString(
+      event.last_name,
+      event.lastName,
+      traits.last_name,
+      traits.lastName,
+      properties.last_name,
+      properties.lastName
+    ),
+    customer_name: firstString(
+      event.customer_name,
+      traits.name,
+      properties.customer_name,
+      properties.customerName,
+      properties.name
+    ),
+    page_url: firstString(
+      event.page_url,
+      event.url,
+      properties.page_url,
+      properties.pageUrl,
+      properties.url,
+      page.url
+    ),
+    page_path: firstString(
+      event.page_path,
+      event.path,
+      properties.page_path,
+      properties.pagePath,
+      properties.path,
+      page.path
+    ),
+    page_referrer: firstString(
+      event.page_referrer,
+      event.referrer,
+      properties.page_referrer,
+      properties.referrer,
+      page.referrer
+    ),
+    form_id: firstString(event.form_id, properties.form_id, properties.formId),
+    form_name: firstString(
+      event.form_name,
+      properties.form_name,
+      properties.formName
+    ),
+    form_action: firstString(
+      event.form_action,
+      properties.form_action,
+      properties.formAction
+    ),
+    submitted_at: firstTimestamp(
+      event.submitted_at,
+      event.submittedAt,
+      properties.submitted_at,
+      properties.submittedAt
+    ),
+    is_checkout_form: firstBoolean(
+      event.is_checkout_form,
+      properties.is_checkout_form,
+      properties.isCheckoutForm
+    ),
+    is_payment_confirmed: firstBoolean(
+      event.is_payment_confirmed,
+      properties.is_payment_confirmed,
+      properties.isPaymentConfirmed
+    ),
+    payment_status: firstString(
+      event.payment_status,
+      properties.payment_status,
+      properties.paymentStatus
+    ),
+    amount: firstNumber(event.amount, properties.amount),
+    value: firstNumber(event.value, properties.value),
+    currency: firstString(event.currency, properties.currency),
+    product_id: firstString(
+      event.product_id,
+      properties.product_id,
+      properties.productId
+    ),
+    product_name: firstString(
+      event.product_name,
+      properties.product_name,
+      properties.productName
+    ),
+    products: firstJsonString(event.products, properties.products, properties.contents),
+    utm_source: attributionString("utm_source", event, properties, attribution),
+    utm_medium: attributionString("utm_medium", event, properties, attribution),
+    utm_campaign: attributionString("utm_campaign", event, properties, attribution),
+    utm_content: attributionString("utm_content", event, properties, attribution),
+    utm_term: attributionString("utm_term", event, properties, attribution),
+    utm_id: attributionString("utm_id", event, properties, attribution),
+    campaign_id: firstString(
+      event.campaign_id,
+      properties.campaign_id,
+      attribution.campaign_id,
+      campaign.id
+    ),
+    adset_id: firstString(event.adset_id, properties.adset_id, attribution.adset_id),
+    ad_id: firstString(event.ad_id, properties.ad_id, attribution.ad_id),
+    fbclid: attributionString("fbclid", event, properties, attribution),
+    source_fact_version: sourceFactVersion,
+    source_deleted: 0,
+    fact_payload_hash: factPayloadHash,
+    fact_payload: factPayload
+  };
+  const payloadHashInput = stableStringify({
+    ...bodyWithoutHash,
+    // Delivery retries may change only this operational timestamp.
+    ingested_at: ""
+  });
+  return {
+    ...bodyWithoutHash,
+    payload_hash: await sha256Hex(payloadHashInput)
+  };
+}
+__name(buildObservationDraft, "buildObservationDraft");
+function compareDrafts(left, right) {
+  return compareText(left.message_id, right.message_id) || compareText(left.payload_hash, right.payload_hash) || compareText(left.fact_payload, right.fact_payload);
+}
+__name(compareDrafts, "compareDrafts");
+function compareText(left, right) {
+  if (left < right) {
+    return -1;
+  }
+  if (left > right) {
+    return 1;
+  }
+  return 0;
+}
+__name(compareText, "compareText");
+function rejectConflictingMessageIds(drafts) {
+  const payloadsByMessageId = /* @__PURE__ */ new Map();
+  for (const draft of drafts) {
+    const existingPayloadHash = payloadsByMessageId.get(draft.message_id);
+    if (existingPayloadHash && existingPayloadHash !== draft.payload_hash) {
+      throw new RequestError(
+        `Jitsu message_id ${draft.message_id} has conflicting payloads`,
+        400
+      );
+    }
+    payloadsByMessageId.set(draft.message_id, draft.payload_hash);
+  }
+}
+__name(rejectConflictingMessageIds, "rejectConflictingMessageIds");
+function eventKind(type, name) {
+  const normalizedType = normalizeLabel(type);
+  const normalizedName = normalizeLabel(name);
+  if (normalizedType === "page") {
+    return "page_view";
+  }
+  if (normalizedType === "identify") {
+    return "identify";
+  }
+  if (normalizedName === "form_submitted") {
+    return "client_form";
+  }
+  if (normalizedName === "order_completed") {
+    return "client_order";
+  }
+  if (normalizedName === "attr" || normalizedName === "attribution") {
+    return "attribution";
+  }
+  return normalizedType || normalizedName || "event";
+}
+__name(eventKind, "eventKind");
+function normalizeLabel(value) {
+  return (value ?? "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+__name(normalizeLabel, "normalizeLabel");
+function attributionString(key, event, properties, attribution) {
+  return firstString(event[key], properties[key], attribution[key]);
+}
+__name(attributionString, "attributionString");
+function objectValue(value) {
+  return isJsonObject(value) ? value : {};
+}
+__name(objectValue, "objectValue");
+function firstString(...values) {
+  for (const value of values) {
+    if (typeof value !== "string") {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (trimmed !== "") {
+      return trimmed;
+    }
+  }
+  return null;
+}
+__name(firstString, "firstString");
+function firstBoolean(...values) {
+  for (const value of values) {
+    if (typeof value === "boolean") {
+      return value;
+    }
+    if (value === 1 || value === "1" || value === "true") {
+      return true;
+    }
+    if (value === 0 || value === "0" || value === "false") {
+      return false;
+    }
+  }
+  return null;
+}
+__name(firstBoolean, "firstBoolean");
+function firstNumber(...values) {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+    if (typeof value !== "string" || value.trim() === "") {
+      continue;
+    }
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+__name(firstNumber, "firstNumber");
+function firstJsonString(...values) {
+  for (const value of values) {
+    if (value === void 0 || value === null) {
+      continue;
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      return trimmed === "" ? null : trimmed;
+    }
+    return stableStringify(value);
+  }
+  return null;
+}
+__name(firstJsonString, "firstJsonString");
+function firstTimestamp(...values) {
+  for (const value of values) {
+    const timestamp = parseTimestamp(value);
+    if (timestamp) {
+      return timestamp;
+    }
+  }
+  return null;
+}
+__name(firstTimestamp, "firstTimestamp");
+function parseTimestamp(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const milliseconds = Math.abs(value) < 1e11 ? value * 1e3 : value;
+    const date2 = new Date(milliseconds);
+    return Number.isNaN(date2.getTime()) ? null : date2.toISOString();
+  }
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+__name(parseTimestamp, "parseTimestamp");
+function createEnvelope(producerId, events) {
+  return {
+    schema_version: QUEUE_SCHEMA_VERSION,
+    producer_id: producerId,
+    events
+  };
+}
+__name(createEnvelope, "createEnvelope");
+
+// src/ingress.ts
+var MAX_SEND_BATCH_MESSAGES = 100;
+var MAX_SEND_BATCH_BYTES = 24e4;
+async function handleJitsuWebhook(request, env) {
+  if (!env.JITSU_WEBHOOK_TOKEN) {
+    return jsonResponse({ error: "Webhook authentication is not configured" }, 503);
+  }
+  if (!await isAuthorized(request, env.JITSU_WEBHOOK_TOKEN)) {
+    return jsonResponse({ error: "Unauthorized" }, 401);
+  }
+  try {
+    const events = await parseJitsuRequest(request);
+    const delivery = await buildJitsuDelivery(events, env.TENANT_ID);
+    await enqueueEnvelopes(env.JITSU_EVENTS_QUEUE, delivery.envelopes);
+    return jsonResponse(
+      {
+        accepted: delivery.observations.length,
+        producerId: delivery.producerId,
+        queueMessages: delivery.envelopes.length
+      },
+      200
+    );
+  } catch (error) {
+    if (error instanceof RequestError) {
+      return jsonResponse({ error: error.message }, error.status);
+    }
+    console.error("jitsu_webhook_enqueue_failed", safeError(error));
+    return jsonResponse({ error: "Queue delivery failed" }, 503);
+  }
+}
+__name(handleJitsuWebhook, "handleJitsuWebhook");
+async function enqueueEnvelopes(queue, envelopes) {
+  let messages = [];
+  let messageBytes = 0;
+  for (const envelope of envelopes) {
+    const envelopeBytes = queueEnvelopeBytes(envelope);
+    const batchIsFull = messages.length === MAX_SEND_BATCH_MESSAGES;
+    const batchIsTooLarge = messageBytes + envelopeBytes > MAX_SEND_BATCH_BYTES;
+    if (messages.length > 0 && (batchIsFull || batchIsTooLarge)) {
+      await queue.sendBatch(messages);
+      messages = [];
+      messageBytes = 0;
+    }
+    messages.push({ body: envelope, contentType: "json" });
+    messageBytes += envelopeBytes;
+  }
+  if (messages.length > 0) {
+    await queue.sendBatch(messages);
+  }
+}
+__name(enqueueEnvelopes, "enqueueEnvelopes");
+function jsonResponse(body, status) {
+  return Response.json(body, { status });
+}
+__name(jsonResponse, "jsonResponse");
+async function isAuthorized(request, expectedToken) {
+  const authorization = request.headers.get("authorization") ?? "";
+  const prefix = "Bearer ";
+  if (!authorization.startsWith(prefix)) {
+    return false;
+  }
+  return constantTimeEqual(authorization.slice(prefix.length), expectedToken);
+}
+__name(isAuthorized, "isAuthorized");
+function safeError(error) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+__name(safeError, "safeError");
+
+// src/tinybird.ts
+var REQUEST_TIMEOUT_MS = 15e3;
+async function consumeJitsuQueue(batch, env, fetcher = fetch) {
+  await Promise.all(
+    batch.messages.map((message) => consumeMessage(message, env, fetcher))
+  );
+}
+__name(consumeJitsuQueue, "consumeJitsuQueue");
+async function sendToTinybird(envelope, env, fetcher = fetch, deliveredAt = (/* @__PURE__ */ new Date()).toISOString()) {
+  const url = tinybirdEventsUrl(env);
+  const body = envelope.events.map((event) => JSON.stringify({ ...event, ingested_at: deliveredAt })).join("\n");
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response;
+  let responseBody;
+  try {
+    response = await fetcher(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.TINYBIRD_APPEND_TOKEN}`,
+        "Content-Type": "application/x-ndjson"
+      },
+      body,
+      signal: controller.signal
+    });
+    responseBody = await response.text();
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (response.status !== 200) {
+    return {
+      ok: false,
+      status: response.status,
+      retryAfterSeconds: retryDelay(response),
+      error: responseBody.trim() === "" ? "Tinybird returned an empty error response" : "Tinybird returned an error response"
+    };
+  }
+  const quarantinedRows = readQuarantinedRows(responseBody);
+  if (quarantinedRows > 0) {
+    return {
+      ok: false,
+      status: response.status,
+      retryAfterSeconds: 300,
+      error: `Tinybird quarantined ${quarantinedRows} rows`
+    };
+  }
+  return {
+    ok: true,
+    status: response.status,
+    retryAfterSeconds: 0
+  };
+}
+__name(sendToTinybird, "sendToTinybird");
+async function consumeMessage(message, env, fetcher) {
+  if (!isQueueEnvelope(message.body)) {
+    console.error("jitsu_queue_message_invalid", {
+      messageId: message.id,
+      attempts: message.attempts
+    });
+    message.retry({ delaySeconds: 300 });
+    return;
+  }
+  let result;
+  try {
+    result = await sendToTinybird(message.body, env, fetcher);
+  } catch (error) {
+    console.error("tinybird_request_failed", {
+      messageId: message.id,
+      producerId: message.body.producer_id,
+      attempts: message.attempts,
+      error: error instanceof Error ? error.message : "Unknown error"
+    });
+    message.retry({ delaySeconds: 60 });
+    return;
+  }
+  if (result.ok) {
+    message.ack();
+    return;
+  }
+  console.error("tinybird_write_rejected", {
+    messageId: message.id,
+    producerId: message.body.producer_id,
+    attempts: message.attempts,
+    status: result.status,
+    error: result.error
+  });
+  message.retry({ delaySeconds: result.retryAfterSeconds });
+}
+__name(consumeMessage, "consumeMessage");
+function isQueueEnvelope(value) {
+  if (!isJsonObject(value)) {
+    return false;
+  }
+  if (value.schema_version !== QUEUE_SCHEMA_VERSION) {
+    return false;
+  }
+  if (typeof value.producer_id !== "string" || value.producer_id === "") {
+    return false;
+  }
+  return Array.isArray(value.events) && value.events.length > 0;
+}
+__name(isQueueEnvelope, "isQueueEnvelope");
+function tinybirdEventsUrl(env) {
+  if (!env.TINYBIRD_APPEND_TOKEN) {
+    throw new Error("TINYBIRD_APPEND_TOKEN is not configured");
+  }
+  if (!env.TINYBIRD_DATASOURCE) {
+    throw new Error("TINYBIRD_DATASOURCE is not configured");
+  }
+  const baseUrl = new URL(env.TINYBIRD_API_URL);
+  if (baseUrl.protocol !== "https:") {
+    throw new Error("TINYBIRD_API_URL must use HTTPS");
+  }
+  const url = new URL("/v0/events", baseUrl);
+  url.searchParams.set("name", env.TINYBIRD_DATASOURCE);
+  url.searchParams.set("wait", "true");
+  return url;
+}
+__name(tinybirdEventsUrl, "tinybirdEventsUrl");
+function readQuarantinedRows(body) {
+  if (body.trim() === "") {
+    return 0;
+  }
+  try {
+    const parsed = JSON.parse(body);
+    if (!isJsonObject(parsed)) {
+      return 0;
+    }
+    return typeof parsed.quarantined_rows === "number" ? parsed.quarantined_rows : 0;
+  } catch {
+    return 0;
+  }
+}
+__name(readQuarantinedRows, "readQuarantinedRows");
+function retryDelay(response) {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) {
+      return Math.min(Math.ceil(seconds), 3600);
+    }
+    const retryAt = Date.parse(retryAfter);
+    if (Number.isFinite(retryAt)) {
+      return Math.min(
+        Math.max(Math.ceil((retryAt - Date.now()) / 1e3), 0),
+        3600
+      );
+    }
+  }
+  if (response.status === 429 || response.status === 503) {
+    return 30;
+  }
+  if (response.status >= 500) {
+    return 60;
+  }
+  return 300;
+}
+__name(retryDelay, "retryDelay");
+
+// src/index.ts
+var WEBHOOK_PATH = "/webhooks/jitsu";
+var index_default = {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (url.pathname === "/health" && request.method === "GET") {
+      return Response.json({ ok: true, service: "jitsu-tinybird-ingest" });
+    }
+    if (url.pathname !== WEBHOOK_PATH) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
+    if (request.method !== "POST") {
+      return Response.json(
+        { error: "Method not allowed" },
+        { status: 405, headers: { Allow: "POST" } }
+      );
+    }
+    return handleJitsuWebhook(request, env);
+  },
+  async queue(batch, env) {
+    await consumeJitsuQueue(batch, env);
+  }
+};
+export {
+  index_default as default
+};
+//# sourceMappingURL=index.js.map
+
+--11892029bd114a49b7e88d8f80daadb5f512cbc49f585e3a2cc0dae80cbe
+Content-Disposition: form-data; name="index.js.map"; filename="index.js.map"
+Content-Type: application/source-map
+
+{"version":3,"file":"index.js","sourcesRoot":null,"sources":["src/json.ts","src/jitsu.ts","src/ingress.ts","src/tinybird.ts","src/index.ts"],"sourcesContent":["import type { JsonObject, JsonValue } from \"./types\";\n\nconst textEncoder = new TextEncoder();\n\nexport class RequestError extends Error {\n  constructor(\n    message: string,\n    readonly status: number,\n  ) {\n    super(message);\n  }\n}\n\nexport function isJsonObject(value: unknown): value is JsonObject {\n  return typeof value === \"object\" \u0026\u0026 value !== null \u0026\u0026 !Array.isArray(value);\n}\n\nexport function stableStringify(value: JsonValue): string {\n  return JSON.stringify(sortJson(value));\n}\n\nexport function utf8ByteLength(value: string): number {\n  return textEncoder.encode(value).byteLength;\n}\n\nexport async function sha256Hex(value: string): Promise\u003cstring\u003e {\n  const digest = await crypto.subtle.digest(\"SHA-256\", textEncoder.encode(value));\n\n  return Array.from(new Uint8Array(digest), (byte) =\u003e\n    byte.toString(16).padStart(2, \"0\"),\n  )\n    .join(\"\")\n    .toUpperCase();\n}\n\nexport async function constantTimeEqual(\n  actual: string,\n  expected: string,\n): Promise\u003cboolean\u003e {\n  const [actualDigest, expectedDigest] = await Promise.all([\n    crypto.subtle.digest(\"SHA-256\", textEncoder.encode(actual)),\n    crypto.subtle.digest(\"SHA-256\", textEncoder.encode(expected)),\n  ]);\n  const actualBytes = new Uint8Array(actualDigest);\n  const expectedBytes = new Uint8Array(expectedDigest);\n  let difference = 0;\n\n  for (let index = 0; index \u003c actualBytes.length; index += 1) {\n    difference |= actualBytes[index] ^ expectedBytes[index];\n  }\n\n  return difference === 0;\n}\n\nfunction sortJson(value: JsonValue): JsonValue {\n  if (Array.isArray(value)) {\n    return value.map(sortJson);\n  }\n\n  if (!isJsonObject(value)) {\n    return value;\n  }\n\n  const sorted = Object.create(null) as JsonObject;\n\n  for (const key of Object.keys(value).sort()) {\n    sorted[key] = sortJson(value[key]);\n  }\n\n  return sorted;\n}\n","import {\n  isJsonObject,\n  RequestError,\n  sha256Hex,\n  stableStringify,\n  utf8ByteLength,\n} from \"./json\";\nimport type {\n  JitsuObservation,\n  JsonObject,\n  JsonValue,\n  QueueEnvelope,\n} from \"./types\";\n\nexport const MAX_REQUEST_BYTES = 10_000_000;\nexport const MAX_EVENTS_PER_REQUEST = 10_000;\nexport const MAX_QUEUE_MESSAGE_BYTES = 120_000;\nexport const QUEUE_SCHEMA_VERSION = \"jitsu_events_api_v1\" as const;\n\ntype ObservationDraft = Omit\u003c\n  JitsuObservation,\n  \"delivery_event_id\" | \"producer_id\" | \"producer_sequence\" | \"tenant_id\"\n\u003e;\n\nexport interface JitsuDelivery {\n  producerId: string;\n  observations: JitsuObservation[];\n  envelopes: QueueEnvelope[];\n}\n\nexport async function parseJitsuRequest(\n  request: Request,\n): Promise\u003cJsonObject[]\u003e {\n  const contentLength = Number(request.headers.get(\"content-length\"));\n\n  if (Number.isFinite(contentLength) \u0026\u0026 contentLength \u003e MAX_REQUEST_BYTES) {\n    throw new RequestError(\"Request body exceeds 10 MB\", 413);\n  }\n\n  const body = await request.text();\n\n  if (utf8ByteLength(body) \u003e MAX_REQUEST_BYTES) {\n    throw new RequestError(\"Request body exceeds 10 MB\", 413);\n  }\n\n  if (body.trim() === \"\") {\n    throw new RequestError(\"Request body is empty\", 400);\n  }\n\n  const contentType = request.headers.get(\"content-type\")?.toLowerCase() ?? \"\";\n  const events = contentType.includes(\"ndjson\")\n    ? parseNdjson(body)\n    : parseJson(body);\n\n  if (events.length === 0) {\n    throw new RequestError(\"Request contains no Jitsu events\", 400);\n  }\n\n  if (events.length \u003e MAX_EVENTS_PER_REQUEST) {\n    throw new RequestError(\"Request contains more than 10,000 events\", 413);\n  }\n\n  return events;\n}\n\nexport async function buildJitsuDelivery(\n  events: JsonObject[],\n  tenantId: string,\n  maxQueueMessageBytes = MAX_QUEUE_MESSAGE_BYTES,\n): Promise\u003cJitsuDelivery\u003e {\n  const trimmedTenantId = tenantId.trim();\n\n  if (trimmedTenantId === \"\") {\n    throw new RequestError(\"TENANT_ID is not configured\", 503);\n  }\n\n  const acceptedAt = new Date().toISOString();\n  const drafts = await Promise.all(\n    events.map((event, index) =\u003e buildObservationDraft(event, index, acceptedAt)),\n  );\n  drafts.sort(compareDrafts);\n  rejectConflictingMessageIds(drafts);\n\n  const batchFingerprint = drafts\n    .map((draft) =\u003e `${draft.message_id}:${draft.payload_hash}`)\n    .join(\"\\n\");\n  const batchHash = await sha256Hex(\n    `${QUEUE_SCHEMA_VERSION}\\n${trimmedTenantId}\\n${batchFingerprint}`,\n  );\n  const producerId = `jitsu-webhook-v1:${batchHash}`;\n  const observations = await Promise.all(\n    drafts.map(async (draft, index) =\u003e {\n      const producerSequence = index + 1;\n      const deliveryEventId = await sha256Hex(\n        `${producerId}:${producerSequence}:${draft.message_id}:${draft.payload_hash}`,\n      );\n\n      return {\n        tenant_id: trimmedTenantId,\n        producer_id: producerId,\n        producer_sequence: producerSequence,\n        delivery_event_id: deliveryEventId,\n        ...draft,\n      } satisfies JitsuObservation;\n    }),\n  );\n\n  return {\n    producerId,\n    observations,\n    envelopes: buildQueueEnvelopes(\n      producerId,\n      observations,\n      maxQueueMessageBytes,\n    ),\n  };\n}\n\nexport function buildQueueEnvelopes(\n  producerId: string,\n  observations: JitsuObservation[],\n  maxBytes = MAX_QUEUE_MESSAGE_BYTES,\n): QueueEnvelope[] {\n  const envelopes: QueueEnvelope[] = [];\n  let events: JitsuObservation[] = [];\n\n  for (const observation of observations) {\n    const candidate = createEnvelope(producerId, [...events, observation]);\n\n    if (queueEnvelopeBytes(candidate) \u003c= maxBytes) {\n      events = candidate.events;\n      continue;\n    }\n\n    if (events.length === 0) {\n      throw new RequestError(\n        `Jitsu event ${observation.message_id} exceeds the Queue message limit`,\n        413,\n      );\n    }\n\n    envelopes.push(createEnvelope(producerId, events));\n    const singleEventEnvelope = createEnvelope(producerId, [observation]);\n\n    if (queueEnvelopeBytes(singleEventEnvelope) \u003e maxBytes) {\n      throw new RequestError(\n        `Jitsu event ${observation.message_id} exceeds the Queue message limit`,\n        413,\n      );\n    }\n\n    events = [observation];\n  }\n\n  if (events.length \u003e 0) {\n    envelopes.push(createEnvelope(producerId, events));\n  }\n\n  return envelopes;\n}\n\nexport function queueEnvelopeBytes(envelope: QueueEnvelope): number {\n  return utf8ByteLength(JSON.stringify(envelope));\n}\n\nfunction parseJson(body: string): JsonObject[] {\n  let parsed: unknown;\n\n  try {\n    parsed = JSON.parse(body);\n  } catch {\n    throw new RequestError(\"Request body is not valid JSON\", 400);\n  }\n\n  return extractEvents(parsed);\n}\n\nfunction parseNdjson(body: string): JsonObject[] {\n  const events: JsonObject[] = [];\n  const lines = body.split(/\\r?\\n/);\n\n  for (const [index, line] of lines.entries()) {\n    if (line.trim() === \"\") {\n      continue;\n    }\n\n    let parsed: unknown;\n\n    try {\n      parsed = JSON.parse(line);\n    } catch {\n      throw new RequestError(`NDJSON line ${index + 1} is not valid JSON`, 400);\n    }\n\n    events.push(...extractEvents(parsed));\n  }\n\n  return events;\n}\n\nfunction extractEvents(value: unknown): JsonObject[] {\n  if (Array.isArray(value)) {\n    return value.flatMap(extractEvents);\n  }\n\n  if (!isJsonObject(value)) {\n    throw new RequestError(\"Every Jitsu event must be a JSON object\", 400);\n  }\n\n  if (Array.isArray(value.batch)) {\n    return value.batch.flatMap(extractEvents);\n  }\n\n  if (Array.isArray(value.events)) {\n    return value.events.flatMap(extractEvents);\n  }\n\n  return [value];\n}\n\nasync function buildObservationDraft(\n  event: JsonObject,\n  index: number,\n  acceptedAt: string,\n): Promise\u003cObservationDraft\u003e {\n  const properties = objectValue(event.properties);\n  const context = objectValue(event.context);\n  const traits = {\n    ...objectValue(context.traits),\n    ...objectValue(event.traits),\n  };\n  const page = objectValue(context.page);\n  const attribution = objectValue(context.attribution);\n  const campaign = objectValue(context.campaign);\n  const factPayload = stableStringify(event);\n  const factPayloadHash = await sha256Hex(factPayload);\n  const messageId =\n    firstString(\n      event.messageId,\n      event.message_id,\n      event.id,\n      properties.event_id,\n      properties.message_id,\n    ) ?? `jitsu_${factPayloadHash}`;\n  const observedAt = firstTimestamp(\n    event.timestamp,\n    event.sentAt,\n    event.sent_at,\n    event.receivedAt,\n    event.received_at,\n    properties.timestamp,\n  );\n  const sourceVersionAt = firstTimestamp(\n    event.receivedAt,\n    event.received_at,\n    event.sentAt,\n    event.sent_at,\n    event.timestamp,\n  );\n\n  if (!observedAt || !sourceVersionAt) {\n    throw new RequestError(\n      `Jitsu event ${messageId || index + 1} has no valid timestamp`,\n      400,\n    );\n  }\n\n  const sourceFactVersion = Date.parse(sourceVersionAt) * 1_000;\n  const eventName = firstString(event.event, event.name, properties.event_name);\n  const eventType = firstString(event.type, event.event_type);\n  const bodyWithoutHash = {\n    payload_hash: \"\",\n    message_id: messageId,\n    event_kind: eventKind(eventType, eventName),\n    observed_at: observedAt,\n    // The Queue consumer replaces this with the Tinybird delivery-attempt time.\n    // Keeping it operational (rather than upstream-authored) makes incremental\n    // scans include events that spent longer than the overlap window in Queue.\n    ingested_at: acceptedAt,\n    event_timestamp: firstTimestamp(event.timestamp),\n    anonymous_id: firstString(\n      event.anonymousId,\n      event.anonymous_id,\n      traits.anonymousId,\n      traits.anonymous_id,\n    ),\n    user_id: firstString(event.userId, event.user_id, traits.userId, traits.user_id),\n    email: firstString(event.email, traits.email, properties.email),\n    phone: firstString(\n      event.phone,\n      traits.phone,\n      traits.phone_number,\n      traits.phoneNumber,\n      properties.phone,\n      properties.phone_number,\n    ),\n    first_name: firstString(\n      event.first_name,\n      event.firstName,\n      traits.first_name,\n      traits.firstName,\n      properties.first_name,\n      properties.firstName,\n    ),\n    last_name: firstString(\n      event.last_name,\n      event.lastName,\n      traits.last_name,\n      traits.lastName,\n      properties.last_name,\n      properties.lastName,\n    ),\n    customer_name: firstString(\n      event.customer_name,\n      traits.name,\n      properties.customer_name,\n      properties.customerName,\n      properties.name,\n    ),\n    page_url: firstString(\n      event.page_url,\n      event.url,\n      properties.page_url,\n      properties.pageUrl,\n      properties.url,\n      page.url,\n    ),\n    page_path: firstString(\n      event.page_path,\n      event.path,\n      properties.page_path,\n      properties.pagePath,\n      properties.path,\n      page.path,\n    ),\n    page_referrer: firstString(\n      event.page_referrer,\n      event.referrer,\n      properties.page_referrer,\n      properties.referrer,\n      page.referrer,\n    ),\n    form_id: firstString(event.form_id, properties.form_id, properties.formId),\n    form_name: firstString(\n      event.form_name,\n      properties.form_name,\n      properties.formName,\n    ),\n    form_action: firstString(\n      event.form_action,\n      properties.form_action,\n      properties.formAction,\n    ),\n    submitted_at: firstTimestamp(\n      event.submitted_at,\n      event.submittedAt,\n      properties.submitted_at,\n      properties.submittedAt,\n    ),\n    is_checkout_form: firstBoolean(\n      event.is_checkout_form,\n      properties.is_checkout_form,\n      properties.isCheckoutForm,\n    ),\n    is_payment_confirmed: firstBoolean(\n      event.is_payment_confirmed,\n      properties.is_payment_confirmed,\n      properties.isPaymentConfirmed,\n    ),\n    payment_status: firstString(\n      event.payment_status,\n      properties.payment_status,\n      properties.paymentStatus,\n    ),\n    amount: firstNumber(event.amount, properties.amount),\n    value: firstNumber(event.value, properties.value),\n    currency: firstString(event.currency, properties.currency),\n    product_id: firstString(\n      event.product_id,\n      properties.product_id,\n      properties.productId,\n    ),\n    product_name: firstString(\n      event.product_name,\n      properties.product_name,\n      properties.productName,\n    ),\n    products: firstJsonString(event.products, properties.products, properties.contents),\n    utm_source: attributionString(\"utm_source\", event, properties, attribution),\n    utm_medium: attributionString(\"utm_medium\", event, properties, attribution),\n    utm_campaign: attributionString(\"utm_campaign\", event, properties, attribution),\n    utm_content: attributionString(\"utm_content\", event, properties, attribution),\n    utm_term: attributionString(\"utm_term\", event, properties, attribution),\n    utm_id: attributionString(\"utm_id\", event, properties, attribution),\n    campaign_id: firstString(\n      event.campaign_id,\n      properties.campaign_id,\n      attribution.campaign_id,\n      campaign.id,\n    ),\n    adset_id: firstString(event.adset_id, properties.adset_id, attribution.adset_id),\n    ad_id: firstString(event.ad_id, properties.ad_id, attribution.ad_id),\n    fbclid: attributionString(\"fbclid\", event, properties, attribution),\n    source_fact_version: sourceFactVersion,\n    source_deleted: 0 as const,\n    fact_payload_hash: factPayloadHash,\n    fact_payload: factPayload,\n  } satisfies ObservationDraft;\n  const payloadHashInput = stableStringify({\n    ...bodyWithoutHash,\n    // Delivery retries may change only this operational timestamp.\n    ingested_at: \"\",\n  } as unknown as JsonObject);\n\n  return {\n    ...bodyWithoutHash,\n    payload_hash: await sha256Hex(payloadHashInput),\n  };\n}\n\nfunction compareDrafts(left: ObservationDraft, right: ObservationDraft): number {\n  return (\n    compareText(left.message_id, right.message_id) ||\n    compareText(left.payload_hash, right.payload_hash) ||\n    compareText(left.fact_payload, right.fact_payload)\n  );\n}\n\nfunction compareText(left: string, right: string): number {\n  if (left \u003c right) {\n    return -1;\n  }\n\n  if (left \u003e right) {\n    return 1;\n  }\n\n  return 0;\n}\n\nfunction rejectConflictingMessageIds(drafts: ObservationDraft[]): void {\n  const payloadsByMessageId = new Map\u003cstring, string\u003e();\n\n  for (const draft of drafts) {\n    const existingPayloadHash = payloadsByMessageId.get(draft.message_id);\n\n    if (existingPayloadHash \u0026\u0026 existingPayloadHash !== draft.payload_hash) {\n      throw new RequestError(\n        `Jitsu message_id ${draft.message_id} has conflicting payloads`,\n        400,\n      );\n    }\n\n    payloadsByMessageId.set(draft.message_id, draft.payload_hash);\n  }\n}\n\nfunction eventKind(type: string | null, name: string | null): string {\n  const normalizedType = normalizeLabel(type);\n  const normalizedName = normalizeLabel(name);\n\n  if (normalizedType === \"page\") {\n    return \"page_view\";\n  }\n\n  if (normalizedType === \"identify\") {\n    return \"identify\";\n  }\n\n  if (normalizedName === \"form_submitted\") {\n    return \"client_form\";\n  }\n\n  if (normalizedName === \"order_completed\") {\n    return \"client_order\";\n  }\n\n  if (normalizedName === \"attr\" || normalizedName === \"attribution\") {\n    return \"attribution\";\n  }\n\n  return normalizedType || normalizedName || \"event\";\n}\n\nfunction normalizeLabel(value: string | null): string {\n  return (value ?? \"\")\n    .trim()\n    .toLowerCase()\n    .replace(/[^a-z0-9]+/g, \"_\")\n    .replace(/^_+|_+$/g, \"\");\n}\n\nfunction attributionString(\n  key: string,\n  event: JsonObject,\n  properties: JsonObject,\n  attribution: JsonObject,\n): string | null {\n  return firstString(event[key], properties[key], attribution[key]);\n}\n\nfunction objectValue(value: JsonValue | undefined): JsonObject {\n  return isJsonObject(value) ? value : {};\n}\n\nfunction firstString(...values: Array\u003cJsonValue | undefined\u003e): string | null {\n  for (const value of values) {\n    if (typeof value !== \"string\") {\n      continue;\n    }\n\n    const trimmed = value.trim();\n\n    if (trimmed !== \"\") {\n      return trimmed;\n    }\n  }\n\n  return null;\n}\n\nfunction firstBoolean(...values: Array\u003cJsonValue | undefined\u003e): boolean | null {\n  for (const value of values) {\n    if (typeof value === \"boolean\") {\n      return value;\n    }\n\n    if (value === 1 || value === \"1\" || value === \"true\") {\n      return true;\n    }\n\n    if (value === 0 || value === \"0\" || value === \"false\") {\n      return false;\n    }\n  }\n\n  return null;\n}\n\nfunction firstNumber(...values: Array\u003cJsonValue | undefined\u003e): number | null {\n  for (const value of values) {\n    if (typeof value === \"number\" \u0026\u0026 Number.isFinite(value)) {\n      return value;\n    }\n\n    if (typeof value !== \"string\" || value.trim() === \"\") {\n      continue;\n    }\n\n    const parsed = Number(value);\n\n    if (Number.isFinite(parsed)) {\n      return parsed;\n    }\n  }\n\n  return null;\n}\n\nfunction firstJsonString(...values: Array\u003cJsonValue | undefined\u003e): string | null {\n  for (const value of values) {\n    if (value === undefined || value === null) {\n      continue;\n    }\n\n    if (typeof value === \"string\") {\n      const trimmed = value.trim();\n      return trimmed === \"\" ? null : trimmed;\n    }\n\n    return stableStringify(value);\n  }\n\n  return null;\n}\n\nfunction firstTimestamp(...values: Array\u003cJsonValue | undefined\u003e): string | null {\n  for (const value of values) {\n    const timestamp = parseTimestamp(value);\n\n    if (timestamp) {\n      return timestamp;\n    }\n  }\n\n  return null;\n}\n\nfunction parseTimestamp(value: JsonValue | undefined): string | null {\n  if (typeof value === \"number\" \u0026\u0026 Number.isFinite(value)) {\n    const milliseconds = Math.abs(value) \u003c 100_000_000_000 ? value * 1_000 : value;\n    const date = new Date(milliseconds);\n    return Number.isNaN(date.getTime()) ? null : date.toISOString();\n  }\n\n  if (typeof value !== \"string\" || value.trim() === \"\") {\n    return null;\n  }\n\n  const date = new Date(value);\n  return Number.isNaN(date.getTime()) ? null : date.toISOString();\n}\n\nfunction createEnvelope(\n  producerId: string,\n  events: JitsuObservation[],\n): QueueEnvelope {\n  return {\n    schema_version: QUEUE_SCHEMA_VERSION,\n    producer_id: producerId,\n    events,\n  };\n}\n","import { constantTimeEqual, RequestError } from \"./json\";\nimport {\n  buildJitsuDelivery,\n  parseJitsuRequest,\n  queueEnvelopeBytes,\n} from \"./jitsu\";\nimport type { QueueEnvelope, WorkerEnv } from \"./types\";\n\nconst MAX_SEND_BATCH_MESSAGES = 100;\nconst MAX_SEND_BATCH_BYTES = 240_000;\n\nexport async function handleJitsuWebhook(\n  request: Request,\n  env: WorkerEnv,\n): Promise\u003cResponse\u003e {\n  if (!env.JITSU_WEBHOOK_TOKEN) {\n    return jsonResponse({ error: \"Webhook authentication is not configured\" }, 503);\n  }\n\n  if (!(await isAuthorized(request, env.JITSU_WEBHOOK_TOKEN))) {\n    return jsonResponse({ error: \"Unauthorized\" }, 401);\n  }\n\n  try {\n    const events = await parseJitsuRequest(request);\n    const delivery = await buildJitsuDelivery(events, env.TENANT_ID);\n    await enqueueEnvelopes(env.JITSU_EVENTS_QUEUE, delivery.envelopes);\n\n    return jsonResponse(\n      {\n        accepted: delivery.observations.length,\n        producerId: delivery.producerId,\n        queueMessages: delivery.envelopes.length,\n      },\n      200,\n    );\n  } catch (error) {\n    if (error instanceof RequestError) {\n      return jsonResponse({ error: error.message }, error.status);\n    }\n\n    console.error(\"jitsu_webhook_enqueue_failed\", safeError(error));\n    return jsonResponse({ error: \"Queue delivery failed\" }, 503);\n  }\n}\n\nexport async function enqueueEnvelopes(\n  queue: Queue\u003cQueueEnvelope\u003e,\n  envelopes: QueueEnvelope[],\n): Promise\u003cvoid\u003e {\n  let messages: Array\u003c{ body: QueueEnvelope; contentType: \"json\" }\u003e = [];\n  let messageBytes = 0;\n\n  for (const envelope of envelopes) {\n    const envelopeBytes = queueEnvelopeBytes(envelope);\n    const batchIsFull = messages.length === MAX_SEND_BATCH_MESSAGES;\n    const batchIsTooLarge = messageBytes + envelopeBytes \u003e MAX_SEND_BATCH_BYTES;\n\n    if (messages.length \u003e 0 \u0026\u0026 (batchIsFull || batchIsTooLarge)) {\n      await queue.sendBatch(messages);\n      messages = [];\n      messageBytes = 0;\n    }\n\n    messages.push({ body: envelope, contentType: \"json\" });\n    messageBytes += envelopeBytes;\n  }\n\n  if (messages.length \u003e 0) {\n    await queue.sendBatch(messages);\n  }\n}\n\nfunction jsonResponse(body: unknown, status: number): Response {\n  return Response.json(body, { status });\n}\n\nasync function isAuthorized(request: Request, expectedToken: string): Promise\u003cboolean\u003e {\n  const authorization = request.headers.get(\"authorization\") ?? \"\";\n  const prefix = \"Bearer \";\n\n  if (!authorization.startsWith(prefix)) {\n    return false;\n  }\n\n  return constantTimeEqual(authorization.slice(prefix.length), expectedToken);\n}\n\nfunction safeError(error: unknown): string {\n  return error instanceof Error ? error.message : \"Unknown error\";\n}\n","import { isJsonObject } from \"./json\";\nimport { QUEUE_SCHEMA_VERSION } from \"./jitsu\";\nimport type {\n  Fetcher,\n  QueueEnvelope,\n  WorkerEnv,\n} from \"./types\";\n\nconst REQUEST_TIMEOUT_MS = 15_000;\n\ninterface TinybirdResult {\n  ok: boolean;\n  status: number;\n  retryAfterSeconds: number;\n  error?: string;\n}\n\nexport async function consumeJitsuQueue(\n  batch: MessageBatch\u003cQueueEnvelope\u003e,\n  env: WorkerEnv,\n  fetcher: Fetcher = fetch,\n): Promise\u003cvoid\u003e {\n  await Promise.all(\n    batch.messages.map((message) =\u003e consumeMessage(message, env, fetcher)),\n  );\n}\n\nexport async function sendToTinybird(\n  envelope: QueueEnvelope,\n  env: WorkerEnv,\n  fetcher: Fetcher = fetch,\n  deliveredAt = new Date().toISOString(),\n): Promise\u003cTinybirdResult\u003e {\n  const url = tinybirdEventsUrl(env);\n  const body = envelope.events\n    .map((event) =\u003e JSON.stringify({ ...event, ingested_at: deliveredAt }))\n    .join(\"\\n\");\n  const controller = new AbortController();\n  const timeout = setTimeout(() =\u003e controller.abort(), REQUEST_TIMEOUT_MS);\n  let response: Response;\n  let responseBody: string;\n\n  try {\n    response = await fetcher(url, {\n      method: \"POST\",\n      headers: {\n        Authorization: `Bearer ${env.TINYBIRD_APPEND_TOKEN}`,\n        \"Content-Type\": \"application/x-ndjson\",\n      },\n      body,\n      signal: controller.signal,\n    });\n    responseBody = await response.text();\n  } finally {\n    clearTimeout(timeout);\n  }\n\n  if (response.status !== 200) {\n    return {\n      ok: false,\n      status: response.status,\n      retryAfterSeconds: retryDelay(response),\n      error:\n        responseBody.trim() === \"\"\n          ? \"Tinybird returned an empty error response\"\n          : \"Tinybird returned an error response\",\n    };\n  }\n\n  const quarantinedRows = readQuarantinedRows(responseBody);\n\n  if (quarantinedRows \u003e 0) {\n    return {\n      ok: false,\n      status: response.status,\n      retryAfterSeconds: 300,\n      error: `Tinybird quarantined ${quarantinedRows} rows`,\n    };\n  }\n\n  return {\n    ok: true,\n    status: response.status,\n    retryAfterSeconds: 0,\n  };\n}\n\nasync function consumeMessage(\n  message: Message\u003cQueueEnvelope\u003e,\n  env: WorkerEnv,\n  fetcher: Fetcher,\n): Promise\u003cvoid\u003e {\n  if (!isQueueEnvelope(message.body)) {\n    console.error(\"jitsu_queue_message_invalid\", {\n      messageId: message.id,\n      attempts: message.attempts,\n    });\n    message.retry({ delaySeconds: 300 });\n    return;\n  }\n\n  let result: TinybirdResult;\n\n  try {\n    result = await sendToTinybird(message.body, env, fetcher);\n  } catch (error) {\n    console.error(\"tinybird_request_failed\", {\n      messageId: message.id,\n      producerId: message.body.producer_id,\n      attempts: message.attempts,\n      error: error instanceof Error ? error.message : \"Unknown error\",\n    });\n    message.retry({ delaySeconds: 60 });\n    return;\n  }\n\n  if (result.ok) {\n    message.ack();\n    return;\n  }\n\n  console.error(\"tinybird_write_rejected\", {\n    messageId: message.id,\n    producerId: message.body.producer_id,\n    attempts: message.attempts,\n    status: result.status,\n    error: result.error,\n  });\n  message.retry({ delaySeconds: result.retryAfterSeconds });\n}\n\nexport function isQueueEnvelope(value: unknown): value is QueueEnvelope {\n  if (!isJsonObject(value)) {\n    return false;\n  }\n\n  if (value.schema_version !== QUEUE_SCHEMA_VERSION) {\n    return false;\n  }\n\n  if (typeof value.producer_id !== \"string\" || value.producer_id === \"\") {\n    return false;\n  }\n\n  return Array.isArray(value.events) \u0026\u0026 value.events.length \u003e 0;\n}\n\nfunction tinybirdEventsUrl(env: WorkerEnv): URL {\n  if (!env.TINYBIRD_APPEND_TOKEN) {\n    throw new Error(\"TINYBIRD_APPEND_TOKEN is not configured\");\n  }\n\n  if (!env.TINYBIRD_DATASOURCE) {\n    throw new Error(\"TINYBIRD_DATASOURCE is not configured\");\n  }\n\n  const baseUrl = new URL(env.TINYBIRD_API_URL);\n\n  if (baseUrl.protocol !== \"https:\") {\n    throw new Error(\"TINYBIRD_API_URL must use HTTPS\");\n  }\n\n  const url = new URL(\"/v0/events\", baseUrl);\n  url.searchParams.set(\"name\", env.TINYBIRD_DATASOURCE);\n  url.searchParams.set(\"wait\", \"true\");\n  return url;\n}\n\nfunction readQuarantinedRows(body: string): number {\n  if (body.trim() === \"\") {\n    return 0;\n  }\n\n  try {\n    const parsed: unknown = JSON.parse(body);\n\n    if (!isJsonObject(parsed)) {\n      return 0;\n    }\n\n    return typeof parsed.quarantined_rows === \"number\"\n      ? parsed.quarantined_rows\n      : 0;\n  } catch {\n    return 0;\n  }\n}\n\nfunction retryDelay(response: Response): number {\n  const retryAfter = response.headers.get(\"retry-after\");\n\n  if (retryAfter) {\n    const seconds = Number(retryAfter);\n\n    if (Number.isFinite(seconds) \u0026\u0026 seconds \u003e= 0) {\n      return Math.min(Math.ceil(seconds), 3_600);\n    }\n\n    const retryAt = Date.parse(retryAfter);\n\n    if (Number.isFinite(retryAt)) {\n      return Math.min(\n        Math.max(Math.ceil((retryAt - Date.now()) / 1_000), 0),\n        3_600,\n      );\n    }\n  }\n\n  if (response.status === 429 || response.status === 503) {\n    return 30;\n  }\n\n  if (response.status \u003e= 500) {\n    return 60;\n  }\n\n  return 300;\n}\n","import { handleJitsuWebhook } from \"./ingress\";\nimport { consumeJitsuQueue } from \"./tinybird\";\nimport type { QueueEnvelope, WorkerEnv } from \"./types\";\n\nconst WEBHOOK_PATH = \"/webhooks/jitsu\";\n\nexport default {\n  async fetch(request: Request, env: WorkerEnv): Promise\u003cResponse\u003e {\n    const url = new URL(request.url);\n\n    if (url.pathname === \"/health\" \u0026\u0026 request.method === \"GET\") {\n      return Response.json({ ok: true, service: \"jitsu-tinybird-ingest\" });\n    }\n\n    if (url.pathname !== WEBHOOK_PATH) {\n      return Response.json({ error: \"Not found\" }, { status: 404 });\n    }\n\n    if (request.method !== \"POST\") {\n      return Response.json(\n        { error: \"Method not allowed\" },\n        { status: 405, headers: { Allow: \"POST\" } },\n      );\n    }\n\n    return handleJitsuWebhook(request, env);\n  },\n\n  async queue(\n    batch: MessageBatch\u003cQueueEnvelope\u003e,\n    env: WorkerEnv,\n  ): Promise\u003cvoid\u003e {\n    await consumeJitsuQueue(batch, env);\n  },\n};\n\n"],"names":["date"],"mappings":"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"}
+--11892029bd114a49b7e88d8f80daadb5f512cbc49f585e3a2cc0dae80cbe--

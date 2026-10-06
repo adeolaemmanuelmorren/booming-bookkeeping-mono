@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Retained immutable identity baseline state. No TTL.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `baseline_id` String `json:$.baseline_id`,
+    `manifest_kind` LowCardinality(String) `json:$.manifest_kind`,
+    `manifest_key` String `json:$.manifest_key`,
+    `sequence` UInt64 `json:$.sequence`,
+    `payload_json` String `json:$.payload_json`,
+    `payload_hash` FixedString(64) `json:$.payload_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, baseline_id, manifest_kind, manifest_key, sequence
+
+TOKEN v1_facts_runtime READ
+TOKEN v1_facts_runtime APPEND

@@ -1,0 +1,19 @@
+DESCRIPTION >
+    Daily Meta delivery product projected directly from each source hierarchy level.
+
+NODE bill_daily_delivery_product_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        date,
+        level,
+        campaign_id,
+        adset_id,
+        ad_id,
+        impressions,
+        reach,
+        frequency,
+        now64(6) AS materialized_at
+    FROM current_daily_ad_delivery
+    WHERE source = 'meta'

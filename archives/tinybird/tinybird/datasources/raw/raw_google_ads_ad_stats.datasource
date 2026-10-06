@@ -1,0 +1,46 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.google_ads.ad_stats.
+    Source role: google_ad_delivery_daily.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `customer_id` Nullable(Int64) `json:$.customer_id`,
+    `date` Nullable(Date) `json:$.date`,
+    `_fivetran_id` Nullable(String) `json:$._fivetran_id`,
+    `campaign_base_campaign` Nullable(String) `json:$.campaign_base_campaign`,
+    `conversions` Nullable(Float64) `json:$.conversions`,
+    `interactions` Nullable(Int64) `json:$.interactions`,
+    `interaction_event_types` Nullable(String) `json:$.interaction_event_types`,
+    `campaign_id` Nullable(Int64) `json:$.campaign_id`,
+    `device` Nullable(String) `json:$.device`,
+    `active_view_impressions` Nullable(Int64) `json:$.active_view_impressions`,
+    `clicks` Nullable(Int64) `json:$.clicks`,
+    `active_view_measurable_impressions` Nullable(Int64) `json:$.active_view_measurable_impressions`,
+    `cost_per_conversion` Nullable(Float64) `json:$.cost_per_conversion`,
+    `active_view_measurability` Nullable(Float64) `json:$.active_view_measurability`,
+    `conversions_value` Nullable(Float64) `json:$.conversions_value`,
+    `ad_id` Nullable(Int64) `json:$.ad_id`,
+    `video_trueview_views` Nullable(Int64) `json:$.video_trueview_views`,
+    `ad_network_type` Nullable(String) `json:$.ad_network_type`,
+    `impressions` Nullable(Int64) `json:$.impressions`,
+    `ad_group_id` Nullable(Int64) `json:$.ad_group_id`,
+    `view_through_conversions` Nullable(Int64) `json:$.view_through_conversions`,
+    `active_view_viewability` Nullable(Float64) `json:$.active_view_viewability`,
+    `active_view_measurable_cost_micros` Nullable(Int64) `json:$.active_view_measurable_cost_micros`,
+    `ad_group_base_ad_group` Nullable(String) `json:$.ad_group_base_ad_group`,
+    `cost_micros` Nullable(Int64) `json:$.cost_micros`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` Date `json:$.__tb_sort_1` DEFAULT ifNull(date, toDate(0)),
+    `__tb_sort_2` Int64 `json:$.__tb_sort_2` DEFAULT ifNull(customer_id, toInt64(0)),
+    `__tb_sort_3` Int64 `json:$.__tb_sort_3` DEFAULT ifNull(campaign_id, toInt64(0)),
+    `__tb_sort_4` Int64 `json:$.__tb_sort_4` DEFAULT ifNull(ad_group_id, toInt64(0)),
+    `__tb_sort_5` Int64 `json:$.__tb_sort_5` DEFAULT ifNull(ad_id, toInt64(0)),
+    `__tb_sort_6` String `json:$.__tb_sort_6` DEFAULT ifNull(_fivetran_id, '')
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2, __tb_sort_3, __tb_sort_4, __tb_sort_5, __tb_sort_6"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/google_ads/ad_stats/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

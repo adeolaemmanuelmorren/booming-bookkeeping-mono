@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Versioned identity policy. Click identifiers are intentionally absent.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `identifier_type` LowCardinality(String) `json:$.identifier_type`,
+    `normalization_family` LowCardinality(String) `json:$.normalization_family`,
+    `winner_priority` UInt8 `json:$.winner_priority`,
+    `relation_mode` LowCardinality(String) `json:$.relation_mode`,
+    `is_public` UInt8 `json:$.is_public`,
+    `is_enabled` UInt8 `json:$.is_enabled`,
+    `policy_version` UInt64 `json:$.policy_version`,
+    `updated_at` DateTime64(6) `json:$.updated_at`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, identifier_type"
+ENGINE_VER "policy_version"

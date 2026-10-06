@@ -1,0 +1,295 @@
+DESCRIPTION >
+    Deduplicate, cursor-bound, and normalize pending first-party identity deliveries. Click IDs are not read.
+
+NODE authoritative_identity_deliveries
+SQL >
+    SELECT * FROM identity_events_raw
+
+    UNION ALL
+
+    SELECT
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        delivery_event_id AS event_id,
+        payload_hash,
+        event_kind,
+        observed_at,
+        ingested_at,
+        ifNull(anonymous_id, '') AS anonymous_id,
+        ifNull(user_id, '') AS user_id,
+        ifNull(email, '') AS email,
+        ifNull(phone, '') AS phone,
+        ifNull(first_name, '') AS first_name,
+        ifNull(last_name, '') AS last_name,
+        multiIf(
+            event_kind = 'page_view', 'page_view',
+            event_kind = 'client_form', 'form_submission',
+            event_kind = 'client_order', 'order_completed',
+            'identity_observation'
+        ) AS fact_kind,
+        message_id AS fact_key,
+        source_fact_version,
+        source_deleted AS fact_deleted,
+        fact_payload_hash,
+        fact_payload
+    FROM jitsu_events_api_observations
+    WHERE tenant_id = 'boom'
+      AND source_fact_version = toUInt64(toUnixTimestamp64Micro(ingested_at))
+
+NODE sequence_integrity
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        countDistinct(event_id) AS distinct_event_ids,
+        countDistinct(payload_hash) AS distinct_payload_hashes
+    FROM authoritative_identity_deliveries
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, producer_id, producer_sequence
+
+NODE event_id_integrity
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        event_id,
+        countDistinct(producer_sequence) AS distinct_sequences,
+        countDistinct(payload_hash) AS distinct_payload_hashes
+    FROM authoritative_identity_deliveries
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, producer_id, event_id
+
+NODE valid_delivery_versions
+SQL >
+    SELECT
+        source.tenant_id,
+        source.producer_id,
+        source.producer_sequence,
+        argMax(
+            tuple(
+                source.event_id,
+                source.payload_hash,
+                source.event_kind,
+                source.observed_at,
+                source.ingested_at,
+                source.anonymous_id,
+                source.user_id,
+                source.email,
+                source.phone,
+                source.first_name,
+                source.last_name,
+                source.fact_kind,
+                source.fact_key,
+                source.source_fact_version,
+                source.fact_deleted,
+                source.fact_payload_hash,
+                source.fact_payload
+            ),
+            tuple(source.ingested_at, source.event_id, source.payload_hash)
+        ) AS delivery
+    FROM authoritative_identity_deliveries AS source
+    INNER JOIN sequence_integrity AS integrity
+        ON source.tenant_id = integrity.tenant_id
+       AND source.producer_id = integrity.producer_id
+       AND source.producer_sequence = integrity.producer_sequence
+    INNER JOIN event_id_integrity AS event_integrity
+        ON source.tenant_id = event_integrity.tenant_id
+       AND source.producer_id = event_integrity.producer_id
+       AND source.event_id = event_integrity.event_id
+    WHERE source.tenant_id = 'boom'
+      AND integrity.distinct_event_ids = 1
+      AND integrity.distinct_payload_hashes = 1
+      AND event_integrity.distinct_sequences = 1
+      AND event_integrity.distinct_payload_hashes = 1
+    GROUP BY source.tenant_id, source.producer_id, source.producer_sequence
+
+NODE pending_delivery_candidates
+SQL >
+    SELECT
+        versions.*,
+        coalesce(checkpoints.checkpoint_sequence, toUInt64(0)) AS checkpoint_sequence,
+        row_number() OVER (
+            PARTITION BY versions.tenant_id, versions.producer_id
+            ORDER BY versions.producer_sequence
+        ) AS pending_rank
+    FROM valid_delivery_versions AS versions
+    LEFT JOIN current_identity_checkpoints AS checkpoints
+        ON versions.tenant_id = checkpoints.tenant_id
+       AND versions.producer_id = checkpoints.producer_id
+    WHERE versions.producer_sequence > coalesce(checkpoints.checkpoint_sequence, toUInt64(0))
+
+NODE contiguous_batch_high
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        checkpoint_sequence,
+        least(
+            if(
+                countIf(producer_sequence != checkpoint_sequence + pending_rank) = 0,
+                max(producer_sequence),
+                checkpoint_sequence + minIf(
+                    pending_rank,
+                    producer_sequence != checkpoint_sequence + pending_rank
+                ) - 1
+            ),
+            checkpoint_sequence + 5000
+        ) AS batch_high_sequence
+    FROM pending_delivery_candidates
+    GROUP BY tenant_id, producer_id, checkpoint_sequence
+
+NODE bounded_deliveries
+SQL >
+    SELECT
+        candidates.tenant_id,
+        candidates.producer_id,
+        candidates.producer_sequence,
+        tupleElement(candidates.delivery, 1) AS event_id,
+        tupleElement(candidates.delivery, 2) AS payload_hash,
+        tupleElement(candidates.delivery, 3) AS event_kind,
+        tupleElement(candidates.delivery, 4) AS observed_at,
+        tupleElement(candidates.delivery, 5) AS ingested_at,
+        tupleElement(candidates.delivery, 6) AS anonymous_id,
+        tupleElement(candidates.delivery, 7) AS user_id,
+        tupleElement(candidates.delivery, 8) AS email,
+        tupleElement(candidates.delivery, 9) AS phone,
+        tupleElement(candidates.delivery, 10) AS first_name,
+        tupleElement(candidates.delivery, 11) AS last_name,
+        tupleElement(candidates.delivery, 12) AS fact_kind,
+        tupleElement(candidates.delivery, 13) AS fact_key,
+        tupleElement(candidates.delivery, 14) AS source_fact_version,
+        tupleElement(candidates.delivery, 15) AS fact_deleted,
+        tupleElement(candidates.delivery, 16) AS fact_payload_hash,
+        tupleElement(candidates.delivery, 17) AS fact_payload,
+        bounds.batch_high_sequence
+    FROM pending_delivery_candidates AS candidates
+    INNER JOIN contiguous_batch_high AS bounds
+        ON candidates.tenant_id = bounds.tenant_id
+       AND candidates.producer_id = bounds.producer_id
+    WHERE candidates.producer_sequence <= bounds.batch_high_sequence
+
+NODE basic_normalization
+SQL >
+    SELECT
+        *,
+        trim(anonymous_id) AS normalized_anonymous_id,
+        lower(trim(user_id)) AS normalized_user_id,
+        lower(trim(email)) AS normalized_email,
+        replaceRegexpAll(trim(phone), '[^0-9]', '') AS phone_digits
+    FROM bounded_deliveries
+
+NODE identity_values
+SQL >
+    SELECT
+        *,
+        if(
+            normalized_email = '',
+            '',
+            if(
+                splitByChar('@', normalized_email)[2] IN ('gmail.com', 'googlemail.com'),
+                concat(
+                    replaceAll(
+                        replaceRegexpOne(splitByChar('@', normalized_email)[1], '[+].*$', ''),
+                        '.',
+                        ''
+                    ),
+                    '@gmail.com'
+                ),
+                normalized_email
+            )
+        ) AS canonical_email,
+        if(
+            length(phone_digits) = 10,
+            phone_digits,
+            if(length(phone_digits) = 11 AND startsWith(phone_digits, '1'), substring(phone_digits, 2), '')
+        ) AS national_phone
+    FROM basic_normalization
+
+NODE exact_phone_normalization
+SQL >
+    SELECT
+        *,
+        if(
+            match(national_phone, '^[2-9][0-9]{2}[2-9][0-9]{6}$')
+            AND substring(national_phone, 4, 3) != '555'
+            AND NOT match(national_phone, '(0000000|1111111|2222222|3333333|4444444|5555555|6666666|7777777|8888888|9999999)$')
+            AND NOT match(national_phone, '^(0123456789|1234567890|234567890[0-9]|9876543210)$'),
+            concat('+1', national_phone),
+            ''
+        ) AS normalized_phone
+    FROM identity_values
+
+NODE normalized_identifier_rows
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        event_id,
+        payload_hash,
+        event_kind,
+        observed_at,
+        ingested_at,
+        'identifier' AS record_kind,
+        tupleElement(identifier, 1) AS identifier_type,
+        tupleElement(identifier, 2) AS identifier_value,
+        concat(tupleElement(identifier, 1), ':', tupleElement(identifier, 2)) AS identifier_key,
+        tupleElement(identifier, 3) AS winner_priority,
+        tupleElement(identifier, 4) AS is_public,
+        first_name,
+        last_name,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_deleted,
+        fact_payload_hash,
+        fact_payload,
+        batch_high_sequence
+    FROM exact_phone_normalization
+    ARRAY JOIN arrayFilter(
+        item -> tupleElement(item, 2) != '',
+        [
+            tuple('anonymous_id', normalized_anonymous_id, toUInt8(4), toUInt8(1)),
+            tuple('user_id', normalized_user_id, toUInt8(3), toUInt8(1)),
+            tuple('email', normalized_email, toUInt8(1), toUInt8(1)),
+            tuple('canonical_email', canonical_email, toUInt8(2), toUInt8(0)),
+            tuple('phone', normalized_phone, toUInt8(5), toUInt8(1))
+        ]
+    ) AS identifier
+    WHERE fact_deleted = 0
+
+NODE normalized_event_rows
+SQL >
+    SELECT
+        tenant_id,
+        producer_id,
+        producer_sequence,
+        event_id,
+        payload_hash,
+        event_kind,
+        observed_at,
+        ingested_at,
+        'event' AS record_kind,
+        '' AS identifier_type,
+        '' AS identifier_value,
+        '' AS identifier_key,
+        toUInt8(0) AS winner_priority,
+        toUInt8(0) AS is_public,
+        first_name,
+        last_name,
+        fact_kind,
+        fact_key,
+        source_fact_version,
+        fact_deleted,
+        fact_payload_hash,
+        fact_payload,
+        batch_high_sequence
+    FROM exact_phone_normalization
+
+NODE normalized_identity_input
+SQL >
+    SELECT * FROM normalized_event_rows
+    UNION ALL
+    SELECT * FROM normalized_identifier_rows

@@ -1,0 +1,8 @@
+- name: exact_live_shape_and_half_open_range
+  description: Covers exact column order, a pinned generation, and start-inclusive/end-exclusive Pacific hours.
+  parameters: 'p_report_generation=fixture-generation&p_range_start_pacific=2026-08-01T10%3A00&p_range_end_pacific=2026-08-02T10%3A00'
+  expected_result: ''
+- name: invalid_calendar_date_fails
+  description: A throwing timestamp parser must reject an impossible Pacific calendar date.
+  parameters: 'p_report_generation=fixture-generation&p_range_start_pacific=2026-02-30T10%3A00&p_range_end_pacific=2026-03-01T10%3A00'
+  expected_result: ''

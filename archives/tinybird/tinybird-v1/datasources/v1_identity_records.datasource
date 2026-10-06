@@ -1,0 +1,17 @@
+DESCRIPTION >
+    Incremental identity facts, reverse evidence, mappings and profiles.
+    Readers expose only batches recorded in v1_identity_commits.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `state_kind` LowCardinality(String) `json:$.state_kind`,
+    `state_key` String `json:$.state_key`,
+    `lookup_key` String `json:$.lookup_key`,
+    `sub_key` String `json:$.sub_key`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `is_deleted` UInt8 `json:$.is_deleted`,
+    `payload_json` String `json:$.payload_json`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, state_kind, lookup_key, state_key, batch_version

@@ -1,0 +1,36 @@
+DESCRIPTION >
+    Raw schema mirror of able-folio-499722.stripe.product.
+    Source role: product_catalog.
+    Nullable source keys use non-null internal DEFAULT projections for MergeTree sorting.
+
+SCHEMA >
+    `id` Nullable(String) `json:$.id`,
+    `active` Nullable(Bool) `json:$.active`,
+    `caption` Nullable(String) `json:$.caption`,
+    `created` Nullable(DateTime64(6)) `json:$.created`,
+    `description` Nullable(String) `json:$.description`,
+    `livemode` Nullable(Bool) `json:$.livemode`,
+    `metadata` Nullable(String) `json:$.metadata`,
+    `name` Nullable(String) `json:$.name`,
+    `package_dimensions_height` Nullable(Float64) `json:$.package_dimensions_height`,
+    `package_dimensions_length` Nullable(Float64) `json:$.package_dimensions_length`,
+    `package_dimensions_weight` Nullable(Float64) `json:$.package_dimensions_weight`,
+    `package_dimensions_width` Nullable(Float64) `json:$.package_dimensions_width`,
+    `shippable` Nullable(Bool) `json:$.shippable`,
+    `statement_descriptor` Nullable(String) `json:$.statement_descriptor`,
+    `type` Nullable(String) `json:$.type`,
+    `unit_label` Nullable(String) `json:$.unit_label`,
+    `updated` Nullable(DateTime64(6)) `json:$.updated`,
+    `url` Nullable(String) `json:$.url`,
+    `is_deleted` Nullable(Bool) `json:$.is_deleted`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `__tb_sort_1` String `json:$.__tb_sort_1` DEFAULT ifNull(id, ''),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME boom_bigquery_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/stripe/product/**/*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

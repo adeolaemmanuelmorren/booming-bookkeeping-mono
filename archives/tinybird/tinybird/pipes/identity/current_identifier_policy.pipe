@@ -1,0 +1,37 @@
+DESCRIPTION >
+    Latest enabled first-party identifier policy for tenant boom.
+
+NODE policy_versions
+SQL >
+    SELECT
+        tenant_id,
+        identifier_type,
+        argMax(
+            tuple(
+                normalization_family,
+                winner_priority,
+                relation_mode,
+                is_public,
+                is_enabled,
+                policy_version,
+                updated_at
+            ),
+            tuple(policy_version, updated_at)
+        ) AS current_policy
+    FROM identity_identifier_type_policy
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, identifier_type
+
+NODE enabled_policy_rows
+SQL >
+    SELECT
+        tenant_id,
+        identifier_type,
+        tupleElement(current_policy, 1) AS normalization_family,
+        tupleElement(current_policy, 2) AS winner_priority,
+        tupleElement(current_policy, 3) AS relation_mode,
+        tupleElement(current_policy, 4) AS is_public,
+        tupleElement(current_policy, 6) AS policy_version,
+        tupleElement(current_policy, 7) AS updated_at
+    FROM policy_versions
+    WHERE tupleElement(current_policy, 5) = 1

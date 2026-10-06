@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Fixed-time Fivetran source snapshot for V1 conversion facts.
+
+SCHEMA >
+    `id` Nullable(Int64) `json:$.id`,
+    `_fivetran_deleted` Nullable(Bool) `json:$._fivetran_deleted`,
+    `contact` Nullable(Int64) `json:$.contact`,
+    `_fivetran_synced` Nullable(DateTime64(6)) `json:$._fivetran_synced`,
+    `c_date` Nullable(DateTime64(6)) `json:$.c_date`,
+    `updated_timestamp` Nullable(DateTime64(6)) `json:$.updated_timestamp`,
+    `created_timestamp` Nullable(DateTime64(6)) `json:$.created_timestamp`,
+    `tags` Nullable(Int64) `json:$.tags`,
+    `__tb_sort_1` Int64 `json:$.__tb_sort_1` DEFAULT ifNull(id, toInt64(0)),
+    `__tb_sort_2` DateTime64(6) `json:$.__tb_sort_2` DEFAULT ifNull(_fivetran_synced, toDateTime64(0, 6))
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "__tb_sort_1, __tb_sort_2"
+
+IMPORT_CONNECTION_NAME v1_history_gcs
+IMPORT_BUCKET_URI gs://booming-data/tinybird/v1-preserved/fivetran-snapshot/20260905T222800Z/raw_activecampaign_contact_tag/part-*.parquet
+IMPORT_SCHEDULE '@on-demand'
+IMPORT_FORMAT parquet

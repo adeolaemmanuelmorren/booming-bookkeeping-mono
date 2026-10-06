@@ -1,0 +1,468 @@
+DESCRIPTION >
+    Deterministic, replay-safe envelopes from one validated canonical source generation.
+
+NODE registry_identity_candidates
+SQL >
+    SELECT
+        observations.source_generation_id,
+        observations.tenant_id,
+        observations.source_system,
+        coalesce(
+            observations.source_record_id,
+            concat(
+                '__null_partition__:',
+                observations.source_connection_id,
+                ':',
+                observations.source_system
+            )
+        ) AS source_record_id,
+        observations.source_version,
+        observations.observed_at,
+        ifNull(observations.anonymous_id, '') AS anonymous_id,
+        ifNull(observations.user_id, '') AS user_id,
+        ifNull(observations.email, '') AS email,
+        ifNull(observations.phone, '') AS phone,
+        ifNull(observations.first_name, '') AS first_name,
+        ifNull(observations.last_name, '') AS last_name,
+        'identity_observation' AS event_kind,
+        'identity_observation' AS fact_kind,
+        concat(
+            toString(length(observations.source_connection_id)),
+            ':',
+            observations.source_connection_id,
+            ':',
+            toString(length(observations.source_system)),
+            ':',
+            observations.source_system,
+            ':',
+            toString(length(coalesce(
+                observations.source_record_id,
+                concat(
+                    '__null_partition__:',
+                    observations.source_connection_id,
+                    ':',
+                    observations.source_system
+                )
+            ))),
+            ':',
+            coalesce(
+                observations.source_record_id,
+                concat(
+                    '__null_partition__:',
+                    observations.source_connection_id,
+                    ':',
+                    observations.source_system
+                )
+            )
+        ) AS fact_key,
+        toUInt8(0) AS fact_deleted,
+        toJSONString(map(
+            '__boom_source_connection_id', observations.source_connection_id,
+            'anonymous_id', ifNull(observations.anonymous_id, ''),
+            'user_id', ifNull(observations.user_id, ''),
+            'email', ifNull(observations.email, ''),
+            'phone', ifNull(observations.phone, ''),
+            'first_name', ifNull(observations.first_name, ''),
+            'last_name', ifNull(observations.last_name, '')
+        )) AS fact_payload
+    FROM identity_observation_registry AS observations
+    INNER JOIN current_source_connection_cutoffs AS cutoff
+        ON observations.tenant_id = cutoff.tenant_id
+       AND observations.source_generation_id = cutoff.source_generation_id
+       AND observations.source_connection_id = cutoff.source_connection_id
+    WHERE observations.tenant_id = 'boom'
+      AND cutoff.is_complete = 1
+      AND observations.source_deleted = 0
+      AND NOT startsWith(observations.source_system, 'jitsu_events_api:')
+      AND observations.source_changed_at > cutoff.previous_cutoff
+      AND observations.source_changed_at <= cutoff.current_cutoff
+
+NODE page_fact_candidates
+SQL >
+    SELECT
+        pages.source_generation_id,
+        pages.tenant_id,
+        concat(pages.source_system, ':page_view_fact') AS source_system,
+        coalesce(
+            pages.page_view_id,
+            concat('__null_partition__:page_view:', pages.source_system)
+        ) AS source_record_id,
+        pages.source_version,
+        pages.page_view_timestamp AS observed_at,
+        ifNull(pages.anonymous_id, '') AS anonymous_id,
+        ifNull(pages.user_id, '') AS user_id,
+        '' AS email,
+        '' AS phone,
+        '' AS first_name,
+        '' AS last_name,
+        'page_view' AS event_kind,
+        'page_view' AS fact_kind,
+        coalesce(
+            pages.page_view_id,
+            concat('__null_partition__:page_view:', pages.source_system)
+        ) AS fact_key,
+        toUInt8(0) AS fact_deleted,
+        toJSONString(map(
+            '__boom_source_connection_id', pages.source_system,
+            'anonymous_id', ifNull(anonymous_id, ''),
+            'user_id', ifNull(user_id, ''),
+            'page_url', ifNull(page_url, ''),
+            'page_host', '',
+            'page_path', ifNull(page_path, ''),
+            'page_path_host', ifNull(page_path, ''),
+            'page_referrer', ifNull(page_referrer, ''),
+            'ip_address', '',
+            'user_agent', '',
+            'device_platform', '',
+            'device_is_mobile', '0',
+            'geo_city', '',
+            'geo_region', '',
+            'geo_region_code', '',
+            'geo_country', '',
+            'geo_timezone', '',
+            'utm_source', ifNull(utm_source, ''),
+            'utm_medium', ifNull(utm_medium, ''),
+            'utm_campaign', ifNull(utm_campaign, ''),
+            'utm_content', ifNull(utm_content, ''),
+            'utm_term', ifNull(utm_term, ''),
+            'utm_id', ifNull(utm_id, ''),
+            'campaign_id', ifNull(campaign_id, ''),
+            'adset_id', ifNull(adset_id, ''),
+            'ad_id', ifNull(ad_id, ''),
+            'google_keyword_id', '',
+            'google_keyword', '',
+            'click_id', '',
+            'click_id_type', '',
+            'gclid', '',
+            'gbraid', '',
+            'wbraid', '',
+            'fbclid', ifNull(fbclid, ''),
+            'ttclid', '',
+            'li_fat_id', '',
+            'rdt_cid', '',
+            'twclid', '',
+            'fbc', '',
+            'fbp', '',
+            'ttp', '',
+            'uetsid', '',
+            'uetvid', '',
+            'channel_source', ifNull(utm_source, ''),
+            'channel_medium', ifNull(utm_medium, '')
+        )) AS fact_payload
+    FROM web_page_view_adapter AS pages
+    INNER JOIN current_source_connection_cutoffs AS cutoff
+        ON pages.tenant_id = cutoff.tenant_id
+       AND pages.source_generation_id = cutoff.source_generation_id
+       AND pages.source_system = cutoff.source_connection_id
+    WHERE pages.tenant_id = 'boom'
+      AND cutoff.is_complete = 1
+      AND pages.page_view_timestamp IS NOT NULL
+      AND pages.source_system != 'jitsu_events_api'
+      AND pages.source_version > cutoff.previous_cutoff
+      AND pages.source_version <= cutoff.current_cutoff
+
+NODE conversion_fact_candidates
+SQL >
+    SELECT
+        conversions.source_generation_id,
+        conversions.tenant_id,
+        concat(conversions.source_system, ':', conversions.event_kind, '_fact') AS source_system,
+        coalesce(
+            conversions.source_row_id,
+            concat('__null_partition__:', conversions.event_kind, ':', conversions.source_system)
+        ) AS source_record_id,
+        conversions.source_version,
+        conversions.observed_at,
+        ifNull(conversions.anonymous_id, '') AS anonymous_id,
+        ifNull(conversions.user_id, '') AS user_id,
+        ifNull(conversions.email, '') AS email,
+        ifNull(conversions.phone, '') AS phone,
+        ifNull(conversions.first_name, '') AS first_name,
+        '' AS last_name,
+        conversions.event_kind,
+        if(conversions.event_kind = 'client_form', 'form_submission', 'order_completed') AS fact_kind,
+        coalesce(
+            conversions.source_row_id,
+            concat('__null_partition__:', conversions.event_kind, ':', conversions.source_system)
+        ) AS fact_key,
+        toUInt8(0) AS fact_deleted,
+        toJSONString(map(
+            '__boom_source_connection_id', conversions.source_system,
+            'event_id', ifNull(event_id, ''),
+            'anonymous_id', ifNull(anonymous_id, ''),
+            'user_id', ifNull(user_id, ''),
+            'email', ifNull(email, ''),
+            'phone', ifNull(phone, ''),
+            'first_name', ifNull(first_name, ''),
+            'form_id', ifNull(form_id, ''),
+            'form_name', ifNull(form_name, ''),
+            'form_action', ifNull(form_action, ''),
+            'page_url', ifNull(page_url, ''),
+            'page_path', ifNull(page_path, ''),
+            'is_checkout_form', toString(is_checkout_form),
+            'is_payment_confirmed', toString(is_payment_confirmed),
+            'payment_status', ifNull(payment_status, ''),
+            'amount', if(amount IS NULL, '', toString(amount)),
+            'currency', ifNull(currency, ''),
+            'product_id', ifNull(product_id, ''),
+            'product_name', ifNull(product_name, ''),
+            'products', ifNull(products, '')
+        )) AS fact_payload
+    FROM web_conversion_adapter AS conversions
+    INNER JOIN current_source_connection_cutoffs AS cutoff
+        ON conversions.tenant_id = cutoff.tenant_id
+       AND conversions.source_generation_id = cutoff.source_generation_id
+       AND conversions.source_system = cutoff.source_connection_id
+    WHERE conversions.tenant_id = 'boom'
+      AND cutoff.is_complete = 1
+      AND conversions.observed_at IS NOT NULL
+      AND conversions.source_system != 'jitsu_events_api'
+      AND conversions.source_version > cutoff.previous_cutoff
+      AND conversions.source_version <= cutoff.current_cutoff
+
+NODE current_generation_fact_candidates
+SQL >
+    SELECT * FROM page_fact_candidates
+    UNION ALL
+    SELECT * FROM conversion_fact_candidates
+
+NODE current_registry_identity_fact_keys
+SQL >
+    SELECT
+        tenant_id,
+        'identity_observation' AS fact_kind,
+        concat(
+            toString(length(source_connection_id)),
+            ':',
+            source_connection_id,
+            ':',
+            toString(length(source_system)),
+            ':',
+            source_system,
+            ':',
+            toString(length(coalesce(
+                source_record_id,
+                concat('__null_partition__:', source_connection_id, ':', source_system)
+            ))),
+            ':',
+            coalesce(
+                source_record_id,
+                concat('__null_partition__:', source_connection_id, ':', source_system)
+            )
+        ) AS fact_key
+    FROM identity_observation_registry
+    WHERE tenant_id = 'boom'
+      AND source_deleted = 0
+      AND NOT startsWith(source_system, 'jitsu_events_api:')
+
+NODE current_registry_fact_keys
+SQL >
+    SELECT
+        tenant_id,
+        multiIf(
+            endsWith(source_system, ':page_view'), 'page_view',
+            endsWith(source_system, ':client_form'), 'form_submission',
+            'order_completed'
+        ) AS fact_kind,
+        coalesce(
+            source_record_id,
+            multiIf(
+                endsWith(source_system, ':page_view'), concat(
+                    '__null_partition__:page_view:',
+                    replaceRegexpOne(source_system, ':[^:]+$', '')
+                ),
+                concat(
+                    '__null_partition__:',
+                    if(endsWith(source_system, ':client_form'), 'client_form', 'client_order'),
+                    ':',
+                    replaceRegexpOne(source_system, ':[^:]+$', '')
+                )
+            )
+        ) AS fact_key
+    FROM identity_observation_registry
+    WHERE tenant_id = 'boom'
+      AND source_deleted = 0
+      AND (
+          endsWith(source_system, ':page_view')
+          OR endsWith(source_system, ':client_form')
+          OR endsWith(source_system, ':client_order')
+      )
+      AND NOT startsWith(source_system, 'jitsu_events_api:')
+
+NODE current_generation_fact_keys
+SQL >
+    SELECT DISTINCT tenant_id, fact_kind, fact_key
+    FROM current_registry_fact_keys
+
+    UNION DISTINCT
+
+    SELECT tenant_id, fact_kind, fact_key
+    FROM current_registry_identity_fact_keys
+
+NODE pre_generation_identity_fact_versions
+SQL >
+    SELECT
+        state.tenant_id,
+        state.fact_kind,
+        state.fact_key,
+        generation.source_generation_id,
+        argMax(
+            tuple(
+                state.is_deleted,
+                state.source_fact_version,
+                state.fact_observed_at,
+                state.fact_payload_hash,
+                state.fact_payload,
+                state.evidence_keys,
+                state.producer_id,
+                state.batch_version
+            ),
+            tuple(state.batch_version, state.committed_at, state.row_hash)
+        ) AS pinned_fact
+    FROM identity_state_versions AS state
+    INNER JOIN current_source_generation AS generation
+        ON state.tenant_id = generation.tenant_id
+       AND state.batch_version < generation.identity_stable_batch_version
+    WHERE state.state_kind = 'fact'
+    GROUP BY
+        state.tenant_id,
+        state.fact_kind,
+        state.fact_key,
+        generation.source_generation_id
+
+NODE pre_generation_identity_facts
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        fact_kind,
+        fact_key,
+        tupleElement(pinned_fact, 2) AS source_fact_version,
+        tupleElement(pinned_fact, 3) AS observed_at,
+        tupleElement(pinned_fact, 4) AS fact_payload_hash,
+        tupleElement(pinned_fact, 5) AS fact_payload,
+        tupleElement(pinned_fact, 6) AS evidence_keys,
+        tupleElement(pinned_fact, 7) AS producer_id,
+        tupleElement(pinned_fact, 8) AS batch_version
+    FROM pre_generation_identity_fact_versions
+    WHERE tupleElement(pinned_fact, 1) = 0
+
+NODE removed_generation_fact_candidates
+SQL >
+    SELECT
+        generation.source_generation_id,
+        stable.tenant_id,
+        'source_generation:tombstone' AS source_system,
+        stable.fact_key AS source_record_id,
+        cutoff.current_cutoff AS source_version,
+        source_version AS observed_at,
+        '' AS anonymous_id,
+        '' AS user_id,
+        '' AS email,
+        '' AS phone,
+        '' AS first_name,
+        '' AS last_name,
+        concat(stable.fact_kind, '_deleted') AS event_kind,
+        stable.fact_kind,
+        stable.fact_key,
+        toUInt8(1) AS fact_deleted,
+        '{}' AS fact_payload
+    FROM pre_generation_identity_facts AS stable
+    INNER JOIN current_source_generation AS generation
+        ON stable.tenant_id = generation.tenant_id
+       AND stable.source_generation_id = generation.source_generation_id
+    INNER JOIN current_source_connection_cutoffs AS cutoff
+        ON generation.tenant_id = cutoff.tenant_id
+       AND generation.source_generation_id = cutoff.source_generation_id
+       AND cutoff.source_connection_id = JSONExtractString(
+           stable.fact_payload,
+           '__boom_source_connection_id'
+       )
+       AND cutoff.is_complete = 1
+    LEFT JOIN (
+        SELECT tenant_id, fact_kind, fact_key
+        FROM current_generation_fact_keys
+    ) AS current
+        ON stable.tenant_id = current.tenant_id
+       AND stable.fact_kind = current.fact_kind
+       AND stable.fact_key = current.fact_key
+    WHERE stable.fact_kind IN (
+        'page_view',
+        'form_submission',
+        'order_completed',
+        'identity_observation'
+    )
+      AND startsWith(stable.producer_id, 'source_generation:')
+      AND current.fact_key = ''
+
+NODE all_generation_event_candidates
+SQL >
+    SELECT * FROM registry_identity_candidates
+    UNION ALL SELECT * FROM current_generation_fact_candidates
+    UNION ALL SELECT * FROM removed_generation_fact_candidates
+
+NODE ready_generation_event_candidates
+SQL >
+    SELECT events.*
+    FROM all_generation_event_candidates AS events
+    INNER JOIN source_generation_cutoff_readiness AS readiness
+        ON events.tenant_id = readiness.tenant_id
+       AND events.source_generation_id = readiness.source_generation_id
+    WHERE readiness.is_ready = 1
+
+NODE deterministic_generation_events
+SQL >
+    SELECT
+        tenant_id,
+        concat('source_generation:', source_generation_id) AS producer_id,
+        row_number() OVER (
+            PARTITION BY tenant_id, source_generation_id
+            ORDER BY event_kind, fact_kind, fact_key, source_system, source_record_id
+        ) AS producer_sequence,
+        hex(SHA256(concat(
+            source_generation_id,
+            ':',
+            event_kind,
+            ':',
+            fact_kind,
+            ':',
+            fact_key,
+            ':',
+            source_system,
+            ':',
+            source_record_id
+        ))) AS event_id,
+        hex(SHA256(toJSONString(tuple(
+            source_version,
+            observed_at,
+            anonymous_id,
+            user_id,
+            email,
+            phone,
+            first_name,
+            last_name,
+            fact_kind,
+            fact_key,
+            fact_deleted,
+            fact_payload
+        )))) AS payload_hash,
+        event_kind,
+        observed_at,
+        now64(6) AS ingested_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        fact_kind,
+        fact_key,
+        if(
+            fact_kind = '',
+            toUInt64(0),
+            toUInt64(toUnixTimestamp64Micro(source_version))
+        ) AS source_fact_version,
+        fact_deleted,
+        if(fact_kind = '', repeat('0', 64), hex(SHA256(fact_payload))) AS fact_payload_hash,
+        fact_payload
+    FROM ready_generation_event_candidates

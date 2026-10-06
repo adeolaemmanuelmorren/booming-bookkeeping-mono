@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Web page observations projected into the canonical identity contract.
+
+NODE web_page_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        source_system AS source_connection_id,
+        concat(source_system, ':page_view') AS source_system,
+        page_view_id AS source_record_id,
+        pages.page_view_timestamp AS source_version,
+        pages.source_version AS source_changed_at,
+        page_view_timestamp AS observed_at,
+        anonymous_id,
+        user_id,
+        CAST(NULL AS Nullable(String)) AS email,
+        CAST(NULL AS Nullable(String)) AS phone,
+        CAST(NULL AS Nullable(String)) AS first_name,
+        CAST(NULL AS Nullable(String)) AS last_name,
+        toUInt8(0) AS source_deleted
+    FROM web_page_view_adapter AS pages

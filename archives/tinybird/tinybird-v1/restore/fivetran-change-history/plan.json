@@ -1,0 +1,100 @@
+{
+  "jobId": "tinybird_v1_enable_change_history_20260905T233816Z",
+  "location": "US",
+  "project": "able-folio-499722",
+  "query": "ALTER TABLE `able-folio-499722.activecampaign.contact` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.activecampaign.contact_tag` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.activecampaign.tags` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe.charge` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe.customer` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe_kajabi.charge` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe_kajabi.customer` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe_kajabi.payment_intent` SET OPTIONS(enable_change_history=TRUE);\nALTER TABLE `able-folio-499722.stripe.payment_intent` SET OPTIONS(enable_change_history=TRUE);",
+  "querySha256": "2f958adbde24d48670ac50b22d32eff2ab1e77aff5d54f508bec0ea140493b3f",
+  "snapshotAt": "2026-09-05T22:28:00Z",
+  "tables": [
+    {
+      "creationTime": "1784108422635",
+      "id": "able-folio-499722:activecampaign.contact",
+      "name": "raw_activecampaign_contact",
+      "source": {
+        "dataset": "activecampaign",
+        "project": "able-folio-499722",
+        "table": "contact"
+      }
+    },
+    {
+      "creationTime": "1784108441170",
+      "id": "able-folio-499722:activecampaign.contact_tag",
+      "name": "raw_activecampaign_contact_tag",
+      "source": {
+        "dataset": "activecampaign",
+        "project": "able-folio-499722",
+        "table": "contact_tag"
+      }
+    },
+    {
+      "creationTime": "1784174837322",
+      "id": "able-folio-499722:activecampaign.tags",
+      "name": "raw_activecampaign_tags",
+      "source": {
+        "dataset": "activecampaign",
+        "project": "able-folio-499722",
+        "table": "tags"
+      }
+    },
+    {
+      "creationTime": "1782237377085",
+      "id": "able-folio-499722:stripe.charge",
+      "name": "raw_stripe_charge",
+      "source": {
+        "dataset": "stripe",
+        "project": "able-folio-499722",
+        "table": "charge"
+      }
+    },
+    {
+      "creationTime": "1782237377834",
+      "id": "able-folio-499722:stripe.customer",
+      "name": "raw_stripe_customer",
+      "source": {
+        "dataset": "stripe",
+        "project": "able-folio-499722",
+        "table": "customer"
+      }
+    },
+    {
+      "creationTime": "1784697890089",
+      "id": "able-folio-499722:stripe_kajabi.charge",
+      "name": "raw_stripe_kajabi_charge",
+      "source": {
+        "dataset": "stripe_kajabi",
+        "project": "able-folio-499722",
+        "table": "charge"
+      }
+    },
+    {
+      "creationTime": "1784697895757",
+      "id": "able-folio-499722:stripe_kajabi.customer",
+      "name": "raw_stripe_kajabi_customer",
+      "source": {
+        "dataset": "stripe_kajabi",
+        "project": "able-folio-499722",
+        "table": "customer"
+      }
+    },
+    {
+      "creationTime": "1784697890928",
+      "id": "able-folio-499722:stripe_kajabi.payment_intent",
+      "name": "raw_stripe_kajabi_payment_intent",
+      "source": {
+        "dataset": "stripe_kajabi",
+        "project": "able-folio-499722",
+        "table": "payment_intent"
+      }
+    },
+    {
+      "creationTime": "1782237376745",
+      "id": "able-folio-499722:stripe.payment_intent",
+      "name": "raw_stripe_payment_intent",
+      "source": {
+        "dataset": "stripe",
+        "project": "able-folio-499722",
+        "table": "payment_intent"
+      }
+    }
+  ]
+}

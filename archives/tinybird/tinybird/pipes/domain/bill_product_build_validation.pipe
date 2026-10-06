@@ -1,0 +1,448 @@
+DESCRIPTION >
+    Deterministic comparison of every candidate Bill product with its materialized
+    generation. Build timestamps are excluded because they are not report data.
+
+NODE required_bill_product_stages
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        generation.report_generation,
+        generation.version AS source_manifest_version,
+        generation.source_manifest_digest,
+        generation.connection_inventory_digest,
+        cutoff_readiness.cutoff_set_digest,
+        generation.policy_digest,
+        arrayJoin([
+            'krc_acquisition',
+            'hourly_performance',
+            'meta_delivery_daily',
+            'meta_hour_bounds'
+        ]) AS stage_id
+    FROM current_source_generation AS generation
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON generation.tenant_id = cutoff_readiness.tenant_id
+       AND generation.source_generation_id = cutoff_readiness.source_generation_id
+       AND generation.version = cutoff_readiness.source_manifest_version
+       AND generation.source_manifest_digest = cutoff_readiness.source_manifest_digest
+       AND generation.connection_inventory_digest = cutoff_readiness.connection_inventory_digest
+       AND cutoff_readiness.is_ready = 1
+
+NODE expected_krc_product_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        'krc_acquisition' AS stage_id,
+        toJSONString(tuple(
+            registration_id,
+            profile_id,
+            registration_timestamp,
+            registration_date,
+            pre_registration_paid_click_count,
+            is_solo_touch,
+            first_touch_touchpoint_id,
+            first_touch_click_timestamp,
+            first_touch_click_hour,
+            first_touch_campaign_id,
+            first_touch_adset_id,
+            first_touch_ad_id,
+            first_touch_campaign_name,
+            first_touch_adset_name,
+            first_touch_ad_name,
+            last_touch_touchpoint_id,
+            last_touch_click_timestamp,
+            last_touch_click_hour,
+            last_touch_campaign_id,
+            last_touch_adset_id,
+            last_touch_ad_id,
+            last_touch_campaign_name,
+            last_touch_adset_name,
+            last_touch_ad_name,
+            immediate_vip_payment_id,
+            immediate_vip_payment_timestamp,
+            immediate_vip_revenue,
+            is_immediate_vip,
+            first_5k_payment_id,
+            first_5k_payment_timestamp,
+            first_5k_revenue,
+            is_5k_purchaser
+        )) AS row_signature
+    FROM bill_krc_acquisition_product
+
+NODE expected_hourly_product_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        'hourly_performance' AS stage_id,
+        toJSONString(tuple(
+            hour_start,
+            source,
+            campaign_id,
+            adset_id,
+            ad_id,
+            campaign_name,
+            adset_name,
+            ad_name,
+            spend,
+            impressions,
+            clicks,
+            last_touch_registrations,
+            last_touch_immediate_vips,
+            first_touch_registrations,
+            first_touch_immediate_vips,
+            solo_touch_registrations,
+            solo_touch_immediate_vips,
+            last_touch_5k_purchasers,
+            last_touch_5k_revenue,
+            last_touch_immediate_vip_5k_purchasers,
+            first_touch_5k_purchasers,
+            first_touch_5k_revenue,
+            solo_touch_5k_purchasers,
+            solo_touch_5k_revenue
+        )) AS row_signature
+    FROM bill_hourly_product
+
+NODE expected_daily_product_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        'meta_delivery_daily' AS stage_id,
+        toJSONString(tuple(
+            date,
+            level,
+            campaign_id,
+            adset_id,
+            ad_id,
+            impressions,
+            reach,
+            frequency
+        )) AS row_signature
+    FROM bill_meta_delivery_daily_product
+
+NODE expected_meta_bound_rows
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        'meta_hour_bounds' AS stage_id,
+        toJSONString(tuple(available_start, max_hour_start)) AS row_signature
+    FROM bill_meta_hour_bounds_product
+
+NODE all_expected_bill_product_rows
+SQL >
+    SELECT * FROM expected_krc_product_rows
+    UNION ALL
+    SELECT * FROM expected_hourly_product_rows
+    UNION ALL
+    SELECT * FROM expected_daily_product_rows
+    UNION ALL
+    SELECT * FROM expected_meta_bound_rows
+
+NODE materialized_krc_product_rows
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'krc_acquisition' AS stage_id,
+        toJSONString(tuple(
+            registration_id,
+            profile_id,
+            registration_timestamp,
+            registration_date,
+            pre_registration_paid_click_count,
+            is_solo_touch,
+            first_touch_touchpoint_id,
+            first_touch_click_timestamp,
+            first_touch_click_hour,
+            first_touch_campaign_id,
+            first_touch_adset_id,
+            first_touch_ad_id,
+            first_touch_campaign_name,
+            first_touch_adset_name,
+            first_touch_ad_name,
+            last_touch_touchpoint_id,
+            last_touch_click_timestamp,
+            last_touch_click_hour,
+            last_touch_campaign_id,
+            last_touch_adset_id,
+            last_touch_ad_id,
+            last_touch_campaign_name,
+            last_touch_adset_name,
+            last_touch_ad_name,
+            immediate_vip_payment_id,
+            immediate_vip_payment_timestamp,
+            immediate_vip_revenue,
+            is_immediate_vip,
+            first_5k_payment_id,
+            first_5k_payment_timestamp,
+            first_5k_revenue,
+            is_5k_purchaser
+        )) AS row_signature
+    FROM current_bill_krc_acquisition_build AS product
+
+NODE latest_materialized_bill_product_attempts
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'krc_acquisition' AS stage_id,
+        max(product.materialized_at) AS product_materialized_at
+    FROM bill_krc_acquisition_versions AS product
+    INNER JOIN current_source_generation AS generation
+        ON product.tenant_id = generation.tenant_id
+       AND product.report_generation = generation.report_generation
+    GROUP BY product.tenant_id, product.report_generation
+
+    UNION ALL
+
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'hourly_performance' AS stage_id,
+        max(product.materialized_at) AS product_materialized_at
+    FROM bill_hourly_product_versions AS product
+    INNER JOIN current_source_generation AS generation
+        ON product.tenant_id = generation.tenant_id
+       AND product.report_generation = generation.report_generation
+    GROUP BY product.tenant_id, product.report_generation
+
+    UNION ALL
+
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'meta_delivery_daily' AS stage_id,
+        max(product.materialized_at) AS product_materialized_at
+    FROM bill_meta_delivery_daily_versions AS product
+    INNER JOIN current_source_generation AS generation
+        ON product.tenant_id = generation.tenant_id
+       AND product.report_generation = generation.report_generation
+    GROUP BY product.tenant_id, product.report_generation
+
+    UNION ALL
+
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'meta_hour_bounds' AS stage_id,
+        max(product.materialized_at) AS product_materialized_at
+    FROM bill_meta_hour_bounds_versions AS product
+    INNER JOIN current_source_generation AS generation
+        ON product.tenant_id = generation.tenant_id
+       AND product.report_generation = generation.report_generation
+    GROUP BY product.tenant_id, product.report_generation
+
+NODE materialized_hourly_product_rows
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'hourly_performance' AS stage_id,
+        toJSONString(tuple(
+            hour_start,
+            source,
+            campaign_id,
+            adset_id,
+            ad_id,
+            campaign_name,
+            adset_name,
+            ad_name,
+            spend,
+            impressions,
+            clicks,
+            last_touch_registrations,
+            last_touch_immediate_vips,
+            first_touch_registrations,
+            first_touch_immediate_vips,
+            solo_touch_registrations,
+            solo_touch_immediate_vips,
+            last_touch_5k_purchasers,
+            last_touch_5k_revenue,
+            last_touch_immediate_vip_5k_purchasers,
+            first_touch_5k_purchasers,
+            first_touch_5k_revenue,
+            solo_touch_5k_purchasers,
+            solo_touch_5k_revenue
+        )) AS row_signature
+    FROM bill_hourly_product_versions AS product
+    INNER JOIN latest_materialized_bill_product_attempts AS attempt
+        ON product.tenant_id = attempt.tenant_id
+       AND product.report_generation = attempt.report_generation
+       AND attempt.stage_id = 'hourly_performance'
+       AND product.materialized_at = attempt.product_materialized_at
+
+NODE materialized_daily_product_rows
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'meta_delivery_daily' AS stage_id,
+        toJSONString(tuple(
+            date,
+            level,
+            campaign_id,
+            adset_id,
+            ad_id,
+            impressions,
+            reach,
+            frequency
+        )) AS row_signature
+    FROM bill_meta_delivery_daily_versions AS product
+    INNER JOIN latest_materialized_bill_product_attempts AS attempt
+        ON product.tenant_id = attempt.tenant_id
+       AND product.report_generation = attempt.report_generation
+       AND attempt.stage_id = 'meta_delivery_daily'
+       AND product.materialized_at = attempt.product_materialized_at
+
+NODE materialized_meta_bound_rows
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        'meta_hour_bounds' AS stage_id,
+        toJSONString(tuple(available_start, max_hour_start)) AS row_signature
+    FROM bill_meta_hour_bounds_versions AS product
+    INNER JOIN latest_materialized_bill_product_attempts AS attempt
+        ON product.tenant_id = attempt.tenant_id
+       AND product.report_generation = attempt.report_generation
+       AND attempt.stage_id = 'meta_hour_bounds'
+       AND product.materialized_at = attempt.product_materialized_at
+
+NODE all_materialized_bill_product_rows
+SQL >
+    SELECT * FROM materialized_krc_product_rows
+    UNION ALL
+    SELECT * FROM materialized_hourly_product_rows
+    UNION ALL
+    SELECT * FROM materialized_daily_product_rows
+    UNION ALL
+    SELECT * FROM materialized_meta_bound_rows
+
+NODE expected_bill_product_signatures
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        stage_id,
+        count() AS row_count,
+        hex(SHA256(arrayStringConcat(arraySort(groupArray(row_signature)), '\n'))) AS content_digest
+    FROM all_expected_bill_product_rows
+    GROUP BY tenant_id, report_generation, stage_id
+
+NODE materialized_bill_product_signatures
+SQL >
+    SELECT
+        tenant_id,
+        report_generation,
+        stage_id,
+        count() AS row_count,
+        hex(SHA256(arrayStringConcat(arraySort(groupArray(row_signature)), '\n'))) AS content_digest
+    FROM all_materialized_bill_product_rows
+    GROUP BY tenant_id, report_generation, stage_id
+
+NODE bill_product_stage_comparisons
+SQL >
+    SELECT
+        stages.tenant_id,
+        stages.source_generation_id,
+        stages.report_generation,
+        stages.source_manifest_version,
+        stages.source_manifest_digest,
+        stages.connection_inventory_digest,
+        stages.cutoff_set_digest,
+        stages.policy_digest,
+        stages.stage_id,
+        coalesce(
+            attempt.product_materialized_at,
+            toDateTime64(0, 6)
+        ) AS product_materialized_at,
+        coalesce(expected.row_count, toUInt64(0)) AS expected_row_count,
+        coalesce(materialized.row_count, toUInt64(0)) AS materialized_row_count,
+        coalesce(expected.content_digest, hex(SHA256(''))) AS expected_digest,
+        coalesce(materialized.content_digest, hex(SHA256(''))) AS materialized_digest,
+        toUInt8(
+            expected_row_count = materialized_row_count
+            AND expected_digest = materialized_digest
+        ) AS is_valid,
+        now64(6) AS validated_at
+    FROM required_bill_product_stages AS stages
+    LEFT JOIN expected_bill_product_signatures AS expected
+        ON stages.tenant_id = expected.tenant_id
+       AND stages.report_generation = expected.report_generation
+       AND stages.stage_id = expected.stage_id
+    LEFT JOIN materialized_bill_product_signatures AS materialized
+        ON stages.tenant_id = materialized.tenant_id
+       AND stages.report_generation = materialized.report_generation
+       AND stages.stage_id = materialized.stage_id
+    LEFT JOIN latest_materialized_bill_product_attempts AS attempt
+        ON stages.tenant_id = attempt.tenant_id
+       AND stages.report_generation = attempt.report_generation
+       AND stages.stage_id = attempt.stage_id
+
+NODE bill_product_composite_build_digest
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        hex(SHA256(concat(
+            source_manifest_digest,
+            ':',
+            connection_inventory_digest,
+            ':',
+            cutoff_set_digest,
+            ':',
+            policy_digest,
+            ':',
+            arrayStringConcat(arraySort(groupArray(concat(
+                stage_id,
+                ':',
+                toString(product_materialized_at),
+                ':',
+                toString(expected_row_count),
+                ':',
+                expected_digest,
+                ':',
+                toString(materialized_row_count),
+                ':',
+                materialized_digest
+            ))), '|')
+        ))) AS build_digest
+    FROM bill_product_stage_comparisons
+    GROUP BY
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        source_manifest_digest,
+        connection_inventory_digest,
+        cutoff_set_digest,
+        policy_digest
+
+NODE bill_product_stage_validation_rows
+SQL >
+    SELECT
+        stages.tenant_id,
+        stages.source_generation_id,
+        stages.report_generation,
+        stages.source_manifest_version,
+        stages.source_manifest_digest,
+        stages.connection_inventory_digest,
+        stages.cutoff_set_digest,
+        stages.policy_digest,
+        stages.stage_id,
+        stages.product_materialized_at,
+        stages.expected_row_count,
+        stages.materialized_row_count,
+        stages.expected_digest,
+        stages.materialized_digest,
+        build.build_digest,
+        stages.is_valid,
+        stages.validated_at
+    FROM bill_product_stage_comparisons AS stages
+    INNER JOIN bill_product_composite_build_digest AS build
+        ON stages.tenant_id = build.tenant_id
+       AND stages.source_generation_id = build.source_generation_id
+       AND stages.report_generation = build.report_generation

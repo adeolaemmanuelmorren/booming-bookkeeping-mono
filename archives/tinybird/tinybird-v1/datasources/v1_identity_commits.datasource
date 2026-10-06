@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Commits written only after the actual identity records have been read back and verified.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `batch_version` UInt64 `json:$.batch_version`,
+    `batch_id` String `json:$.batch_id`,
+    `committed_at` DateTime64(6) `json:$.committed_at`,
+    `row_count` UInt64 `json:$.row_count`,
+    `content_hash` FixedString(64) `json:$.content_hash`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY tenant_id, batch_version, batch_id

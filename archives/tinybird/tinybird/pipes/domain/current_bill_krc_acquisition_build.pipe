@@ -1,0 +1,24 @@
+DESCRIPTION >
+    Latest complete KRC materialization attempt for the source generation being built.
+    A later report validation pins this exact attempt for publication.
+
+NODE latest_krc_materialization_attempt
+SQL >
+    SELECT
+        product.tenant_id,
+        product.report_generation,
+        max(product.materialized_at) AS product_materialized_at
+    FROM bill_krc_acquisition_versions AS product
+    INNER JOIN current_source_generation AS generation
+        ON product.tenant_id = generation.tenant_id
+       AND product.report_generation = generation.report_generation
+    GROUP BY product.tenant_id, product.report_generation
+
+NODE latest_krc_materialization_rows
+SQL >
+    SELECT product.*
+    FROM bill_krc_acquisition_versions AS product
+    INNER JOIN latest_krc_materialization_attempt AS attempt
+        ON product.tenant_id = attempt.tenant_id
+       AND product.report_generation = attempt.report_generation
+       AND product.materialized_at = attempt.product_materialized_at

@@ -1,0 +1,128 @@
+DESCRIPTION >
+    Latest per-connection cutoffs for the exact current manifest version and digest.
+    Rows from an amended or unrelated manifest cannot satisfy this generation.
+
+NODE previous_active_source_connection_cutoff_versions
+SQL >
+    SELECT
+        cutoffs.tenant_id,
+        active.source_generation_id AS previous_active_source_generation_id,
+        cutoffs.source_connection_id,
+        argMax(
+            tuple(
+                cutoffs.current_cutoff,
+                cutoffs.is_complete,
+                cutoffs.content_digest
+            ),
+            tuple(cutoffs.version, cutoffs.recorded_at, cutoffs.content_digest)
+        ) AS previous_state,
+        uniqExact(tuple(
+            cutoffs.source_manifest_version,
+            cutoffs.source_manifest_digest,
+            cutoffs.previous_cutoff,
+            cutoffs.current_cutoff,
+            cutoffs.is_complete,
+            cutoffs.object_count,
+            cutoffs.row_count,
+            cutoffs.content_digest,
+            cutoffs.recorded_at,
+            cutoffs.version
+        )) AS previous_revision_count
+    FROM source_generation_connection_cutoffs AS cutoffs
+    INNER JOIN current_report_generation AS active
+        ON cutoffs.tenant_id = active.tenant_id
+       AND cutoffs.source_generation_id = active.source_generation_id
+       AND cutoffs.source_manifest_version = active.source_manifest_version
+       AND cutoffs.source_manifest_digest = active.source_manifest_digest
+    WHERE cutoffs.version = 1
+    GROUP BY
+        cutoffs.tenant_id,
+        active.source_generation_id,
+        cutoffs.source_connection_id
+
+NODE previous_active_source_connection_cutoffs
+SQL >
+    SELECT
+        tenant_id,
+        previous_active_source_generation_id,
+        source_connection_id,
+        tupleElement(previous_state, 1) AS previous_active_cutoff
+    FROM previous_active_source_connection_cutoff_versions
+    WHERE tupleElement(previous_state, 2) = 1
+      AND tupleElement(previous_state, 3) != repeat('0', 64)
+      AND previous_revision_count = 1
+
+NODE source_connection_cutoff_versions
+SQL >
+    SELECT
+        cutoffs.tenant_id,
+        cutoffs.source_generation_id,
+        cutoffs.source_connection_id,
+        argMax(
+            tuple(
+                cutoffs.source_manifest_version,
+                cutoffs.source_manifest_digest,
+                cutoffs.previous_cutoff,
+                cutoffs.current_cutoff,
+                cutoffs.is_complete,
+                cutoffs.object_count,
+                cutoffs.row_count,
+                cutoffs.content_digest,
+                cutoffs.recorded_at,
+                cutoffs.version
+            ),
+            tuple(cutoffs.version, cutoffs.recorded_at, cutoffs.content_digest)
+        ) AS cutoff_state,
+        uniqExact(tuple(
+            cutoffs.source_manifest_version,
+            cutoffs.source_manifest_digest,
+            cutoffs.previous_cutoff,
+            cutoffs.current_cutoff,
+            cutoffs.is_complete,
+            cutoffs.object_count,
+            cutoffs.row_count,
+            cutoffs.content_digest,
+            cutoffs.recorded_at,
+            cutoffs.version
+        )) AS selected_revision_count
+    FROM source_generation_connection_cutoffs AS cutoffs
+    INNER JOIN current_source_generation AS generation
+        ON cutoffs.tenant_id = generation.tenant_id
+       AND cutoffs.source_generation_id = generation.source_generation_id
+       AND cutoffs.source_manifest_version = generation.version
+       AND cutoffs.source_manifest_digest = generation.source_manifest_digest
+    WHERE cutoffs.tenant_id = 'boom'
+    GROUP BY
+        cutoffs.tenant_id,
+        cutoffs.source_generation_id,
+        cutoffs.source_connection_id
+
+NODE current_source_connection_cutoff_rows
+SQL >
+    SELECT
+        current.tenant_id,
+        current.source_generation_id,
+        current.source_connection_id,
+        tupleElement(cutoff_state, 1) AS source_manifest_version,
+        tupleElement(cutoff_state, 2) AS source_manifest_digest,
+        tupleElement(cutoff_state, 3) AS declared_previous_cutoff,
+        if(
+            previous.previous_active_source_generation_id = current.source_generation_id,
+            tupleElement(cutoff_state, 3),
+            coalesce(
+                previous.previous_active_cutoff,
+                toDateTime64('1970-01-01 00:00:00', 6, 'UTC')
+            )
+        ) AS previous_cutoff,
+        tupleElement(cutoff_state, 4) AS current_cutoff,
+        tupleElement(cutoff_state, 5) AS is_complete,
+        tupleElement(cutoff_state, 6) AS object_count,
+        tupleElement(cutoff_state, 7) AS row_count,
+        tupleElement(cutoff_state, 8) AS content_digest,
+        tupleElement(cutoff_state, 9) AS recorded_at,
+        tupleElement(cutoff_state, 10) AS version,
+        current.selected_revision_count
+    FROM source_connection_cutoff_versions AS current
+    LEFT JOIN previous_active_source_connection_cutoffs AS previous
+        ON current.tenant_id = previous.tenant_id
+       AND current.source_connection_id = previous.source_connection_id

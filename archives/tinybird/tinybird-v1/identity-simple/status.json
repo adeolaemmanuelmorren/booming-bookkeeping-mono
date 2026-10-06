@@ -1,0 +1,73 @@
+{
+  "checkedAt": "2026-09-07T20:39:28.951Z",
+  "execution": "tinybird-identity-simple-bckh5",
+  "status": {
+    "completionTime": "2026-09-07T20:30:12.405408Z",
+    "conditions": [
+      {
+        "lastTransitionTime": "2026-09-07T20:30:12.405408Z",
+        "message": "Execution completed successfully in 1h6m37.67s.",
+        "status": "True",
+        "type": "Completed"
+      },
+      {
+        "lastTransitionTime": "2026-09-07T19:23:32.522168Z",
+        "message": "Provisioned imported containers.",
+        "status": "True",
+        "type": "ResourcesAvailable"
+      },
+      {
+        "lastTransitionTime": "2026-09-07T19:23:52.287872Z",
+        "message": "Started deployed execution in 19.76s.",
+        "status": "True",
+        "type": "Started"
+      },
+      {
+        "lastTransitionTime": "2026-09-07T19:23:32.374308Z",
+        "message": "Imported container image in 1.97s.",
+        "status": "True",
+        "type": "ContainerReady"
+      }
+    ],
+    "logUri": "https://console.cloud.google.com/logs/viewer?project=able-folio-499722&advancedFilter=resource.type%3D%22cloud_run_job%22%0Aresource.labels.job_name%3D%22tinybird-identity-simple%22%0Aresource.labels.location%3D%22us-east4%22%0Alabels.%22run.googleapis.com/execution_name%22%3D%22tinybird-identity-simple-bckh5%22",
+    "observedGeneration": 1,
+    "startTime": "2026-09-07T19:23:34.729716Z",
+    "succeededCount": 1
+  },
+  "progress": [
+    {
+      "at": "2026-09-07T20:30:08.253Z",
+      "candidates": 10659477,
+      "complete": true,
+      "continuousIdentityEnabled": false,
+      "exportedAt": "2026-09-07T19:20:00.000Z",
+      "facts": 10157718,
+      "identifiers": 5147878,
+      "profiles": 2408452,
+      "redirects": 0,
+      "rssMiB": 3751,
+      "snapshot": "identity-simple-20260907-v1",
+      "sourceBaseline": "boom-identity-20260905-v1",
+      "sourceSeal": "fbe2f19cd5bdd51e521e0d7d89ab1094d999240493e296035a5da14c5332bad6",
+      "stage": "complete"
+    },
+    {
+      "at": "2026-09-07T20:30:08.252Z",
+      "bucket": 122,
+      "rows": 9265,
+      "rssMiB": 3751,
+      "snapshot": "identity-simple-20260907-v1",
+      "stage": "published",
+      "table": "profiles"
+    },
+    {
+      "at": "2026-09-07T20:30:07.295Z",
+      "bucket": 0,
+      "rows": 9486,
+      "rssMiB": 3750,
+      "snapshot": "identity-simple-20260907-v1",
+      "stage": "published",
+      "table": "profiles"
+    }
+  ]
+}

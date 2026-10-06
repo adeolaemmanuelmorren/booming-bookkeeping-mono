@@ -1,0 +1,57 @@
+{
+  "$schema": "../../tinybird-v1/node_modules/wrangler/config-schema.json",
+  "name": "bill-realtime-coordinator",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "main": "src/stateless.ts",
+  "compatibility_date": "2026-09-05",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {},
+  "durable_objects": {
+    "bindings": []
+  },
+  "migrations": [
+    {
+      "tag": "v1-source-publication",
+      "new_sqlite_classes": [
+        "SourceCoordinator",
+        "Publication"
+      ]
+    },
+    {
+      "tag": "v2-browser-source",
+      "new_sqlite_classes": [
+        "BrowserSource"
+      ]
+    },
+    {
+      "tag": "v3-retire-warehouse-reporting",
+      "deleted_classes": [
+        "SourceCoordinator",
+        "Publication",
+        "BrowserSource"
+      ]
+    }
+  ],
+  "queues": {
+    "consumers": []
+  },
+  "services": [
+    {
+      "binding": "STRIPE_SOURCE",
+      "service": "boom-bookkeeping-segment-proxy",
+      "entrypoint": "StripeSource"
+    },
+    {
+      "binding": "ACTIVECAMPAIGN_SOURCE",
+      "service": "marketing-webhooks",
+      "entrypoint": "ActiveCampaignSource"
+    }
+  ]
+}

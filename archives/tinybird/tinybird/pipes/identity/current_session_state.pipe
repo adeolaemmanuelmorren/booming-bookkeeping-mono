@@ -1,0 +1,163 @@
+DESCRIPTION >
+    Current sessions and touchpoints selected by version before tombstone filtering.
+
+NODE active_session_identity_batch
+SQL >
+    SELECT
+        tenant_id,
+        max(batch_version) AS active_batch_version
+    FROM current_identity_state
+    WHERE state_kind = 'activation_audit'
+    GROUP BY tenant_id
+
+NODE session_versions
+SQL >
+    SELECT
+        tenant_id,
+        record_kind,
+        record_key,
+        argMax(
+            tuple(
+                is_deleted,
+                batch_version,
+                batch_id,
+                committed_at,
+                row_hash,
+                visitor_key,
+                session_id,
+                touchpoint_id,
+                profile_id,
+                anonymous_id,
+                user_id,
+                session_start_timestamp,
+                session_end_timestamp,
+                session_duration_seconds,
+                page_view_count,
+                first_page_view_id,
+                first_page_url,
+                first_page_host,
+                first_page_path,
+                first_page_path_host,
+                last_page_view_id,
+                last_page_url,
+                last_page_path,
+                ip_address,
+                user_agent,
+                device_platform,
+                device_is_mobile,
+                geo_city,
+                geo_region,
+                geo_region_code,
+                geo_country,
+                geo_timezone,
+                utm_source,
+                utm_medium,
+                utm_campaign,
+                utm_content,
+                utm_term,
+                utm_id,
+                campaign_id,
+                adset_id,
+                ad_id,
+                google_keyword_id,
+                google_keyword,
+                click_id,
+                click_id_type,
+                gclid,
+                gbraid,
+                wbraid,
+                fbclid,
+                fbc_fbclid,
+                ttclid,
+                li_fat_id,
+                rdt_cid,
+                twclid,
+                fbc,
+                fbp,
+                ttp,
+                uetsid,
+                uetvid,
+                channel_source,
+                channel_medium,
+                source_event_ids,
+                visitor_history_hash
+            ),
+            tuple(batch_version, committed_at, row_hash)
+        ) AS current_row
+    FROM session_state_versions AS sessions
+    INNER JOIN active_session_identity_batch AS active
+        ON sessions.tenant_id = active.tenant_id
+       AND sessions.batch_version <= active.active_batch_version
+    WHERE sessions.tenant_id = 'boom'
+    GROUP BY sessions.tenant_id, sessions.record_kind, sessions.record_key
+
+NODE live_session_rows
+SQL >
+    SELECT
+        tenant_id,
+        record_kind,
+        record_key,
+        tupleElement(current_row, 2) AS batch_version,
+        tupleElement(current_row, 3) AS batch_id,
+        tupleElement(current_row, 4) AS committed_at,
+        tupleElement(current_row, 5) AS row_hash,
+        tupleElement(current_row, 6) AS visitor_key,
+        tupleElement(current_row, 7) AS session_id,
+        tupleElement(current_row, 8) AS touchpoint_id,
+        tupleElement(current_row, 9) AS profile_id,
+        tupleElement(current_row, 10) AS anonymous_id,
+        tupleElement(current_row, 11) AS user_id,
+        tupleElement(current_row, 12) AS session_start_timestamp,
+        tupleElement(current_row, 13) AS session_end_timestamp,
+        tupleElement(current_row, 14) AS session_duration_seconds,
+        tupleElement(current_row, 15) AS page_view_count,
+        tupleElement(current_row, 16) AS first_page_view_id,
+        tupleElement(current_row, 17) AS first_page_url,
+        tupleElement(current_row, 18) AS first_page_host,
+        tupleElement(current_row, 19) AS first_page_path,
+        tupleElement(current_row, 20) AS first_page_path_host,
+        tupleElement(current_row, 21) AS last_page_view_id,
+        tupleElement(current_row, 22) AS last_page_url,
+        tupleElement(current_row, 23) AS last_page_path,
+        tupleElement(current_row, 24) AS ip_address,
+        tupleElement(current_row, 25) AS user_agent,
+        tupleElement(current_row, 26) AS device_platform,
+        tupleElement(current_row, 27) AS device_is_mobile,
+        tupleElement(current_row, 28) AS geo_city,
+        tupleElement(current_row, 29) AS geo_region,
+        tupleElement(current_row, 30) AS geo_region_code,
+        tupleElement(current_row, 31) AS geo_country,
+        tupleElement(current_row, 32) AS geo_timezone,
+        tupleElement(current_row, 33) AS utm_source,
+        tupleElement(current_row, 34) AS utm_medium,
+        tupleElement(current_row, 35) AS utm_campaign,
+        tupleElement(current_row, 36) AS utm_content,
+        tupleElement(current_row, 37) AS utm_term,
+        tupleElement(current_row, 38) AS utm_id,
+        tupleElement(current_row, 39) AS campaign_id,
+        tupleElement(current_row, 40) AS adset_id,
+        tupleElement(current_row, 41) AS ad_id,
+        tupleElement(current_row, 42) AS google_keyword_id,
+        tupleElement(current_row, 43) AS google_keyword,
+        tupleElement(current_row, 44) AS click_id,
+        tupleElement(current_row, 45) AS click_id_type,
+        tupleElement(current_row, 46) AS gclid,
+        tupleElement(current_row, 47) AS gbraid,
+        tupleElement(current_row, 48) AS wbraid,
+        tupleElement(current_row, 49) AS fbclid,
+        tupleElement(current_row, 50) AS fbc_fbclid,
+        tupleElement(current_row, 51) AS ttclid,
+        tupleElement(current_row, 52) AS li_fat_id,
+        tupleElement(current_row, 53) AS rdt_cid,
+        tupleElement(current_row, 54) AS twclid,
+        tupleElement(current_row, 55) AS fbc,
+        tupleElement(current_row, 56) AS fbp,
+        tupleElement(current_row, 57) AS ttp,
+        tupleElement(current_row, 58) AS uetsid,
+        tupleElement(current_row, 59) AS uetvid,
+        tupleElement(current_row, 60) AS channel_source,
+        tupleElement(current_row, 61) AS channel_medium,
+        tupleElement(current_row, 62) AS source_event_ids,
+        tupleElement(current_row, 63) AS visitor_history_hash
+    FROM session_versions
+    WHERE tupleElement(current_row, 1) = 0

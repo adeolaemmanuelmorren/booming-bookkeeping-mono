@@ -1,0 +1,550 @@
+{
+  "checkedAt": "2026-09-06T06:10:04.178Z",
+  "synthetic": true,
+  "runs": [
+    {
+      "name": "fixture-all",
+      "wallMs": 526,
+      "statistics": {
+        "elapsed": 0.140420939,
+        "rows_read": 6,
+        "bytes_read": 6
+      },
+      "data": [
+        {
+          "click_time": 1788246000,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 0.9,
+          "conversions_ft": 2,
+          "conversions_lt": 0,
+          "revenue_cents": 6500
+        },
+        {
+          "click_time": 1789023600,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 1,
+          "conversions_ft": 2,
+          "conversions_lt": 0,
+          "revenue_cents": 2250
+        },
+        {
+          "click_time": 1789110000,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 2250
+        },
+        {
+          "click_time": 1789196400,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789196400,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 1.2,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 8500
+        },
+        {
+          "click_time": 1789196400,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 2.5,
+          "conversions_ft": 3,
+          "conversions_lt": 2,
+          "revenue_cents": 7000
+        },
+        {
+          "click_time": 1789282800,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 7000
+        },
+        {
+          "click_time": 1789369200,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 1000
+        },
+        {
+          "click_time": 1789455600,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789628400,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 0.4,
+          "conversions_ft": 0,
+          "conversions_lt": 1,
+          "revenue_cents": 4000
+        },
+        {
+          "click_time": 1789887600,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 500
+        }
+      ],
+      "oraclePassed": true
+    },
+    {
+      "name": "fixture-window",
+      "wallMs": 282,
+      "statistics": {
+        "elapsed": 0.149239848,
+        "rows_read": 6,
+        "bytes_read": 6
+      },
+      "data": [
+        {
+          "click_time": 1789110000,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 2250
+        },
+        {
+          "click_time": 1789196400,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789196400,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 1.2,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 8500
+        },
+        {
+          "click_time": 1789196400,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 2.5,
+          "conversions_ft": 3,
+          "conversions_lt": 2,
+          "revenue_cents": 7000
+        },
+        {
+          "click_time": 1789282800,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 7000
+        },
+        {
+          "click_time": 1789369200,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 1000
+        },
+        {
+          "click_time": 1789455600,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789628400,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 0.4,
+          "conversions_ft": 0,
+          "conversions_lt": 1,
+          "revenue_cents": 4000
+        }
+      ],
+      "oraclePassed": true
+    },
+    {
+      "name": "fixture-late-touch-identity-merge",
+      "wallMs": 253,
+      "statistics": {
+        "elapsed": 0.144548658,
+        "rows_read": 6,
+        "bytes_read": 6
+      },
+      "data": [
+        {
+          "click_time": 1788246000,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1.2000000000000002,
+          "conversions_ft": 3,
+          "conversions_lt": 0,
+          "revenue_cents": 9200
+        },
+        {
+          "click_time": 1788937200,
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0.1,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 900
+        },
+        {
+          "click_time": 1789023600,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 1,
+          "conversions_ft": 2,
+          "conversions_lt": 0,
+          "revenue_cents": 2250
+        },
+        {
+          "click_time": 1789110000,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 2250
+        },
+        {
+          "click_time": 1789196400,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789196400,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 0.4,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 2800
+        },
+        {
+          "click_time": 1789196400,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "direct",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "click_time": 1789282800,
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 2.5,
+          "conversions_ft": 3,
+          "conversions_lt": 2,
+          "revenue_cents": 7000
+        },
+        {
+          "click_time": 1789282800,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 1,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 5900
+        },
+        {
+          "click_time": 1789369200,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 1000
+        },
+        {
+          "click_time": 1789455600,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 2000
+        },
+        {
+          "click_time": 1789628400,
+          "source": "meta",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 0.8,
+          "conversions_ft": 0,
+          "conversions_lt": 2,
+          "revenue_cents": 7200
+        },
+        {
+          "click_time": 1789887600,
+          "source": "offline",
+          "campaign_id": 0,
+          "ad_id": 0,
+          "conversions_mt": 1,
+          "conversions_ft": 1,
+          "conversions_lt": 1,
+          "revenue_cents": 500
+        }
+      ],
+      "oraclePassed": true
+    },
+    {
+      "name": "scale-10000-journey-20",
+      "wallMs": 269,
+      "statistics": {
+        "elapsed": 0.161088508,
+        "rows_read": 24500,
+        "bytes_read": 196000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 599.9999999999831,
+          "conversions_ft": 1500,
+          "conversions_lt": 0,
+          "revenue_cents": 3000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 70.80213903743535,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 336363.63636364305
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 296.6844919786008,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 1536363.6363636674
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 276.6844919786036,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 2336363.636363703
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 255.82887700534752,
+          "conversions_ft": 0,
+          "conversions_lt": 500,
+          "revenue_cents": 290909.0909090917
+        }
+      ],
+      "baselineMatch": true
+    },
+    {
+      "name": "scale-100000-journey-20",
+      "wallMs": 571,
+      "statistics": {
+        "elapsed": 0.447245391,
+        "rows_read": 245000,
+        "bytes_read": 1960000
+      },
+      "data": [
+        {
+          "source": "direct",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 5999.999999998925,
+          "conversions_ft": 15000,
+          "conversions_lt": 0,
+          "revenue_cents": 30000000
+        },
+        {
+          "source": "direct",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 0,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 0
+        },
+        {
+          "source": "google",
+          "campaign_id": 1,
+          "ad_id": 1,
+          "conversions_mt": 708.0213903740173,
+          "conversions_ft": 0,
+          "conversions_lt": 0,
+          "revenue_cents": 3363636.3636371912
+        },
+        {
+          "source": "google",
+          "campaign_id": 2,
+          "ad_id": 2,
+          "conversions_mt": 2966.8449197856075,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 15363636.363631198
+        },
+        {
+          "source": "google",
+          "campaign_id": 3,
+          "ad_id": 3,
+          "conversions_mt": 2766.8449197857435,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 23363636.363636494
+        },
+        {
+          "source": "google",
+          "campaign_id": 4,
+          "ad_id": 4,
+          "conversions_mt": 2558.2887700532856,
+          "conversions_ft": 0,
+          "conversions_lt": 5000,
+          "revenue_cents": 2909090.909091415
+        }
+      ],
+      "baselineMatch": true
+    },
+    {
+      "name": "scale-1000000-journey-20",
+      "failed": true,
+      "wallMs": 1716,
+      "error": "{\"error\": \"[Error] Memory limit (for query) exceeded. Make sure the query just process the required data. (MEMORY_LIMIT_EXCEEDED) (query_id=01M1TND7PSCZ0FYAVJZHP37PR4)\", \"documentation\": \"https://tinybird.co/docs/guides/best-practices-for-faster-sql.html#memory-limit-reached-title\"}"
+    }
+  ]
+}

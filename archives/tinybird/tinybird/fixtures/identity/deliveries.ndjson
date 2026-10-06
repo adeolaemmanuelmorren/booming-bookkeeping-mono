@@ -1,0 +1,8 @@
+{"producer_id":"fixture-producer","producer_sequence":42,"event_id":"event-42","payload_hash":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}
+{"producer_id":"fixture-producer","producer_sequence":44,"event_id":"event-44","payload_hash":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}
+{"producer_id":"fixture-replay","producer_sequence":1,"event_id":"event-replay","payload_hash":"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"}
+{"producer_id":"fixture-replay","producer_sequence":1,"event_id":"event-replay","payload_hash":"CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"}
+{"producer_id":"fixture-conflict","producer_sequence":1,"event_id":"event-conflict-a","payload_hash":"DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"}
+{"producer_id":"fixture-conflict","producer_sequence":1,"event_id":"event-conflict-b","payload_hash":"EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE"}
+{"producer_id":"fixture-reused-id","producer_sequence":1,"event_id":"event-reused","payload_hash":"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"}
+{"producer_id":"fixture-reused-id","producer_sequence":2,"event_id":"event-reused","payload_hash":"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"}

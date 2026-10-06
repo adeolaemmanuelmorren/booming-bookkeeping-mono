@@ -1,0 +1,127 @@
+DESCRIPTION >
+    Daily Google ad rows retained as an explicit dependency of the generic ad universe.
+    Bill remains Meta-only, but parity validation fails if this current Dataform branch is absent.
+
+NODE latest_google_accounts
+SQL >
+    SELECT
+        toString(id) AS account_id,
+        nullIf(trim(descriptive_name), '') AS account_name,
+        coalesce(nullIf(trim(currency_code), ''), 'USD') AS currency
+    FROM raw_google_ads_account_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.google_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY id
+        ORDER BY updated_at DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_google_campaigns
+SQL >
+    SELECT
+        toString(customer_id) AS account_id,
+        toString(id) AS campaign_id,
+        nullIf(trim(name), '') AS campaign_name
+    FROM raw_google_ads_campaign_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.google_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY customer_id, id
+        ORDER BY updated_at DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_google_adsets
+SQL >
+    SELECT
+        toString(campaign_id) AS campaign_id,
+        toString(id) AS adset_id,
+        nullIf(trim(name), '') AS adset_name
+    FROM raw_google_ads_ad_group_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.google_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY campaign_id, id
+        ORDER BY updated_at DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE latest_google_ads
+SQL >
+    SELECT
+        toString(ad_group_id) AS adset_id,
+        toString(id) AS ad_id,
+        nullIf(trim(name), '') AS ad_name
+    FROM raw_google_ads_ad_history
+    CROSS JOIN current_source_generation AS generation
+    WHERE _fivetran_synced <= generation.google_cutoff
+    QUALIFY row_number() OVER (
+        PARTITION BY ad_group_id, id
+        ORDER BY updated_at DESC, _fivetran_synced DESC
+    ) = 1
+
+NODE current_google_stat_versions
+SQL >
+    SELECT source.*
+    FROM raw_google_ads_ad_stats AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source._fivetran_synced <= generation.google_cutoff
+      AND source.date <= toDate(now(), 'America/Los_Angeles')
+    QUALIFY row_number() OVER (
+        PARTITION BY
+            source.customer_id,
+            source.date,
+            source.campaign_id,
+            source.ad_group_id,
+            source.ad_id,
+            source._fivetran_id
+        ORDER BY source._fivetran_synced DESC
+    ) = 1
+
+NODE aggregated_google_ad_rows
+SQL >
+    SELECT
+        toString(customer_id) AS account_id,
+        date,
+        toString(campaign_id) AS campaign_id,
+        toString(ad_group_id) AS adset_id,
+        toString(ad_id) AS ad_id,
+        sum(coalesce(impressions, toInt64(0))) AS impressions,
+        sum(coalesce(clicks, toInt64(0))) AS clicks,
+        toDecimal128(sum(coalesce(cost_micros, toInt64(0))) / 1000000.0, 9) AS spend,
+        max(_fivetran_synced) AS source_version
+    FROM current_google_stat_versions
+    GROUP BY account_id, date, campaign_id, adset_id, ad_id
+
+NODE current_google_ad_row_presence
+SQL >
+    SELECT
+        generation.source_generation_id,
+        generation.report_generation,
+        'boom' AS tenant_id,
+        rows.date,
+        'google' AS source,
+        rows.account_id,
+        accounts.account_name,
+        rows.campaign_id,
+        campaigns.campaign_name,
+        rows.adset_id,
+        adsets.adset_name,
+        rows.ad_id,
+        ads.ad_name,
+        rows.impressions,
+        rows.clicks,
+        rows.spend,
+        coalesce(accounts.currency, 'USD') AS currency,
+        rows.source_version
+    FROM aggregated_google_ad_rows AS rows
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN latest_google_accounts AS accounts
+        ON rows.account_id = accounts.account_id
+    LEFT JOIN latest_google_campaigns AS campaigns
+        ON rows.account_id = campaigns.account_id
+       AND rows.campaign_id = campaigns.campaign_id
+    LEFT JOIN latest_google_adsets AS adsets
+        ON rows.campaign_id = adsets.campaign_id
+       AND rows.adset_id = adsets.adset_id
+    LEFT JOIN latest_google_ads AS ads
+        ON rows.adset_id = ads.adset_id
+       AND rows.ad_id = ads.ad_id

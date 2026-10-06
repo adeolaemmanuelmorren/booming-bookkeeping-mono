@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Versioned Boom report policy. The current adapter defaults to Dataform compatibility
+    and only accepts an explicit replacement after it has been activated.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `semantic_policy_version` String `json:$.semantic_policy_version`,
+    `compatibility_mode` LowCardinality(String) `json:$.compatibility_mode`,
+    `report_timezone` LowCardinality(String) `json:$.report_timezone`,
+    `range_mode` LowCardinality(String) `json:$.range_mode`,
+    `click_identity_mode` LowCardinality(String) `json:$.click_identity_mode`,
+    `preserve_generic_row_presence` UInt8 `json:$.preserve_generic_row_presence`,
+    `immediate_vip_requires_positive_net` UInt8 `json:$.immediate_vip_requires_positive_net`,
+    `five_k_net_threshold` Decimal(38,9) `json:$.five_k_net_threshold`,
+    `five_k_reported_value` Int64 `json:$.five_k_reported_value`,
+    `daily_delivery_mode` LowCardinality(String) `json:$.daily_delivery_mode`,
+    `is_active` UInt8 `json:$.is_active`,
+    `activated_at` DateTime64(6) `json:$.activated_at`,
+    `version` UInt64 `json:$.version`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, semantic_policy_version, version"

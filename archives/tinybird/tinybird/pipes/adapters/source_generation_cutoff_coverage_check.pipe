@@ -1,0 +1,28 @@
+DESCRIPTION >
+    Publication check proving that every registered connection has one complete,
+    continuous cutoff row for the exact current source manifest.
+
+NODE source_generation_cutoff_coverage_row
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'source_generation_connection_cutoffs' AS adapter_id,
+        'source_connection_cutoff_v1' AS contract_name,
+        'all_registered_connections_complete' AS validation_name,
+        toUInt64(
+            if(
+                readiness.source_generation_id = '',
+                1,
+                greatest(
+                    toInt64(readiness.expected_connection_count)
+                    - toInt64(readiness.valid_connection_count),
+                    0
+                )
+                + toInt64(readiness.extra_or_mismatched_cutoff_row_count)
+            )
+        ) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN source_generation_cutoff_readiness AS readiness
+        ON generation.tenant_id = readiness.tenant_id
+       AND generation.source_generation_id = readiness.source_generation_id

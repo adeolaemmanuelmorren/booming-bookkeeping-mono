@@ -1,0 +1,20 @@
+DESCRIPTION >
+    Append-only requests for a full retained-evidence identity rebuild after a correction or delete.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `shadow_generation` UInt64 `json:$.shadow_generation`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` FixedString(64) `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `requested_at` DateTime64(6) `json:$.requested_at`,
+    `requested_by` String `json:$.requested_by`,
+    `reason` LowCardinality(String) `json:$.reason`,
+    `source_cutoff` DateTime64(6) `json:$.source_cutoff`,
+    `policy_version` UInt64 `json:$.policy_version`,
+    `request_hash` FixedString(64) `json:$.request_hash`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, shadow_generation, source_generation_id, request_hash, requested_at"

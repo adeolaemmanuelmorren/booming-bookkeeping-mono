@@ -1,0 +1,13 @@
+DESCRIPTION >
+    Synthetic attribution proof only.
+
+SCHEMA >
+    `scenario` String `json:$.scenario`,
+    `chunk_id` String `json:$.chunk_id`,
+    `groups` Array(String) `json:$.groups[:]`,
+    `metrics` Array(Array(String)) `json:$.metrics[:]`,
+    `session_ids` Array(Array(String)) `json:$.session_ids[:]`,
+    `sessions` Array(UInt64) `json:$.sessions[:]`
+
+ENGINE MergeTree
+ENGINE_SORTING_KEY scenario, chunk_id

@@ -1,0 +1,29 @@
+DESCRIPTION >
+    Meta hierarchy-native daily rows projected into the reusable ad-delivery contract.
+
+NODE meta_daily_ad_delivery_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        'meta-primary' AS source_connection_id,
+        'meta' AS source,
+        date,
+        level,
+        account_id,
+        CAST(NULL AS Nullable(String)) AS account_name,
+        campaign_id,
+        adset_id,
+        ad_id,
+        campaign_name,
+        adset_name,
+        ad_name,
+        impressions,
+        CAST(NULL AS Nullable(Int64)) AS clicks,
+        spend,
+        CAST(reach AS Nullable(Int64)) AS reach,
+        frequency,
+        currency,
+        source_version
+    FROM meta_daily_delivery_adapter

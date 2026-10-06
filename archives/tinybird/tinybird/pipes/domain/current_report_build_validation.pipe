@@ -1,0 +1,109 @@
+DESCRIPTION >
+    Latest persisted product-build audit for the current source generation. Publication
+    requires exactly four passing stages and binds approval to the composite digest.
+
+NODE report_build_validation_versions
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        stage_id,
+        argMax(
+            tuple(
+                source_manifest_version,
+                source_manifest_digest,
+                connection_inventory_digest,
+                cutoff_set_digest,
+                policy_digest,
+                product_materialized_at,
+                expected_row_count,
+                materialized_row_count,
+                expected_digest,
+                materialized_digest,
+                build_digest,
+                is_valid,
+                validated_at
+            ),
+            tuple(source_manifest_version, validated_at, build_digest)
+        ) AS current_validation
+    FROM report_build_validations
+    WHERE tenant_id = 'boom'
+    GROUP BY tenant_id, source_generation_id, report_generation, stage_id
+
+NODE current_report_build_stage_rows
+SQL >
+    SELECT
+        validations.tenant_id,
+        validations.source_generation_id,
+        validations.report_generation,
+        validations.stage_id,
+        tupleElement(validations.current_validation, 1) AS source_manifest_version,
+        tupleElement(validations.current_validation, 2) AS source_manifest_digest,
+        tupleElement(validations.current_validation, 3) AS connection_inventory_digest,
+        tupleElement(validations.current_validation, 4) AS cutoff_set_digest,
+        tupleElement(validations.current_validation, 5) AS policy_digest,
+        tupleElement(validations.current_validation, 6) AS product_materialized_at,
+        tupleElement(validations.current_validation, 7) AS expected_row_count,
+        tupleElement(validations.current_validation, 8) AS materialized_row_count,
+        tupleElement(validations.current_validation, 9) AS expected_digest,
+        tupleElement(validations.current_validation, 10) AS materialized_digest,
+        tupleElement(validations.current_validation, 11) AS build_digest,
+        tupleElement(validations.current_validation, 12) AS is_valid,
+        tupleElement(validations.current_validation, 13) AS validated_at
+    FROM report_build_validation_versions AS validations
+    INNER JOIN current_source_generation AS generation
+        ON validations.tenant_id = generation.tenant_id
+       AND validations.source_generation_id = generation.source_generation_id
+       AND validations.report_generation = generation.report_generation
+       AND tupleElement(validations.current_validation, 1) = generation.version
+       AND tupleElement(validations.current_validation, 2) = generation.source_manifest_digest
+       AND tupleElement(validations.current_validation, 3) = generation.connection_inventory_digest
+       AND tupleElement(validations.current_validation, 5) = generation.policy_digest
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON validations.tenant_id = cutoff_readiness.tenant_id
+       AND validations.source_generation_id = cutoff_readiness.source_generation_id
+       AND tupleElement(validations.current_validation, 1) = cutoff_readiness.source_manifest_version
+       AND tupleElement(validations.current_validation, 2) = cutoff_readiness.source_manifest_digest
+       AND tupleElement(validations.current_validation, 3) = cutoff_readiness.connection_inventory_digest
+       AND tupleElement(validations.current_validation, 4) = cutoff_readiness.cutoff_set_digest
+       AND cutoff_readiness.is_ready = 1
+
+NODE current_report_build_validation_summary
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        report_generation,
+        any(stages.source_manifest_version) AS source_manifest_version,
+        any(stages.source_manifest_digest) AS source_manifest_digest,
+        any(stages.connection_inventory_digest) AS connection_inventory_digest,
+        any(stages.cutoff_set_digest) AS cutoff_set_digest,
+        any(stages.policy_digest) AS policy_digest,
+        count() AS required_stage_count,
+        countIf(stages.is_valid = 1) AS passed_stage_count,
+        arraySort(groupArrayIf(stages.stage_id, stages.is_valid = 0)) AS failed_stages,
+        if(
+            uniqExact(stages.build_digest) = 1,
+            any(stages.build_digest),
+            repeat('0', 64)
+        ) AS build_digest,
+        max(stages.validated_at) AS validated_at,
+        toUInt8(
+            arraySort(groupUniqArray(stages.stage_id)) = [
+                'hourly_performance',
+                'krc_acquisition',
+                'meta_delivery_daily',
+                'meta_hour_bounds'
+            ]
+            AND count() = 4
+            AND countIf(stages.is_valid = 1) = 4
+            AND uniqExact(stages.build_digest) = 1
+            AND uniqExact(stages.source_manifest_version) = 1
+            AND uniqExact(stages.source_manifest_digest) = 1
+            AND uniqExact(stages.connection_inventory_digest) = 1
+            AND uniqExact(stages.cutoff_set_digest) = 1
+            AND uniqExact(stages.policy_digest) = 1
+        ) AS is_valid
+    FROM current_report_build_stage_rows AS stages
+    GROUP BY tenant_id, source_generation_id, report_generation

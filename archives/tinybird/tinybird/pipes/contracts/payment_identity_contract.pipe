@@ -1,0 +1,22 @@
+DESCRIPTION >
+    Every registered payment source projected into the canonical identity contract.
+
+NODE payment_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        source_connection_id,
+        concat(payment_source, ':payment') AS source_system,
+        payment_id AS source_record_id,
+        payments.payment_time AS source_version,
+        source_changed_at,
+        payment_time AS observed_at,
+        CAST(NULL AS Nullable(String)) AS anonymous_id,
+        payment_email AS user_id,
+        payment_email AS email,
+        payment_phone AS phone,
+        arrayElement(splitByChar(' ', trim(ifNull(payment_name, ''))), 1) AS first_name,
+        arrayElement(splitByChar(' ', trim(ifNull(payment_name, ''))), -1) AS last_name,
+        toUInt8(0) AS source_deleted
+    FROM current_payment_evidence AS payments

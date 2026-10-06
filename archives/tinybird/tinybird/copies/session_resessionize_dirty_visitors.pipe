@@ -1,0 +1,606 @@
+DESCRIPTION >
+    Rebuild complete page history for every visitor dirtied by a new page, identity change, or shared fbclid.
+
+NODE session_checkpoint
+SQL >
+    SELECT
+        candidate.tenant_id,
+        coalesce(active.session_batch_version, toUInt64(0)) AS session_batch_version
+    FROM candidate_identity_generation AS candidate
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS session_batch_version
+        FROM current_session_state
+        GROUP BY tenant_id
+    ) AS active
+        ON candidate.tenant_id = active.tenant_id
+    LEFT JOIN (
+        SELECT tenant_id, max(batch_version) AS written_batch_version
+        FROM session_state_versions
+        WHERE tenant_id = 'boom'
+        GROUP BY tenant_id
+    ) AS written
+        ON candidate.tenant_id = written.tenant_id
+    WHERE candidate.stable_batch_version
+        > coalesce(written.written_batch_version, toUInt64(0))
+
+NODE current_page_facts
+SQL >
+    SELECT
+        facts.tenant_id,
+        facts.fact_key AS page_view_id,
+        facts.source_fact_version,
+        facts.observed_at AS page_view_timestamp,
+        facts.fact_payload,
+        facts.batch_version,
+        JSONExtractString(facts.fact_payload, 'anonymous_id') AS anonymous_id,
+        lower(JSONExtractString(facts.fact_payload, 'user_id')) AS user_id,
+        coalesce(
+            nullIf(JSONExtractString(facts.fact_payload, 'anonymous_id'), ''),
+            nullIf(lower(JSONExtractString(facts.fact_payload, 'user_id')), ''),
+            facts.fact_key
+        ) AS visitor_key,
+        JSONExtractString(facts.fact_payload, 'fbclid') AS fbclid
+    FROM candidate_identity_facts AS facts
+    WHERE facts.tenant_id = 'boom'
+      AND facts.fact_kind = 'page_view'
+
+NODE dirty_seed_visitors
+SQL >
+    SELECT DISTINCT pages.tenant_id, pages.visitor_key
+    FROM current_page_facts AS pages
+    INNER JOIN session_checkpoint AS checkpoint
+        ON pages.tenant_id = checkpoint.tenant_id
+    WHERE pages.batch_version > checkpoint.session_batch_version
+
+NODE dirty_fbclids
+SQL >
+    SELECT DISTINCT pages.tenant_id, pages.fbclid
+    FROM current_page_facts AS pages
+    INNER JOIN dirty_seed_visitors AS dirty
+        ON pages.tenant_id = dirty.tenant_id
+       AND pages.visitor_key = dirty.visitor_key
+    WHERE pages.fbclid != ''
+
+NODE identity_dirty_visitors
+SQL >
+    SELECT DISTINCT sessions.tenant_id, sessions.visitor_key
+    FROM current_session_state AS sessions
+    INNER JOIN session_checkpoint AS checkpoint
+        ON sessions.tenant_id = checkpoint.tenant_id
+    INNER JOIN candidate_identity_state AS changes
+        ON sessions.tenant_id = changes.tenant_id
+       AND has(arrayConcat(changes.prior_profile_ids, changes.dirty_profile_ids), sessions.profile_id)
+    WHERE sessions.record_kind = 'touchpoint'
+      AND changes.state_kind = 'component_change'
+      AND changes.batch_version > checkpoint.session_batch_version
+
+NODE stale_session_visitors
+SQL >
+    SELECT DISTINCT sessions.tenant_id, sessions.visitor_key
+    FROM current_session_state AS sessions
+    ARRAY JOIN sessions.source_event_ids AS prior_page_view_id
+    LEFT JOIN current_page_facts AS pages
+        ON sessions.tenant_id = pages.tenant_id
+       AND prior_page_view_id = pages.page_view_id
+    WHERE sessions.record_kind = 'touchpoint'
+      AND (
+          pages.page_view_id = ''
+          OR pages.visitor_key != sessions.visitor_key
+      )
+
+NODE base_dirty_visitors
+SQL >
+    SELECT tenant_id, visitor_key FROM dirty_seed_visitors
+    UNION DISTINCT
+    SELECT tenant_id, visitor_key FROM identity_dirty_visitors
+    UNION DISTINCT
+    SELECT tenant_id, visitor_key FROM stale_session_visitors
+
+NODE identity_and_stale_fbclids
+SQL >
+    SELECT DISTINCT sessions.tenant_id, sessions.fbclid
+    FROM current_session_state AS sessions
+    INNER JOIN base_dirty_visitors AS dirty
+        ON sessions.tenant_id = dirty.tenant_id
+       AND sessions.visitor_key = dirty.visitor_key
+    WHERE sessions.record_kind = 'touchpoint'
+      AND sessions.fbclid != ''
+
+NODE all_dirty_fbclids
+SQL >
+    SELECT tenant_id, fbclid FROM dirty_fbclids
+    UNION DISTINCT
+    SELECT tenant_id, fbclid FROM identity_and_stale_fbclids
+
+NODE dirty_visitors
+SQL >
+    SELECT tenant_id, visitor_key FROM base_dirty_visitors
+    UNION DISTINCT
+    SELECT pages.tenant_id, pages.visitor_key
+    FROM current_page_facts AS pages
+    INNER JOIN all_dirty_fbclids AS click_ids
+        ON pages.tenant_id = click_ids.tenant_id
+       AND pages.fbclid = click_ids.fbclid
+    UNION DISTINCT
+    SELECT sessions.tenant_id, sessions.visitor_key
+    FROM current_session_state AS sessions
+    INNER JOIN all_dirty_fbclids AS click_ids
+        ON sessions.tenant_id = click_ids.tenant_id
+       AND sessions.fbclid = click_ids.fbclid
+    WHERE sessions.record_kind = 'touchpoint'
+
+NODE dirty_page_history
+SQL >
+    SELECT
+        pages.*,
+        JSONExtractString(pages.fact_payload, 'page_url') AS page_url,
+        JSONExtractString(pages.fact_payload, 'page_host') AS page_host,
+        JSONExtractString(pages.fact_payload, 'page_path') AS page_path,
+        JSONExtractString(pages.fact_payload, 'page_path_host') AS page_path_host,
+        JSONExtractString(pages.fact_payload, 'ip_address') AS ip_address,
+        JSONExtractString(pages.fact_payload, 'user_agent') AS user_agent,
+        JSONExtractString(pages.fact_payload, 'device_platform') AS device_platform,
+        toUInt8(JSONExtractBool(pages.fact_payload, 'device_is_mobile')) AS device_is_mobile,
+        JSONExtractString(pages.fact_payload, 'geo_city') AS geo_city,
+        JSONExtractString(pages.fact_payload, 'geo_region') AS geo_region,
+        JSONExtractString(pages.fact_payload, 'geo_region_code') AS geo_region_code,
+        JSONExtractString(pages.fact_payload, 'geo_country') AS geo_country,
+        JSONExtractString(pages.fact_payload, 'geo_timezone') AS geo_timezone,
+        JSONExtractString(pages.fact_payload, 'utm_source') AS utm_source,
+        JSONExtractString(pages.fact_payload, 'utm_medium') AS utm_medium,
+        JSONExtractString(pages.fact_payload, 'utm_campaign') AS utm_campaign,
+        JSONExtractString(pages.fact_payload, 'utm_content') AS utm_content,
+        JSONExtractString(pages.fact_payload, 'utm_term') AS utm_term,
+        JSONExtractString(pages.fact_payload, 'utm_id') AS utm_id,
+        JSONExtractString(pages.fact_payload, 'campaign_id') AS campaign_id,
+        JSONExtractString(pages.fact_payload, 'adset_id') AS adset_id,
+        JSONExtractString(pages.fact_payload, 'ad_id') AS ad_id,
+        JSONExtractString(pages.fact_payload, 'google_keyword_id') AS google_keyword_id,
+        JSONExtractString(pages.fact_payload, 'google_keyword') AS google_keyword,
+        JSONExtractString(pages.fact_payload, 'click_id') AS click_id,
+        JSONExtractString(pages.fact_payload, 'click_id_type') AS click_id_type,
+        JSONExtractString(pages.fact_payload, 'gclid') AS gclid,
+        JSONExtractString(pages.fact_payload, 'gbraid') AS gbraid,
+        JSONExtractString(pages.fact_payload, 'wbraid') AS wbraid,
+        JSONExtractString(pages.fact_payload, 'ttclid') AS ttclid,
+        JSONExtractString(pages.fact_payload, 'li_fat_id') AS li_fat_id,
+        JSONExtractString(pages.fact_payload, 'rdt_cid') AS rdt_cid,
+        JSONExtractString(pages.fact_payload, 'twclid') AS twclid,
+        JSONExtractString(pages.fact_payload, 'fbc') AS fbc,
+        JSONExtractString(pages.fact_payload, 'fbp') AS fbp,
+        JSONExtractString(pages.fact_payload, 'ttp') AS ttp,
+        JSONExtractString(pages.fact_payload, 'uetsid') AS uetsid,
+        JSONExtractString(pages.fact_payload, 'uetvid') AS uetvid,
+        JSONExtractString(pages.fact_payload, 'channel_source') AS channel_source,
+        JSONExtractString(pages.fact_payload, 'channel_medium') AS channel_medium
+    FROM current_page_facts AS pages
+    INNER JOIN dirty_visitors AS dirty
+        ON pages.tenant_id = dirty.tenant_id
+       AND pages.visitor_key = dirty.visitor_key
+    WHERE pages.page_view_timestamp > toDateTime64(0, 6)
+
+NODE ordered_page_views
+SQL >
+    SELECT
+        *,
+        lagInFrame(page_view_timestamp) OVER (
+            PARTITION BY tenant_id, visitor_key
+            ORDER BY page_view_timestamp, page_view_id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS previous_page_view_timestamp
+    FROM dirty_page_history
+
+NODE session_boundaries
+SQL >
+    SELECT
+        *,
+        toUInt8(
+            previous_page_view_timestamp = toDateTime64(0, 6)
+            OR toUnixTimestamp64Micro(page_view_timestamp)
+                - toUnixTimestamp64Micro(previous_page_view_timestamp) >= 1860000000
+        ) AS starts_new_session
+    FROM ordered_page_views
+
+NODE numbered_page_views
+SQL >
+    SELECT
+        *,
+        sum(starts_new_session) OVER (
+            PARTITION BY tenant_id, visitor_key
+            ORDER BY page_view_timestamp, page_view_id
+            ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS visitor_session_number
+    FROM session_boundaries
+
+NODE identified_page_sessions
+SQL >
+    SELECT
+        *,
+        hex(MD5(concat(visitor_key, '|', toString(visitor_session_number)))) AS session_id,
+        row_number() OVER (
+            PARTITION BY tenant_id, visitor_key, visitor_session_number
+            ORDER BY page_view_timestamp, page_view_id
+        ) AS first_rank,
+        row_number() OVER (
+            PARTITION BY tenant_id, visitor_key, visitor_session_number
+            ORDER BY page_view_timestamp DESC, page_view_id DESC
+        ) AS last_rank
+    FROM numbered_page_views
+
+NODE first_page_views
+SQL >
+    SELECT * FROM identified_page_sessions WHERE first_rank = 1
+
+NODE last_page_views
+SQL >
+    SELECT * FROM identified_page_sessions WHERE last_rank = 1
+
+NODE session_counts
+SQL >
+    SELECT
+        tenant_id,
+        session_id,
+        count() AS page_view_count,
+        arraySort(groupUniqArray(page_view_id)) AS source_event_ids,
+        hex(SHA256(arrayStringConcat(arraySort(groupArray(concat(formatDateTime(page_view_timestamp, '%Y-%m-%d %H:%i:%S.%f'), ':', page_view_id))), '|'))) AS visitor_history_hash
+    FROM identified_page_sessions
+    GROUP BY tenant_id, session_id
+
+NODE rebuilt_sessions
+SQL >
+    SELECT
+        first.tenant_id,
+        first.visitor_key,
+        first.session_id,
+        first.anonymous_id,
+        first.user_id,
+        first.page_view_timestamp AS session_start_timestamp,
+        last.page_view_timestamp AS session_end_timestamp,
+        intDiv(
+            toUnixTimestamp64Micro(last.page_view_timestamp) - toUnixTimestamp64Micro(first.page_view_timestamp),
+            1000000
+        ) AS session_duration_seconds,
+        counts.page_view_count,
+        first.page_view_id AS first_page_view_id,
+        first.page_url AS first_page_url,
+        first.page_host AS first_page_host,
+        first.page_path AS first_page_path,
+        first.page_path_host AS first_page_path_host,
+        last.page_view_id AS last_page_view_id,
+        last.page_url AS last_page_url,
+        last.page_path AS last_page_path,
+        first.ip_address,
+        first.user_agent,
+        first.device_platform,
+        first.device_is_mobile,
+        first.geo_city,
+        first.geo_region,
+        first.geo_region_code,
+        first.geo_country,
+        first.geo_timezone,
+        first.utm_source,
+        first.utm_medium,
+        first.utm_campaign,
+        first.utm_content,
+        first.utm_term,
+        first.utm_id,
+        first.campaign_id,
+        first.adset_id,
+        first.ad_id,
+        first.google_keyword_id,
+        first.google_keyword,
+        first.click_id,
+        first.click_id_type,
+        first.gclid,
+        first.gbraid,
+        first.wbraid,
+        first.fbclid,
+        first.ttclid,
+        first.li_fat_id,
+        first.rdt_cid,
+        first.twclid,
+        first.fbc,
+        first.fbp,
+        first.ttp,
+        first.uetsid,
+        first.uetvid,
+        first.channel_source,
+        first.channel_medium,
+        counts.source_event_ids,
+        counts.visitor_history_hash
+    FROM first_page_views AS first
+    INNER JOIN last_page_views AS last
+        ON first.tenant_id = last.tenant_id
+       AND first.session_id = last.session_id
+    INNER JOIN session_counts AS counts
+        ON first.tenant_id = counts.tenant_id
+       AND first.session_id = counts.session_id
+
+NODE resolved_rebuilt_sessions
+SQL >
+    SELECT
+        sessions.*,
+        coalesce(
+            nullIf(anonymous_profiles.profile_id, ''),
+            nullIf(user_profiles.profile_id, ''),
+            email_profiles.profile_id,
+            ''
+        ) AS profile_id
+    FROM rebuilt_sessions AS sessions
+    LEFT JOIN candidate_identity_mappings AS anonymous_profiles
+        ON sessions.tenant_id = anonymous_profiles.tenant_id
+       AND anonymous_profiles.identifier_type = 'anonymous_id'
+       AND sessions.anonymous_id = anonymous_profiles.identifier_value
+    LEFT JOIN candidate_identity_mappings AS user_profiles
+        ON sessions.tenant_id = user_profiles.tenant_id
+       AND user_profiles.identifier_type = 'user_id'
+       AND lower(sessions.user_id) = user_profiles.identifier_value
+    LEFT JOIN candidate_identity_mappings AS email_profiles
+        ON sessions.tenant_id = email_profiles.tenant_id
+       AND email_profiles.identifier_type = 'email'
+       AND lower(sessions.user_id) = email_profiles.identifier_value
+
+NODE fbclid_first_seen
+SQL >
+    SELECT
+        fbclid,
+        min(session_start_timestamp) AS first_seen_at
+    FROM (
+        SELECT existing.fbclid, existing.session_start_timestamp
+        FROM current_session_state AS existing
+        LEFT JOIN dirty_visitors AS dirty
+            ON existing.tenant_id = dirty.tenant_id
+           AND existing.visitor_key = dirty.visitor_key
+        WHERE existing.record_kind = 'touchpoint'
+          AND dirty.visitor_key = ''
+          AND existing.fbclid != ''
+
+        UNION ALL
+
+        SELECT fbclid, session_start_timestamp
+        FROM resolved_rebuilt_sessions
+        WHERE fbclid != ''
+    )
+    GROUP BY fbclid
+
+NODE replacement_touchpoints
+SQL >
+    SELECT
+        sessions.tenant_id,
+        'touchpoint' AS record_kind,
+        hex(MD5(concat(sessions.session_id, '|website_session'))) AS record_key,
+        generation.stable_batch_version AS batch_version,
+        generation.stable_batch_id AS batch_id,
+        now64(6) AS committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(sessions.session_id, ':', sessions.visitor_history_hash, ':', generation.stable_batch_id))) AS row_hash,
+        sessions.visitor_key,
+        sessions.session_id,
+        record_key AS touchpoint_id,
+        sessions.profile_id,
+        sessions.anonymous_id,
+        sessions.user_id,
+        sessions.session_start_timestamp,
+        sessions.session_end_timestamp,
+        sessions.session_duration_seconds,
+        sessions.page_view_count,
+        sessions.first_page_view_id,
+        sessions.first_page_url,
+        sessions.first_page_host,
+        sessions.first_page_path,
+        sessions.first_page_path_host,
+        sessions.last_page_view_id,
+        sessions.last_page_url,
+        sessions.last_page_path,
+        sessions.ip_address,
+        sessions.user_agent,
+        sessions.device_platform,
+        sessions.device_is_mobile,
+        sessions.geo_city,
+        sessions.geo_region,
+        sessions.geo_region_code,
+        sessions.geo_country,
+        sessions.geo_timezone,
+        sessions.utm_source,
+        sessions.utm_medium,
+        sessions.utm_campaign,
+        sessions.utm_content,
+        sessions.utm_term,
+        sessions.utm_id,
+        sessions.campaign_id,
+        sessions.adset_id,
+        sessions.ad_id,
+        sessions.google_keyword_id,
+        sessions.google_keyword,
+        sessions.click_id,
+        sessions.click_id_type,
+        sessions.gclid,
+        sessions.gbraid,
+        sessions.wbraid,
+        sessions.fbclid,
+        if(
+            sessions.fbclid = '',
+            '',
+            concat('fb.1.', toString(toUnixTimestamp64Milli(first_seen.first_seen_at)), '.', sessions.fbclid)
+        ) AS fbc_fbclid,
+        sessions.ttclid,
+        sessions.li_fat_id,
+        sessions.rdt_cid,
+        sessions.twclid,
+        sessions.fbc,
+        sessions.fbp,
+        sessions.ttp,
+        sessions.uetsid,
+        sessions.uetvid,
+        sessions.channel_source,
+        sessions.channel_medium,
+        sessions.source_event_ids,
+        sessions.visitor_history_hash
+    FROM resolved_rebuilt_sessions AS sessions
+    INNER JOIN candidate_identity_generation AS generation
+        ON sessions.tenant_id = generation.tenant_id
+    LEFT JOIN fbclid_first_seen AS first_seen
+        ON sessions.fbclid = first_seen.fbclid
+
+NODE removed_touchpoint_tombstones
+SQL >
+    SELECT
+        existing.tenant_id,
+        existing.record_kind,
+        existing.record_key,
+        generation.stable_batch_version AS batch_version,
+        generation.stable_batch_id AS batch_id,
+        now64(6) AS committed_at,
+        toUInt8(1) AS is_deleted,
+        hex(SHA256(concat('delete:', existing.record_key, ':', generation.stable_batch_id))) AS row_hash,
+        existing.visitor_key,
+        existing.session_id,
+        existing.touchpoint_id,
+        existing.profile_id,
+        existing.anonymous_id,
+        existing.user_id,
+        existing.session_start_timestamp,
+        existing.session_end_timestamp,
+        existing.session_duration_seconds,
+        existing.page_view_count,
+        existing.first_page_view_id,
+        existing.first_page_url,
+        existing.first_page_host,
+        existing.first_page_path,
+        existing.first_page_path_host,
+        existing.last_page_view_id,
+        existing.last_page_url,
+        existing.last_page_path,
+        existing.ip_address,
+        existing.user_agent,
+        existing.device_platform,
+        existing.device_is_mobile,
+        existing.geo_city,
+        existing.geo_region,
+        existing.geo_region_code,
+        existing.geo_country,
+        existing.geo_timezone,
+        existing.utm_source,
+        existing.utm_medium,
+        existing.utm_campaign,
+        existing.utm_content,
+        existing.utm_term,
+        existing.utm_id,
+        existing.campaign_id,
+        existing.adset_id,
+        existing.ad_id,
+        existing.google_keyword_id,
+        existing.google_keyword,
+        existing.click_id,
+        existing.click_id_type,
+        existing.gclid,
+        existing.gbraid,
+        existing.wbraid,
+        existing.fbclid,
+        existing.fbc_fbclid,
+        existing.ttclid,
+        existing.li_fat_id,
+        existing.rdt_cid,
+        existing.twclid,
+        existing.fbc,
+        existing.fbp,
+        existing.ttp,
+        existing.uetsid,
+        existing.uetvid,
+        existing.channel_source,
+        existing.channel_medium,
+        existing.source_event_ids,
+        existing.visitor_history_hash
+    FROM current_session_state AS existing
+    INNER JOIN dirty_visitors AS dirty
+        ON existing.tenant_id = dirty.tenant_id
+       AND existing.visitor_key = dirty.visitor_key
+    INNER JOIN candidate_identity_generation AS generation
+        ON existing.tenant_id = generation.tenant_id
+    LEFT JOIN replacement_touchpoints AS replacement
+        ON existing.tenant_id = replacement.tenant_id
+       AND existing.record_key = replacement.record_key
+    WHERE existing.record_kind = 'touchpoint'
+      AND replacement.record_key = ''
+
+NODE session_state_changes
+SQL >
+    SELECT * FROM replacement_touchpoints
+    UNION ALL
+    SELECT * FROM removed_touchpoint_tombstones
+    UNION ALL
+    SELECT
+        generation.tenant_id,
+        'batch_audit' AS record_kind,
+        concat('batch_audit:', leftPad(toString(generation.stable_batch_version), 20, '0')) AS record_key,
+        generation.stable_batch_version AS batch_version,
+        generation.stable_batch_id AS batch_id,
+        now64(6) AS committed_at,
+        toUInt8(0) AS is_deleted,
+        hex(SHA256(concat(generation.stable_batch_id, ':session_replay'))) AS row_hash,
+        '' AS visitor_key,
+        '' AS session_id,
+        '' AS touchpoint_id,
+        '' AS profile_id,
+        '' AS anonymous_id,
+        '' AS user_id,
+        toDateTime64(0, 6) AS session_start_timestamp,
+        toDateTime64(0, 6) AS session_end_timestamp,
+        toInt64(0) AS session_duration_seconds,
+        toUInt64(0) AS page_view_count,
+        '' AS first_page_view_id,
+        '' AS first_page_url,
+        '' AS first_page_host,
+        '' AS first_page_path,
+        '' AS first_page_path_host,
+        '' AS last_page_view_id,
+        '' AS last_page_url,
+        '' AS last_page_path,
+        '' AS ip_address,
+        '' AS user_agent,
+        '' AS device_platform,
+        toUInt8(0) AS device_is_mobile,
+        '' AS geo_city,
+        '' AS geo_region,
+        '' AS geo_region_code,
+        '' AS geo_country,
+        '' AS geo_timezone,
+        '' AS utm_source,
+        '' AS utm_medium,
+        '' AS utm_campaign,
+        '' AS utm_content,
+        '' AS utm_term,
+        '' AS utm_id,
+        '' AS campaign_id,
+        '' AS adset_id,
+        '' AS ad_id,
+        '' AS google_keyword_id,
+        '' AS google_keyword,
+        '' AS click_id,
+        '' AS click_id_type,
+        '' AS gclid,
+        '' AS gbraid,
+        '' AS wbraid,
+        '' AS fbclid,
+        '' AS fbc_fbclid,
+        '' AS ttclid,
+        '' AS li_fat_id,
+        '' AS rdt_cid,
+        '' AS twclid,
+        '' AS fbc,
+        '' AS fbp,
+        '' AS ttp,
+        '' AS uetsid,
+        '' AS uetvid,
+        '' AS channel_source,
+        '' AS channel_medium,
+        CAST([], 'Array(String)') AS source_event_ids,
+        hex(SHA256(concat(generation.stable_batch_id, ':session_replay'))) AS visitor_history_hash
+    FROM candidate_identity_generation AS generation
+    INNER JOIN session_checkpoint AS checkpoint
+        ON generation.tenant_id = checkpoint.tenant_id
+
+TYPE COPY
+TARGET_DATASOURCE session_state_versions
+COPY_SCHEDULE 2,12,22,32,42,52 * * * *
+COPY_MODE append

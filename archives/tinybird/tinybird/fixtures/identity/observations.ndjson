@@ -1,0 +1,8 @@
+{"observation_id":"gmail-alias","observed_at":"2026-01-01T00:00:00.000001Z","anonymous_id":" anon-alpha ","user_id":"USER-ALPHA","email":"Boom.Identity.Test+promo@GoogleMail.com","phone":"+1 (212) 234-5678","first_name":"Alpha","last_name":"Example"}
+{"observation_id":"gmail-canonical","observed_at":"2026-01-01T00:01:00.000002Z","anonymous_id":"anon-beta","user_id":"","email":"boomidentitytest@gmail.com","phone":"","first_name":"","last_name":""}
+{"observation_id":"separate-component","observed_at":"2026-01-01T00:02:00.000003Z","anonymous_id":"anon-gamma","user_id":"bridge-user","email":"separate.component@example.test","phone":"","first_name":"Gamma","last_name":"Example"}
+{"observation_id":"optional-bridge","observed_at":"2026-01-01T00:03:00.000004Z","anonymous_id":"anon-beta","user_id":"BRIDGE-USER","email":"","phone":"","first_name":"","last_name":"","optional_bridge":true}
+{"observation_id":"invalid-555","observed_at":"2026-01-01T00:04:00.000005Z","anonymous_id":"anon-invalid-555","user_id":"","email":"","phone":"202-555-0123","first_name":"","last_name":""}
+{"observation_id":"invalid-repeated","observed_at":"2026-01-01T00:05:00.000006Z","anonymous_id":"anon-invalid-repeated","user_id":"","email":"","phone":"212-222-2222","first_name":"","last_name":""}
+{"observation_id":"invalid-sequential","observed_at":"2026-01-01T00:06:00.000007Z","anonymous_id":"anon-invalid-sequential","user_id":"","email":"","phone":"123-456-7890","first_name":"","last_name":""}
+{"observation_id":"click-policy","observed_at":"2026-01-01T00:07:00.000008Z","anonymous_id":"anon-click","user_id":"","email":"","phone":"","fbclid":"synthetic-fbclid","gclid":"synthetic-gclid","first_name":"","last_name":""}

@@ -1,0 +1,116 @@
+{
+  "url_parameters": [
+    {
+      "url": "https://example.invalid/page?utm_source=meta%20paid&utm_medium=cpc",
+      "name": "utm_source",
+      "expected": "meta%20paid"
+    },
+    {
+      "url": "https://example.invalid/page?utm_source=meta+paid",
+      "name": "utm_source",
+      "expected": "meta+paid"
+    },
+    {
+      "url": "https://example.invalid/page?utm_source=first&utm_source=second",
+      "name": "utm_source",
+      "expected": "first"
+    },
+    {
+      "url": "https://example.invalid/page?utm_source=a=b&utm_medium=cpc",
+      "name": "utm_source",
+      "expected": "a"
+    },
+    {
+      "url": "https://example.invalid/page?utm_medium=cpc",
+      "name": "utm_source",
+      "expected": null
+    }
+  ],
+  "half_open_range": {
+    "start": "2026-08-01T10:00:00-07:00",
+    "end": "2026-08-02T10:00:00-07:00",
+    "cases": [
+      ["2026-08-01T09:59:59-07:00", false],
+      ["2026-08-01T10:00:00-07:00", true],
+      ["2026-08-02T09:59:59-07:00", true],
+      ["2026-08-02T10:00:00-07:00", false]
+    ]
+  },
+  "strict_dates": [
+    ["2026-08-01T10:00", true],
+    ["2024-02-29T23:59", true],
+    ["2026-02-29T10:00", false],
+    ["2026-04-31T10:00", false],
+    ["not-a-date", false]
+  ],
+  "generation_lifecycle": {
+    "queryable": [
+      { "version": 1, "activated_at": "2026-08-01T00:00:00Z", "status": "validated" },
+      { "version": 2, "activated_at": "2026-08-02T00:00:00Z", "status": "validated" }
+    ],
+    "revoked": [
+      { "version": 1, "activated_at": "2026-08-01T00:00:00Z", "status": "validated" },
+      { "version": 2, "activated_at": "2026-08-02T00:00:00Z", "status": "revoked" }
+    ]
+  },
+  "null_event_ids": [
+    { "event_kind": "client_form", "source_row_id": null, "source_priority": 1, "source_version": 1 },
+    { "event_kind": "client_form", "source_row_id": null, "source_priority": 3, "source_version": 2 },
+    { "event_kind": "client_order", "source_row_id": null, "source_priority": 2, "source_version": 1 }
+  ],
+  "registrations": [
+    { "registration_id": "registration-earlier", "submitted_at": "2026-08-01T09:00:00-07:00" },
+    { "registration_id": "registration-applicable", "submitted_at": "2026-08-03T09:00:00-07:00" },
+    { "registration_id": "registration-after-payment", "submitted_at": "2026-08-05T09:00:00-07:00" }
+  ],
+  "payments": [
+    {
+      "payment_id": "refunded-vip",
+      "payment_time": "2026-08-03T10:00:00-07:00",
+      "product_rule": "structured_basic_vip",
+      "payment_category": "vip",
+      "is_repeat_payment": false,
+      "net_amount": -47
+    },
+    {
+      "payment_id": "threshold-equal",
+      "payment_time": "2026-08-04T08:00:00-07:00",
+      "product_rule": "mentorship_deposit",
+      "payment_category": "mentorship",
+      "is_repeat_payment": false,
+      "net_amount": 900
+    },
+    {
+      "payment_id": "first-qualifying-5k",
+      "payment_time": "2026-08-04T09:00:00-07:00",
+      "product_rule": "mentorship_full_payment",
+      "payment_category": "mentorship",
+      "is_repeat_payment": false,
+      "net_amount": 901
+    },
+    {
+      "payment_id": "later-qualifying-5k",
+      "payment_time": "2026-08-04T10:00:00-07:00",
+      "product_rule": "mentorship_full_payment",
+      "payment_category": "mentorship",
+      "is_repeat_payment": false,
+      "net_amount": 5994
+    }
+  ],
+  "touchpoints": [
+    { "touchpoint_id": "paid-before", "timestamp": "2026-08-03T08:00:00-07:00", "source": "meta", "medium": "paid" },
+    { "touchpoint_id": "paid-at-registration", "timestamp": "2026-08-03T09:00:00-07:00", "source": "meta", "medium": "paid" },
+    { "touchpoint_id": "stored-click-only", "timestamp": "2026-08-03T07:00:00-07:00", "source": "meta", "medium": "social", "fbclid": "synthetic-click-id" }
+  ],
+  "daily_delivery": {
+    "rows": [
+      { "date": "2026-08-01", "key": "campaign:one", "level": "campaign", "reach": 100, "frequency": 1.5 },
+      { "date": "2026-08-02", "key": "campaign:one", "level": "campaign", "reach": 200, "frequency": 2.5 },
+      { "date": "2026-08-01", "key": "ad:one", "level": "ad", "reach": 40, "frequency": 1.25 }
+    ],
+    "expected": {
+      "campaign:one": { "reach": 150, "frequency": 2 },
+      "ad:one": { "reach": 20, "frequency": 0.625 }
+    }
+  }
+}

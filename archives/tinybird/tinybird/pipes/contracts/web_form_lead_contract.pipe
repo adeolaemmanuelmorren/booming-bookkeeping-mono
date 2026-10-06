@@ -1,0 +1,24 @@
+DESCRIPTION >
+    Client-side web forms projected into the reusable lead-evidence contract.
+
+NODE web_form_lead_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        report_generation,
+        tenant_id,
+        source_system AS source_connection_id,
+        source_row_id AS lead_id,
+        CAST(NULL AS Nullable(String)) AS contact_id,
+        email,
+        phone,
+        first_name,
+        CAST(NULL AS Nullable(String)) AS last_name,
+        observed_at AS occurred_at,
+        'client_form' AS lead_type,
+        form_id,
+        form_name,
+        source_system,
+        source_version
+    FROM web_conversion_adapter
+    WHERE event_kind = 'client_form'

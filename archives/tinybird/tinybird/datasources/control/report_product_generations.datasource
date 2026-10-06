@@ -1,0 +1,25 @@
+DESCRIPTION >
+    Publication journal for complete report generations. Endpoints select one validated
+    active generation, keeping partially built shadow generations unreadable.
+
+SCHEMA >
+    `tenant_id` LowCardinality(String) `json:$.tenant_id`,
+    `report_generation` String `json:$.report_generation`,
+    `source_generation_id` String `json:$.source_generation_id`,
+    `identity_stable_batch_version` UInt64 `json:$.identity_stable_batch_version`,
+    `attribution_stable_generation` String `json:$.attribution_stable_generation`,
+    `semantic_policy_version` String `json:$.semantic_policy_version`,
+    `policy_digest` FixedString(64) `json:$.policy_digest`,
+    `source_manifest_version` UInt64 `json:$.source_manifest_version`,
+    `source_manifest_digest` String `json:$.source_manifest_digest`,
+    `connection_inventory_digest` FixedString(64) `json:$.connection_inventory_digest`,
+    `cutoff_set_digest` FixedString(64) `json:$.cutoff_set_digest`,
+    `build_digest` FixedString(64) `json:$.build_digest`,
+    `pending_input_digest` String `json:$.pending_input_digest`,
+    `validation_status` LowCardinality(String) `json:$.validation_status`,
+    `is_active` UInt8 `json:$.is_active`,
+    `activated_at` DateTime64(6) `json:$.activated_at`,
+    `version` UInt64 `json:$.version`
+
+ENGINE "MergeTree"
+ENGINE_SORTING_KEY "tenant_id, report_generation, version"

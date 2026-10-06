@@ -1,0 +1,8 @@
+- name: pinned_pacific_completed_hour_window
+  description: Covers the pinned generation and Pacific Monday-at-10 report-window boundary.
+  parameters: 'p_report_generation=fixture-generation'
+  expected_result: ''
+- name: revoked_generation_returns_no_window
+  description: A later revoked lifecycle row must defeat an older validated row for the same pin.
+  parameters: 'p_report_generation=fixture-revoked-generation'
+  expected_result: ''

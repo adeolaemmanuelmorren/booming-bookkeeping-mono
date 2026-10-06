@@ -1,0 +1,23 @@
+DESCRIPTION >
+    Jitsu logical-fact tombstones projected into the canonical identity contract.
+
+NODE jitsu_tombstone_identity_contract_rows
+SQL >
+    SELECT
+        source_generation_id,
+        tenant_id,
+        'jitsu_events_api' AS source_connection_id,
+        concat('jitsu_events_api:', event_kind) AS source_system,
+        message_id AS source_record_id,
+        observed_at AS source_version,
+        ingested_at AS source_changed_at,
+        observed_at,
+        anonymous_id,
+        user_id,
+        email,
+        phone,
+        first_name,
+        last_name,
+        source_deleted
+    FROM jitsu_events_api_current_versions
+    WHERE source_deleted = 1

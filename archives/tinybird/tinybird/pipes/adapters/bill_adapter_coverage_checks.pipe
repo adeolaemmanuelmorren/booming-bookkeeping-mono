@@ -1,0 +1,431 @@
+DESCRIPTION >
+    Named adapter checks for the current source candidate. This pipe touches every required
+    contract; its on-demand Copy records the result before any report product can build.
+
+NODE web_conversion_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_conversion_adapter' AS adapter_id,
+        'client_conversion_v1' AS contract_name,
+        'unique_current_event_grain' AS validation_name,
+        toUInt64(
+            countIf(observed_at IS NULL)
+            + count()
+            - uniqExact(tuple(event_kind, source_row_id))
+        ) AS invalid_row_count
+    FROM web_conversion_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE web_page_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_page_view_adapter' AS adapter_id,
+        'page_view_v1' AS contract_name,
+        'unique_current_page_grain' AS validation_name,
+        toUInt64(
+            countIf(page_view_timestamp IS NULL)
+            + count()
+            - uniqExact(page_view_id)
+        ) AS invalid_row_count
+    FROM web_page_view_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE web_identity_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'web_identity_observation_adapter' AS adapter_id,
+        'identity_observation_v1' AS contract_name,
+        'unique_current_identity_grain' AS validation_name,
+        toUInt64(
+            countIf(observed_at IS NULL)
+            + count()
+            - uniqExact(observation_id)
+        ) AS invalid_row_count
+    FROM web_identity_observation_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE activecampaign_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'activecampaign_registration_adapter' AS adapter_id,
+        'lead_evidence_v1' AS contract_name,
+        'unique_registration_assignment_grain' AS validation_name,
+        toUInt64(
+            countIf(submitted_at IS NULL OR registration_type NOT IN ('krc', 'webinar'))
+            + count()
+            - uniqExact(registration_id)
+        ) AS invalid_row_count
+    FROM activecampaign_registration_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE jitsu_events_api_sequence_integrity
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.producer_id,
+        source.producer_sequence,
+        any(source.message_id) AS message_id,
+        any(source.delivery_event_id) AS delivery_event_id,
+        toInt64(uniqExact(source.delivery_event_id)) AS delivery_event_id_count,
+        toInt64(uniqExact(source.payload_hash)) AS payload_version_count,
+        toInt64(uniqExact(source.message_id)) AS message_id_count,
+        toInt64(countIf(
+                producer_id = ''
+                OR producer_sequence = 0
+                OR delivery_event_id = ''
+                OR message_id = ''
+                OR empty(payload_hash)
+                OR source_fact_version = 0
+                OR source_fact_version != toUInt64(toUnixTimestamp64Micro(ingested_at))
+                OR source_deleted NOT IN (0, 1)
+                OR empty(fact_payload_hash)
+            )) AS invalid_field_count
+    FROM jitsu_events_api_observations AS source
+    CROSS JOIN current_source_generation AS generation
+    WHERE source.tenant_id = generation.tenant_id
+      AND source.ingested_at <= generation.jitsu_event_cutoff
+    GROUP BY
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.producer_id,
+        source.producer_sequence
+
+NODE jitsu_events_api_producer_integrity
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        producer_id,
+        sum(invalid_field_count)
+            + sum(greatest(delivery_event_id_count - 1, 0))
+            + sum(greatest(payload_version_count - 1, 0))
+            + sum(greatest(message_id_count - 1, 0))
+            + greatest(toInt64(min(producer_sequence)) - 1, 0)
+            + greatest(
+                toInt64(max(producer_sequence))
+                - toInt64(min(producer_sequence))
+                + 1
+                - toInt64(uniqExact(producer_sequence)),
+                0
+            ) AS producer_invalid_row_count
+    FROM jitsu_events_api_sequence_integrity
+    GROUP BY tenant_id, source_generation_id, producer_id
+
+NODE jitsu_events_api_delivery_integrity
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.producer_id,
+        source.delivery_event_id,
+        greatest(toInt64(uniqExact(source.producer_sequence)) - 1, 0)
+            + greatest(toInt64(uniqExact(source.payload_hash)) - 1, 0)
+            AS delivery_invalid_row_count
+    FROM jitsu_events_api_observations AS source
+    INNER JOIN current_source_generation AS generation
+        ON source.tenant_id = generation.tenant_id
+       AND source.ingested_at <= generation.jitsu_event_cutoff
+    GROUP BY
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.producer_id,
+        source.delivery_event_id
+
+NODE jitsu_events_api_logical_version_integrity
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.message_id,
+        source.source_fact_version,
+        greatest(
+            toInt64(uniqExact(tuple(source.payload_hash, source.source_deleted))) - 1,
+            0
+        ) AS logical_version_invalid_row_count
+    FROM jitsu_events_api_observations AS source
+    INNER JOIN current_source_generation AS generation
+        ON source.tenant_id = generation.tenant_id
+       AND source.ingested_at <= generation.jitsu_event_cutoff
+    GROUP BY
+        generation.tenant_id,
+        generation.source_generation_id,
+        source.message_id,
+        source.source_fact_version
+
+NODE jitsu_events_api_integrity_failures
+SQL >
+    SELECT
+        tenant_id,
+        source_generation_id,
+        producer_invalid_row_count AS invalid_row_count
+    FROM jitsu_events_api_producer_integrity
+    UNION ALL
+    SELECT
+        tenant_id,
+        source_generation_id,
+        logical_version_invalid_row_count AS invalid_row_count
+    FROM jitsu_events_api_logical_version_integrity
+
+    UNION ALL
+
+    SELECT
+        tenant_id,
+        source_generation_id,
+        delivery_invalid_row_count AS invalid_row_count
+    FROM jitsu_events_api_delivery_integrity
+
+NODE jitsu_events_api_ingress_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'jitsu_events_api_observations' AS adapter_id,
+        'durable_ingress_v1' AS contract_name,
+        'gap_free_immutable_producer_delivery' AS validation_name,
+        toUInt64(coalesce(sum(greatest(failures.invalid_row_count, 0)), 0)) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN jitsu_events_api_integrity_failures AS failures
+        ON generation.tenant_id = failures.tenant_id
+       AND generation.source_generation_id = failures.source_generation_id
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE primary_payment_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'stripe_primary_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'successful_payment_contract' AS validation_name,
+        toUInt64(
+            countIf(
+                payment_time IS NULL
+                OR amount_paid < 0
+                OR refund_amount < 0
+                OR net_amount != amount_paid - refund_amount
+            )
+            + count()
+            - uniqExact(payment_id)
+        ) AS invalid_row_count
+    FROM stripe_primary_payment_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE kajabi_payment_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'stripe_kajabi_payment_adapter' AS adapter_id,
+        'boom_classified_payment_v1' AS contract_name,
+        'successful_payment_contract' AS validation_name,
+        toUInt64(
+            countIf(
+                payment_time IS NULL
+                OR amount_paid < 0
+                OR refund_amount < 0
+                OR net_amount != amount_paid - refund_amount
+                OR payment_category != 'kajabi'
+            )
+            + count()
+            - uniqExact(payment_id)
+        ) AS invalid_row_count
+    FROM stripe_kajabi_payment_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE meta_hourly_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'meta_hourly_delivery_adapter' AS adapter_id,
+        'ad_delivery_hourly_v1' AS contract_name,
+        'hourly_ad_grain_and_required_fields' AS validation_name,
+        toUInt64(
+            countIf(hour_start IS NULL OR account_id IS NULL OR ad_id IS NULL OR spend < 0)
+            + count()
+            - uniqExact(tuple(hour_start, account_id, ad_id))
+        ) AS invalid_row_count
+    FROM meta_hourly_delivery_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE meta_daily_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'meta_daily_delivery_adapter' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'daily_own_level_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                date IS NULL
+                OR level NOT IN ('campaign', 'adset', 'ad')
+                OR campaign_id IS NULL
+                OR (level = 'adset' AND adset_id IS NULL)
+                OR (level = 'ad' AND (adset_id IS NULL OR ad_id IS NULL))
+                OR reach < 0
+            )
+            + count()
+            - uniqExact(tuple(date, level, account_id, campaign_id, adset_id, ad_id))
+        ) AS invalid_row_count
+    FROM meta_daily_delivery_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE google_dependency_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'google_ad_row_presence_adapter' AS adapter_id,
+        'ad_delivery_daily_v1' AS contract_name,
+        'google_dependency_row_grain' AS validation_name,
+        toUInt64(
+            countIf(date IS NULL OR account_id IS NULL OR campaign_id IS NULL OR adset_id IS NULL OR ad_id IS NULL)
+            + count()
+            - uniqExact(tuple(date, account_id, campaign_id, adset_id, ad_id))
+        ) AS invalid_row_count
+    FROM google_ad_row_presence_adapter
+    CROSS JOIN current_source_generation AS generation
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE manual_link_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'manual_payment_profile_link_adapter' AS adapter_id,
+        'manual_profile_link_v1' AS contract_name,
+        'latest_payment_override_grain' AS validation_name,
+        toUInt64(
+            countIf(
+                manual.payment_id IS NULL
+                OR manual.manual_profile_id IS NULL
+                OR manual.source_connection_id = ''
+                OR manual.source_connection_count != 1
+            )
+            + countIf(
+                manual.manual_profile_id IS NOT NULL
+                AND (
+                    resolution.resolved_profile_id = ''
+                    OR resolution.resolution_target_count != 1
+                )
+            )
+            + count()
+            - uniqExact(tuple(manual.source_connection_id, manual.payment_id))
+        ) AS invalid_row_count
+    FROM manual_payment_profile_link_adapter AS manual
+    CROSS JOIN current_source_generation AS generation
+    LEFT JOIN pinned_profile_id_resolutions AS resolution
+        ON manual.tenant_id = resolution.tenant_id
+       AND manual.source_generation_id = resolution.source_generation_id
+       AND manual.manual_profile_id = resolution.input_profile_id
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE identity_reader_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'pinned_identity_mappings' AS adapter_id,
+        'identity_state_v1' AS contract_name,
+        'candidate_identity_batch_audit' AS validation_name,
+        toUInt64(countIf(audit.batch_version = generation.identity_stable_batch_version) = 0) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN identity_state_versions AS audit
+        ON audit.tenant_id = generation.tenant_id
+       AND audit.state_kind = 'batch_audit'
+       AND audit.is_deleted = 0
+       AND audit.batch_version = generation.identity_stable_batch_version
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE session_reader_coverage_check
+SQL >
+    SELECT
+        generation.tenant_id,
+        generation.source_generation_id,
+        'pinned_session_touchpoints' AS adapter_id,
+        'session_state_v1' AS contract_name,
+        'candidate_session_batch_audit' AS validation_name,
+        toUInt64(countIf(audit.batch_version = generation.identity_stable_batch_version) = 0) AS invalid_row_count
+    FROM current_source_generation AS generation
+    LEFT JOIN session_state_versions AS audit
+        ON audit.tenant_id = generation.tenant_id
+       AND audit.record_kind = 'batch_audit'
+       AND audit.is_deleted = 0
+       AND audit.batch_version = generation.identity_stable_batch_version
+    GROUP BY generation.tenant_id, generation.source_generation_id
+
+NODE all_bill_adapter_coverage_checks
+SQL >
+    SELECT * FROM registered_contract_coverage_checks
+    UNION ALL SELECT * FROM source_generation_cutoff_coverage_check
+    UNION ALL SELECT * FROM web_conversion_coverage_check
+    UNION ALL SELECT * FROM web_page_coverage_check
+    UNION ALL SELECT * FROM web_identity_coverage_check
+    UNION ALL SELECT * FROM jitsu_events_api_ingress_coverage_check
+    UNION ALL SELECT * FROM activecampaign_coverage_check
+    UNION ALL SELECT * FROM primary_payment_coverage_check
+    UNION ALL SELECT * FROM kajabi_payment_coverage_check
+    UNION ALL SELECT * FROM meta_hourly_coverage_check
+    UNION ALL SELECT * FROM meta_daily_coverage_check
+    UNION ALL SELECT * FROM google_dependency_coverage_check
+    UNION ALL SELECT * FROM manual_link_coverage_check
+    UNION ALL SELECT * FROM identity_reader_coverage_check
+    UNION ALL SELECT * FROM session_reader_coverage_check
+
+NODE bill_adapter_validation_records
+SQL >
+    SELECT
+        checks.tenant_id,
+        checks.source_generation_id,
+        generation.version AS source_manifest_version,
+        generation.source_manifest_digest,
+        generation.connection_inventory_digest,
+        cutoff_readiness.cutoff_set_digest,
+        checks.adapter_id,
+        checks.contract_name,
+        checks.validation_name,
+        toUInt8(checks.invalid_row_count = 0) AS is_covered,
+        checks.invalid_row_count,
+        if(
+            checks.invalid_row_count = 0,
+            '',
+            concat(
+                checks.adapter_id,
+                ':',
+                checks.validation_name,
+                ' has ',
+                toString(checks.invalid_row_count),
+                ' invalid rows'
+            )
+        ) AS blocking_reason,
+        now64(6) AS checked_at,
+        toUInt64(toUnixTimestamp64Micro(now64(6))) AS version
+    FROM all_bill_adapter_coverage_checks AS checks
+    INNER JOIN current_source_generation AS generation
+        ON checks.tenant_id = generation.tenant_id
+       AND checks.source_generation_id = generation.source_generation_id
+    INNER JOIN source_generation_cutoff_readiness AS cutoff_readiness
+       ON generation.tenant_id = cutoff_readiness.tenant_id
+       AND generation.source_generation_id = cutoff_readiness.source_generation_id
+       AND generation.version = cutoff_readiness.source_manifest_version
+       AND generation.source_manifest_digest = cutoff_readiness.source_manifest_digest
+       AND generation.connection_inventory_digest = cutoff_readiness.connection_inventory_digest
+       AND cutoff_readiness.is_ready = 1

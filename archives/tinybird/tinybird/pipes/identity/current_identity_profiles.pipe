@@ -1,0 +1,24 @@
+DESCRIPTION >
+    Current resolved profiles from the versioned journal.
+
+NODE live_profile_rows
+SQL >
+    SELECT
+        tenant_id,
+        profile_id,
+        profile_key,
+        winner_identifier_key,
+        member_identifier_keys,
+        anonymous_ids,
+        user_ids,
+        emails,
+        phones,
+        historical_profile_ids,
+        first_name,
+        last_name,
+        first_seen_at,
+        last_seen_at,
+        batch_version,
+        committed_at
+    FROM current_identity_state
+    WHERE state_kind = 'profile'

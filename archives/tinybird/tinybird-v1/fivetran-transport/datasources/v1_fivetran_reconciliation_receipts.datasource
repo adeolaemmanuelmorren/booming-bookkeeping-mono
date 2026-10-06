@@ -1,0 +1,15 @@
+DESCRIPTION >
+    Completed six-shard ActiveCampaign tombstone reconciliation cycles.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `receipt_key` String `json:$.receipt_key`,
+    `complete_through_exclusive` DateTime64(3) `json:$.complete_through_exclusive`,
+    `source_count` UInt8 `json:$.source_count`,
+    `shard_count` UInt8 `json:$.shard_count`,
+    `manifest_json` String `json:$.manifest_json`,
+    `verified_at` DateTime64(3) `json:$.verified_at`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, receipt_key"
+ENGINE_VER "verified_at"

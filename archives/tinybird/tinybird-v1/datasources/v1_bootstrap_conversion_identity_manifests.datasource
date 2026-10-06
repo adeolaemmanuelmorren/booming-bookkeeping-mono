@@ -1,0 +1,14 @@
+DESCRIPTION >
+    Sealed count and ordered hash for one conversion identity snapshot.
+
+SCHEMA >
+    `tenant_id` String `json:$.tenant_id`,
+    `snapshot_id` String `json:$.snapshot_id`,
+    `snapshot_at` DateTime64(6) `json:$.snapshot_at`,
+    `expected_distinct_fact_count` UInt64 `json:$.expected_distinct_fact_count`,
+    `canonical_hash` FixedString(64) `json:$.canonical_hash`,
+    `sealed_at` DateTime64(6) `json:$.sealed_at`
+
+ENGINE "ReplacingMergeTree"
+ENGINE_SORTING_KEY "tenant_id, snapshot_id"
+ENGINE_VER "sealed_at"
