@@ -1,0 +1,310 @@
+{
+  "checkedAt": "2026-10-15T02:27:58.677Z",
+  "base": "https://boom-operations-api-943586541190.us-central1.run.app",
+  "results": [
+    {
+      "path": "/v1/status",
+      "status": 401,
+      "keys": [
+        "error"
+      ]
+    },
+    {
+      "path": "/health",
+      "status": 200,
+      "keys": [
+        "status"
+      ]
+    },
+    {
+      "path": "/v1",
+      "status": 200,
+      "keys": [
+        "service",
+        "routes"
+      ]
+    },
+    {
+      "path": "/v1/status",
+      "status": 200,
+      "keys": [
+        "status",
+        "checkedAt",
+        "checks"
+      ]
+    },
+    {
+      "path": "/v1/dataform/invocations",
+      "status": 200,
+      "keys": [
+        "workflowInvocations",
+        "nextPageToken"
+      ]
+    },
+    {
+      "path": "/v1/dataform/invocations",
+      "status": 200,
+      "keys": [
+        "workflowInvocations",
+        "nextPageToken"
+      ]
+    },
+    {
+      "path": "/v1/dataform/invocations/1792030858-57123f58-d775-474e-827f-452268d3830b",
+      "status": 200,
+      "keys": [
+        "name",
+        "invocationConfig",
+        "state",
+        "invocationTiming",
+        "workflowConfig",
+        "resolvedCompilationResult",
+        "internalMetadata",
+        "privateResourceMetadata"
+      ]
+    },
+    {
+      "path": "/v1/dataform/compilations/e00877f2-de79-4788-8a34-9e22a448bdb9",
+      "status": 200,
+      "keys": [
+        "name",
+        "codeCompilationConfig",
+        "dataformCoreVersion",
+        "releaseConfig",
+        "resolvedGitCommitSha",
+        "createTime",
+        "internalMetadata",
+        "privateResourceMetadata"
+      ]
+    },
+    {
+      "path": "/v1/dataform/invocations/1792030858-57123f58-d775-474e-827f-452268d3830b/actions",
+      "status": 200,
+      "keys": [
+        "workflowInvocationActions"
+      ]
+    },
+    {
+      "path": "/v1/dataform/workflows",
+      "status": 200,
+      "keys": [
+        "workflowConfigs"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/datasets",
+      "status": 200,
+      "keys": [
+        "projectId",
+        "datasets"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/datasets/booming_data_analytics/tables",
+      "status": 200,
+      "keys": [
+        "dataset",
+        "tables",
+        "nextPageToken"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/datasets/booming_data_analytics/tables/stg_facebook_ads",
+      "status": 200,
+      "keys": [
+        "kind",
+        "etag",
+        "id",
+        "selfLink",
+        "tableReference",
+        "description",
+        "schema",
+        "numBytes",
+        "numLongTermBytes",
+        "numRows",
+        "creationTime",
+        "lastModifiedTime",
+        "type",
+        "location",
+        "clustering",
+        "numTimeTravelPhysicalBytes",
+        "numTotalLogicalBytes",
+        "numActiveLogicalBytes",
+        "numLongTermLogicalBytes",
+        "numTotalPhysicalBytes",
+        "numActivePhysicalBytes",
+        "numLongTermPhysicalBytes",
+        "numCurrentPhysicalBytes"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/datasets/booming_data_analytics/tables/stg_facebook_ads/rows",
+      "status": 200,
+      "keys": [
+        "jobId",
+        "rows",
+        "totalRows",
+        "nextPageToken",
+        "maximumBytesBilled"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/query",
+      "status": 200,
+      "keys": [
+        "jobId",
+        "rows",
+        "totalRows",
+        "nextPageToken",
+        "maximumBytesBilled"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/query/boom_health_9b7ff70b-133d-473b-a1ed-343b3aa52e3b",
+      "status": 200,
+      "keys": [
+        "jobId",
+        "rows",
+        "totalRows",
+        "nextPageToken",
+        "maximumBytesBilled"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/query",
+      "status": 403,
+      "keys": [
+        "error",
+        "requestId"
+      ]
+    },
+    {
+      "path": "/v1/bigquery/datasets/airbyte_internal/tables",
+      "status": 403,
+      "keys": [
+        "error",
+        "requestId"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/workspace",
+      "status": 200,
+      "keys": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "name",
+        "deleted",
+        "slug",
+        "featuresEnabled",
+        "oidcLoginGroups"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/connections",
+      "status": 200,
+      "keys": [
+        "connections"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/metrics",
+      "status": 200,
+      "keys": [
+        "format",
+        "text"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/invocations",
+      "status": 200,
+      "keys": [
+        "workspaceId",
+        "type",
+        "records",
+        "limit",
+        "note"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/deliveries",
+      "status": 200,
+      "keys": [
+        "workspaceId",
+        "type",
+        "records",
+        "limit",
+        "note"
+      ]
+    },
+    {
+      "path": "/v1/jitsu/deliveries",
+      "status": 200,
+      "keys": [
+        "workspaceId",
+        "type",
+        "records",
+        "limit",
+        "note"
+      ]
+    },
+    {
+      "path": "/v1/meta/account",
+      "status": 200,
+      "keys": [
+        "id",
+        "name",
+        "account_status",
+        "currency",
+        "timezone_name",
+        "disable_reason"
+      ]
+    },
+    {
+      "path": "/v1/meta/insights",
+      "status": 200,
+      "keys": [
+        "data",
+        "paging"
+      ]
+    },
+    {
+      "path": "/v1/meta/reconciliation",
+      "status": 200,
+      "keys": [
+        "status",
+        "checkedAt",
+        "mismatchCount",
+        "differences",
+        "truncated",
+        "note"
+      ]
+    }
+  ],
+  "providerStatus": {
+    "dataform": "ok",
+    "bigquery": "ok",
+    "jitsu": "ok",
+    "meta": "ok",
+    "metaReconciliation": "warning"
+  },
+  "dataformFailures": [],
+  "dataformVerification": {
+    "checkedAt": "2026-10-15T02:27:28.713Z",
+    "run": "projects/able-folio-499722/locations/us-central1/repositories/dataform/workflowInvocations/1792030858-57123f58-d775-474e-827f-452268d3830b",
+    "state": "SUCCEEDED",
+    "timing": {
+      "startTime": "2026-10-15T02:20:58.337205Z",
+      "endTime": "2026-10-15T02:27:16.269202216Z"
+    },
+    "states": {
+      "SUCCEEDED": 187
+    },
+    "failures": [],
+    "removedAssertionPresent": false
+  },
+  "metaReconciliation": {
+    "status": "warning",
+    "mismatchCount": 21
+  }
+}
