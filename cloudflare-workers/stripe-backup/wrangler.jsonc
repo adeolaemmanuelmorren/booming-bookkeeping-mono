@@ -1,0 +1,24 @@
+{
+  "name": "boom-stripe-backup",
+  "main": "src/index.js",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "compatibility_date": "2026-11-17",
+  "workers_dev": false,
+  "observability": { "enabled": true },
+  "vars": {
+    "WAREHOUSE_URL": "https://boom-stripe-backup-receiver-943586541190.us-central1.run.app",
+    "START_AT": "2026-11-16T00:00:00Z",
+    "ENABLED": "true"
+  },
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "services": [{
+    "binding": "STRIPE_SOURCE",
+    "service": "boom-bookkeeping-segment-proxy",
+    "entrypoint": "StripeSource"
+  }],
+  "workflows": [{
+    "binding": "STRIPE_BACKUP",
+    "name": "boom-stripe-backup",
+    "class_name": "StripeBackup"
+  }]
+}

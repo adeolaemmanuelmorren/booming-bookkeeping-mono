@@ -1,0 +1,8 @@
+{
+  "name": "stripe-backup-receiver",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "node src/index.js", "test": "node --test test/*.test.js" },
+  "dependencies": { "@google-cloud/bigquery": "8.1.1" },
+  "engines": { "node": ">=22" }
+}

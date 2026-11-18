@@ -1,0 +1,125 @@
+{
+  "checkedAt": "2026-11-18T03:49:49.946Z",
+  "activation": "enabled",
+  "productionDataform": {
+    "commit": "a6a5a4e5c3bff38726e0e4550faf93a3928ca450",
+    "state": "SUCCEEDED",
+    "compilation": "projects/able-folio-499722/locations/us-central1/repositories/dataform/compilationResults/c8ba7e90-0421-4b33-9973-4324cf5341ac",
+    "invocation": "projects/able-folio-499722/locations/us-central1/repositories/dataform/workflowInvocations/1794973381-6ca28737-a952-4b27-92f5-b81c0230b4c9",
+    "actionsPassed": 212,
+    "assertionsPassed": 84
+  },
+  "unitTests": {
+    "worker": 5,
+    "receiver": 2,
+    "passed": true
+  },
+  "dataform": {
+    "compiledTables": 127,
+    "compiledAssertions": 84,
+    "initialValidationActionsPassed": 206,
+    "correctedPaymentValidationActionsPassed": 71
+  },
+  "readOnlyStripeHydration": {
+    "accounts": [
+      "stripe",
+      "stripe_kajabi"
+    ],
+    "charges": 20,
+    "warehouseWrites": 0
+  },
+  "syntheticBigQueryChecks": [
+    {
+      "scenario": "duplicate backup plus older Airbyte",
+      "rowCount": 1,
+      "amount": 200,
+      "eventId": "purchase_ch_fixture"
+    },
+    {
+      "scenario": "Airbyte catches up after duplicate backup",
+      "rowCount": 1,
+      "amount": 200,
+      "eventId": "purchase_ch_fixture"
+    }
+  ],
+  "pending": [],
+  "workerVersion": "ae8b9b74-c727-4d51-94fe-215a7466effb",
+  "build": {
+    "wrangler": "4.164.0",
+    "node": "22.23.5",
+    "dryRunPassed": true
+  },
+  "liveReplay": {
+    "accounts": [
+      "stripe",
+      "stripe_kajabi"
+    ],
+    "sampleCharges": 20,
+    "eachBatchPublishedTwice": true,
+    "sourceDuplicateIds": 0
+  },
+  "automaticRuns": [
+    {
+      "id": "stripe-5983245",
+      "status": "complete"
+    },
+    {
+      "id": "stripe_kajabi-5983245",
+      "status": "complete"
+    }
+  ],
+  "productionOutputs": {
+    "checkedAt": "2026-11-18T03:48:52.599Z",
+    "outputs": [
+      {
+        "payment_source": "stripe",
+        "event_count": 8429,
+        "duplicates": 0,
+        "repeat_purchases": 0,
+        "latest_conversion": {
+          "value": "2026-11-18T03:14:38.000Z"
+        }
+      },
+      {
+        "payment_source": "stripe_kajabi",
+        "event_count": 1263,
+        "duplicates": 0,
+        "repeat_purchases": 0,
+        "latest_conversion": {
+          "value": "2026-11-18T03:25:11.000Z"
+        }
+      }
+    ],
+    "newPurchases": [
+      {
+        "payment_source": "stripe",
+        "recovered_events": 59,
+        "earliest": {
+          "value": "2026-11-17T12:19:30.000Z"
+        },
+        "latest": {
+          "value": "2026-11-18T03:14:38.000Z"
+        }
+      },
+      {
+        "payment_source": "stripe_kajabi",
+        "recovered_events": 40,
+        "earliest": {
+          "value": "2026-11-17T13:37:57.000Z"
+        },
+        "latest": {
+          "value": "2026-11-18T03:25:11.000Z"
+        }
+      }
+    ],
+    "unchanged": [
+      {
+        "shared_events": 9593,
+        "changed_values": 0,
+        "changed_currency": 0,
+        "changed_content": 0
+      }
+    ],
+    "missingPayments": []
+  }
+}
