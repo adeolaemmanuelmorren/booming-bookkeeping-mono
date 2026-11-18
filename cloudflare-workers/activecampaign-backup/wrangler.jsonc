@@ -1,0 +1,27 @@
+{
+  "name": "boom-activecampaign-backup",
+  "main": "src/index.js",
+  "account_id": "3e36d14845959c97bd8f93f25552f2eb",
+  "compatibility_date": "2026-11-18",
+  "workers_dev": false,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "WAREHOUSE_URL": "https://boom-activecampaign-backup-receiver-943586541190.us-central1.run.app",
+    "START_AT": "2026-11-16T00:00:00Z",
+    "ENABLED": "false"
+  },
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
+  "workflows": [
+    {
+      "binding": "ACTIVE_CAMPAIGN_BACKUP",
+      "name": "boom-activecampaign-backup",
+      "class_name": "ActiveCampaignBackup"
+    }
+  ]
+}

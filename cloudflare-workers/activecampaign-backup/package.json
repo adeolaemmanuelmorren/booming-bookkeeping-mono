@@ -1,0 +1,16 @@
+{
+  "name": "activecampaign-backup",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "check": "node --check src/index.js && node --check src/activecampaign.js && node --check src/runner.js",
+    "deploy": "wrangler deploy"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "devDependencies": {
+    "wrangler": "4.164.0"
+  }
+}
