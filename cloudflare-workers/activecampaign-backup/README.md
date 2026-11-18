@@ -41,6 +41,10 @@ Recovery completed 12 windows through November 18 at 23:35:12 UTC, covering 7,09
 
 The final source graph passed all 223 shadow actions and 90 assertions. The focused registration-ID change passed all six dependent actions. Recovery added exactly 1,050 events after the Airbyte cutoff: 1,037 KRC and 13 webinar registrations. Three older assignments were removed in AC. One existing registration changed email but retained its published ID, preventing an extra conversion. Shared purchase IDs retained their values, currencies and product classifications; four older purchases aged out of the existing 90-day window.
 
+Production commit `a991f869e5b3286a2256a30aa6ce64ee811b907e` passed all 224 actions and 90 assertions at 23:54:58 UTC on November 18. A second ordinary validation rebuild preserved all 1,014,674 registration IDs exactly. Automatic Workflow instances at 23:50 and 23:55 both completed successfully.
+
+The existing Segment Meta mappings delivered all 1,037 recovered KRC registrations and 13 webinar registrations successfully, with zero delivery failures. No Segment sync state was reset. The Google mappings reported partial delivery failures; similar failures were present before the Airbyte interruption. Segment's sync-detail API returned empty error/errorCode fields for these rejected rows. Its [Delivery Overview API does not support Reverse ETL](https://docs.segmentapis.com/tag/Delivery-Overview/), so those rejection reasons were not available through that API. Do not reset a mapping or resend all accepted conversions to investigate these failures.
+
 ## Verification and rollback
 
 Before rollout, compare an isolated build with a saved registration baseline. Check unique IDs, unchanged conversion identities for shared events, new registrations after the Airbyte cutoff, tag removals, and source retry deduplication. Check all Dataform assertions and the next scheduled Workflow completion. Read Segment sync receipts after publication; warehouse presence alone does not prove destination acceptance.
